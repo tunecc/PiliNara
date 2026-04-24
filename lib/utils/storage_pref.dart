@@ -29,6 +29,7 @@ import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/user/info.dart';
 import 'package:PiliPlus/plugin/pl_player/models/audio_output_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
+import 'package:PiliPlus/plugin/pl_player/models/double_tap_seek_layout.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/hwdec_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
@@ -255,10 +256,8 @@ abstract final class Pref {
     }
     return SegmentType.values
         .map(
-          (item) => Pair(
-            first: item,
-            second: SkipType.values[list[item.index]],
-          ),
+          (item) =>
+              Pair(first: item, second: SkipType.values[list[item.index]]),
         )
         .toList();
   }
@@ -268,13 +267,11 @@ abstract final class Pref {
     if (list == null || list.length != SegmentType.values.length) {
       return SegmentType.values.map((i) => i.color).toList();
     }
-    return SegmentType.values.map(
-      (item) {
-        final String e = list[item.index];
-        final color = e.isNotEmpty ? int.tryParse('FF$e', radix: 16) : null;
-        return color != null ? Color(color) : item.color;
-      },
-    ).toList();
+    return SegmentType.values.map((item) {
+      final String e = list[item.index];
+      final color = e.isNotEmpty ? int.tryParse('FF$e', radix: 16) : null;
+      return color != null ? Color(color) : item.color;
+    }).toList();
   }
 
   static bool get feedBackEnable =>
@@ -808,6 +805,41 @@ abstract final class Pref {
   static int get fastForBackwardDuration =>
       _setting.get(SettingBoxKey.fastForBackwardDuration, defaultValue: 10);
 
+  static int get doubleTapBackwardDuration => _setting.get(
+    SettingBoxKey.doubleTapBackwardDuration,
+    defaultValue: fastForBackwardDuration,
+  );
+
+  static int get doubleTapForwardDuration => _setting.get(
+    SettingBoxKey.doubleTapForwardDuration,
+    defaultValue: fastForBackwardDuration,
+  );
+
+  static int get doubleTapBackwardZoneRaw => _setting.get(
+    SettingBoxKey.doubleTapBackwardZone,
+    defaultValue: DoubleTapSeekLayout.defaultBackwardPercent,
+  );
+
+  static int get doubleTapForwardZoneRaw => _setting.get(
+    SettingBoxKey.doubleTapForwardZone,
+    defaultValue: DoubleTapSeekLayout.defaultForwardPercent,
+  );
+
+  static int get doubleTapBackwardZone =>
+      DoubleTapSeekLayout.clampBackwardPercent(
+        doubleTapBackwardZoneRaw,
+        forwardPercent: doubleTapForwardZoneRaw,
+      );
+
+  static int get doubleTapForwardZone =>
+      DoubleTapSeekLayout.clampForwardPercent(
+        doubleTapForwardZoneRaw,
+        backwardPercent: doubleTapBackwardZone,
+      );
+
+  static bool get enableTwoFingerTapPause =>
+      _setting.get(SettingBoxKey.enableTwoFingerTapPause, defaultValue: false);
+
   static bool get recordSearchHistory =>
       _setting.get(SettingBoxKey.recordSearchHistory, defaultValue: true);
 
@@ -937,15 +969,11 @@ abstract final class Pref {
     defaultValue: true,
   );
 
-  static bool get applyFilterToHotVideos => _setting.get(
-    SettingBoxKey.applyFilterToHotVideos,
-    defaultValue: false,
-  );
+  static bool get applyFilterToHotVideos =>
+      _setting.get(SettingBoxKey.applyFilterToHotVideos, defaultValue: false);
 
-  static bool get applyFilterToRankVideos => _setting.get(
-    SettingBoxKey.applyFilterToRankVideos,
-    defaultValue: false,
-  );
+  static bool get applyFilterToRankVideos =>
+      _setting.get(SettingBoxKey.applyFilterToRankVideos, defaultValue: false);
 
   static bool get enableBackgroundPlay =>
       _setting.get(SettingBoxKey.enableBackgroundPlay, defaultValue: true);
@@ -1006,10 +1034,8 @@ abstract final class Pref {
     defaultValue: false,
   );
 
-  static bool get dynamicsShowSelfUp => _setting.get(
-    SettingBoxKey.dynamicsShowSelfUp,
-    defaultValue: true,
-  );
+  static bool get dynamicsShowSelfUp =>
+      _setting.get(SettingBoxKey.dynamicsShowSelfUp, defaultValue: true);
 
   static bool get enableShowDanmaku =>
       _setting.get(SettingBoxKey.enableShowDanmaku, defaultValue: true);

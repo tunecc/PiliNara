@@ -21,6 +21,7 @@ import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/pages/sponsor_block/block_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
+import 'package:PiliPlus/plugin/pl_player/models/double_tap_seek_layout.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/duration.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
@@ -373,8 +374,14 @@ class PlPlayerController with BlockConfigMixin {
   late final enableSlideVolumeBrightness = Pref.enableSlideVolumeBrightness;
   late final enableSlideFS = Pref.enableSlideFS;
   late final enableDragSubtitle = Pref.enableDragSubtitle;
-  late final fastForBackwardDuration = Duration(
-    seconds: Pref.fastForBackwardDuration,
+  Duration get fastBackwardDuration =>
+      Duration(seconds: Pref.doubleTapBackwardDuration);
+  Duration get fastForwardDuration =>
+      Duration(seconds: Pref.doubleTapForwardDuration);
+  bool get enableTwoFingerTapPause => Pref.enableTwoFingerTapPause;
+  DoubleTapSeekLayout get doubleTapSeekLayout => DoubleTapSeekLayout.normalize(
+    backwardPercent: Pref.doubleTapBackwardZone,
+    forwardPercent: Pref.doubleTapForwardZone,
   );
 
   late final horizontalSeasonPanel = Pref.horizontalSeasonPanel;
@@ -676,9 +683,7 @@ class PlPlayerController with BlockConfigMixin {
         : SuperResolutionType.disable;
     superResolutionType.value = defaultSuperResolutionType;
     if (_videoPlayerController != null) {
-      unawaited(
-        setShader(defaultSuperResolutionType, _videoPlayerController!),
-      );
+      unawaited(setShader(defaultSuperResolutionType, _videoPlayerController!));
     }
   }
 
@@ -858,9 +863,7 @@ class PlPlayerController with BlockConfigMixin {
 
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);
-    final opt = {
-      'video-sync': Pref.videoSync,
-    };
+    final opt = {'video-sync': Pref.videoSync};
     if (Platform.isAndroid) {
       opt['volume-max'] = '100';
       opt['ao'] = Pref.audioOutput;
@@ -893,10 +896,7 @@ class PlPlayerController with BlockConfigMixin {
       ),
     );
 
-    player.setMediaHeader(
-      userAgent: BrowserUa.pc,
-      referer: HttpString.baseUrl,
-    );
+    player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
     // await player.setAudioTrack(.auto());
 
     _startListeners(player);
@@ -952,14 +952,10 @@ class PlPlayerController with BlockConfigMixin {
           audioNormalization = audioNormalization.replaceFirstMapped(
             loudnormRegExp,
             (i) =>
-                'loudnorm=${volume.format(
-                  Map.fromEntries(
-                    i.group(1)!.split(':').map((item) {
-                      final parts = item.split('=');
-                      return MapEntry(parts[0].toLowerCase(), num.parse(parts[1]));
-                    }),
-                  ),
-                )}',
+                'loudnorm=${volume.format(Map.fromEntries(i.group(1)!.split(':').map((item) {
+                  final parts = item.split('=');
+                  return MapEntry(parts[0].toLowerCase(), num.parse(parts[1]));
+                })))}',
           );
         } else {
           audioNormalization = audioNormalization.replaceFirst(
@@ -974,11 +970,7 @@ class PlPlayerController with BlockConfigMixin {
     }
 
     await player.open(
-      Media(
-        video,
-        start: seekTo,
-        extras: extras.isEmpty ? null : extras,
-      ),
+      Media(video, start: seekTo, extras: extras.isEmpty ? null : extras),
       play: false,
     );
   }
