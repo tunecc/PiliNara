@@ -17,7 +17,6 @@ import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:PiliPlus/models_new/video/video_shot/data.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
-import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/pages/sponsor_block/block_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
@@ -61,6 +60,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:path/path.dart' as path;
+import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -114,6 +114,13 @@ class PlPlayerController with BlockConfigMixin {
     PlatformUtils.isDesktop ? Pref.desktopVolume : 1.0,
   );
   final setSystemBrightness = Pref.setSystemBrightness;
+
+  /// 系统音量（仅在应用内音量模式下用于追踪当前系统音量）
+  final RxDouble systemVolume = RxDouble(1.0);
+
+  /// duck 相关状态
+  bool _isDucked = false;
+  double _preDuckVolume = 1.0;
 
   /// 亮度控制条
   final RxDouble brightness = (-1.0).obs;
@@ -281,20 +288,16 @@ class PlPlayerController with BlockConfigMixin {
 
   late bool _shouldSetPip = false;
 
-  bool get _isCurrVideoPage {
+  static bool get _isCurrVideoPage {
     final routing = Get.routing;
     if (routing.route is! GetPageRoute) {
       return false;
     }
-    final currentRoute = routing.current;
-    return currentRoute.startsWith('/video') ||
-        currentRoute.startsWith('/liveRoom');
+    return _isVideoPage(routing.current);
   }
 
-  bool get _isPreviousVideoPage {
-    final previousRoute = Get.previousRoute;
-    return previousRoute.startsWith('/video') ||
-        previousRoute.startsWith('/liveRoom');
+  static bool _isVideoPage(String routeName) {
+    return routeName == '/videoV' || routeName == '/liveRoom';
   }
 
   bool get _isInInAppPip {
@@ -313,12 +316,12 @@ class PlPlayerController with BlockConfigMixin {
     }
   }
 
-  void _disableAutoEnterPipIfNeeded() {
-    // 对齐上游逻辑，如果是从视频页返回到非视频页，则切断 Auto-Enter PiP
-    if (!_isPreviousVideoPage) {
-      _disableAutoEnterPip();
-    }
-  }
+  // void _disableAutoEnterPipIfNeeded() {
+  //   // 对齐上游逻辑，如果是从视频页返回到非视频页，则切断 Auto-Enter PiP
+  //   if (!_isPreviousVideoPage) {
+  //     _disableAutoEnterPip();
+  //   }
+  // }
 
   void disableAutoEnterPip() => _disableAutoEnterPip();
 
@@ -326,14 +329,6 @@ class PlPlayerController with BlockConfigMixin {
     if (_shouldSetPip) {
       Utils.channel.invokeMethod('setPipAutoEnterEnabled', {
         'autoEnable': false,
-      });
-    }
-  }
-
-  void _enableAutoEnterPip() {
-    if (_shouldSetPip && autoPiP && _isCurrVideoPage) {
-      Utils.channel.invokeMethod('setPipAutoEnterEnabled', {
-        'autoEnable': true,
       });
     }
   }
@@ -537,8 +532,11 @@ class PlPlayerController with BlockConfigMixin {
     return _instance?.volume.value;
   }
 
-  static Future<void>? setVolumeIfExists(double volumeNew) {
-    return _instance?.setVolume(volumeNew);
+  static Future<void>? setVolumeIfExists(
+    double volumeNew, {
+    bool showIndicator = true,
+  }) {
+    return _instance?.setVolume(volumeNew, showIndicator: showIndicator);
   }
 
   Box video = GStorage.video;
@@ -555,8 +553,9 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void _onOrientationChanged(OrientationParams param) {
+    _orientation = param.orientation;
     if (!visible) return;
-    final orientation = _orientation = param.orientation;
+    final orientation = param.orientation;
     final isFullScreen = this.isFullScreen.value;
     if (checkIsAutoRotate &&
         param.isAutoRotate != true &&
@@ -692,6 +691,12 @@ class PlPlayerController with BlockConfigMixin {
 
   // offline
   bool get isFileSource => dataSource is FileSource;
+
+  late final _audioNormalization = Pref.audioNormalization;
+  late final enableAudioNormalization =
+      Platform.isAndroid && _audioNormalization != '0';
+  late final String _audioNormalizationParam =
+      AudioNormalization.getParamFromConfig(_audioNormalization);
 
   // 初始化资源
   Future<void> setDataSource(
@@ -869,6 +874,13 @@ class PlPlayerController with BlockConfigMixin {
       opt['ao'] = Pref.audioOutput;
     } else if (PlatformUtils.isDesktop) {
       opt['volume'] = (volume.value * 100).toString();
+    } else if (PlatformUtils.isMobile && Pref.enableAppVolume) {
+      // 移动平台应用内音量模式：初始化系统音量
+      systemVolume.value = (await FlutterVolumeController.getVolume()) ?? 1.0;
+      // 从持久化存储读取应用内音量
+      volume.value = Pref.appVolume;
+      // 使用 media_kit 设置初始音量
+      opt['volume'] = (volume.value * 100).toString();
     }
     final autosync = Pref.autosync;
     if (autosync != '0') {
@@ -944,12 +956,10 @@ class PlPlayerController with BlockConfigMixin {
         extras['audio-files'] =
             '"${Platform.isWindows ? audio.replaceAll(';', r'\;') : audio.replaceAll(':', r'\:')}"';
       }
-      if (kDebugMode || Platform.isAndroid) {
-        String audioNormalization = AudioNormalization.getParamFromConfig(
-          Pref.audioNormalization,
-        );
+      if (enableAudioNormalization) {
+        final String audioNormalization;
         if (volume != null && volume.isNotEmpty) {
-          audioNormalization = audioNormalization.replaceFirstMapped(
+          audioNormalization = _audioNormalizationParam.replaceFirstMapped(
             loudnormRegExp,
             (i) =>
                 'loudnorm=${volume.format(Map.fromEntries(i.group(1)!.split(':').map((item) {
@@ -958,7 +968,7 @@ class PlPlayerController with BlockConfigMixin {
                 })))}',
           );
         } else {
-          audioNormalization = audioNormalization.replaceFirst(
+          audioNormalization = _audioNormalizationParam.replaceFirst(
             loudnormRegExp,
             AudioNormalization.getParamFromConfig(Pref.fallbackNormalization),
           );
@@ -1343,22 +1353,52 @@ class PlPlayerController with BlockConfigMixin {
   Timer? volumeTimer;
   bool volumeInterceptEventStream = false;
 
-  static final double maxVolume = PlatformUtils.isDesktop ? 2.0 : 1.0;
-  Future<void> setVolume(double volume) async {
+  static double get maxVolume => PlatformUtils.isDesktop
+      ? 2.0
+      : (Pref.enableAppVolume && Pref.enableVolumeBoost ? 2.0 : 1.0);
+
+  // 音量增强二次确认：是否已解锁突破 100%（松手后重置）
+  bool volumeBoostUnlocked = false;
+
+  // 手势滑动时的音量上限：未解锁时最大 1.0，解锁后最大 2.0
+  double get gestureVolumeMax {
+    if (Pref.enableAppVolume && Pref.enableVolumeBoost) {
+      return volumeBoostUnlocked ? 2.0 : 1.0;
+    }
+    return maxVolume;
+  }
+
+  // 松手时重置解锁状态
+  void onVolumeGestureEnd() {
+    if (Pref.enableAppVolume && Pref.enableVolumeBoost) {
+      volumeBoostUnlocked = false;
+    }
+  }
+
+  Future<void> setVolume(double volume, {bool showIndicator = true}) async {
     if (this.volume.value != volume) {
       this.volume.value = volume;
       try {
         if (PlatformUtils.isDesktop) {
           _videoPlayerController!.setVolume(volume * 100);
         } else {
-          FlutterVolumeController.updateShowSystemUI(false);
-          await FlutterVolumeController.setVolume(volume);
+          // 移动平台：根据设置选择音量控制方式
+          if (Pref.enableAppVolume) {
+            // 应用内音量模式：使用 media_kit 控制应用内音量
+            _videoPlayerController?.setVolume(volume * 100);
+          } else {
+            // 默认模式：控制系统音量
+            FlutterVolumeController.updateShowSystemUI(false);
+            await FlutterVolumeController.setVolume(volume);
+          }
         }
       } catch (err) {
         if (kDebugMode) debugPrint(err.toString());
       }
     }
-    volumeIndicator.value = true;
+    if (showIndicator) {
+      volumeIndicator.value = true;
+    }
     volumeInterceptEventStream = true;
     volumeTimer?.cancel();
     volumeTimer = Timer(const Duration(milliseconds: 200), () {
@@ -1366,8 +1406,76 @@ class PlPlayerController with BlockConfigMixin {
       volumeInterceptEventStream = false;
       if (PlatformUtils.isDesktop) {
         setting.put(SettingBoxKey.desktopVolume, volume.toPrecision(3));
+      } else if (Pref.enableAppVolume) {
+        // 移动平台应用内音量模式：保存音量到持久化存储
+        // duck 期间不保存，避免保存临时的减半音量
+        if (!_isDucked) {
+          Pref.appVolume = volume;
+        }
       }
     });
+  }
+
+  /// 处理应用内音量设置变更
+  Future<void> onAppVolumeSettingChanged() async {
+    if (!PlatformUtils.isMobile) return;
+
+    // 如果播放器未初始化，直接返回（设置已保存，下次播放器初始化时生效）
+    if (_videoPlayerController == null) return;
+
+    if (Pref.enableAppVolume) {
+      // 切换到应用内音量模式
+      // 获取当前系统音量
+      final currentSystemVolume =
+          (await FlutterVolumeController.getVolume()) ?? 1.0;
+      systemVolume.value = currentSystemVolume;
+
+      // 应用内音量初始化为 1.0，保持实际听感音量不变
+      volume.value = 1.0;
+
+      // 设置 media_kit 音量为 1.0（实际听感 = 系统音量 × 1.0 = 系统音量）
+      _videoPlayerController?.setVolume(100);
+
+      // 显示提示
+      SmartDialog.showToast('已切换到应用内音量模式');
+    } else {
+      // 切换到同步系统音量模式
+      // 实际听感 = 系统音量 × 应用内音量
+      // 切换后应用内音量 = 1.0，要保持听感不变，需要：
+      // 新系统音量 = 旧系统音量 × 旧应用内音量
+      final currentSystemVolume =
+          (await FlutterVolumeController.getVolume()) ?? 1.0;
+      final newSystemVolume = currentSystemVolume * volume.value;
+
+      await FlutterVolumeController.updateShowSystemUI(false);
+      await FlutterVolumeController.setVolume(newSystemVolume);
+
+      // 更新状态
+      systemVolume.value = newSystemVolume;
+      volume.value = newSystemVolume;
+
+      SmartDialog.showToast('已切换到同步系统音量模式');
+    }
+  }
+
+  /// duck 事件处理（由 audio_session.dart 调用）
+  Future<void> handleDuck(bool begin) async {
+    if (!PlatformUtils.isMobile) return;
+
+    if (Pref.enableAppVolume) {
+      // 应用内音量模式：使用临时音量，不影响持久化值
+      if (begin) {
+        _isDucked = true;
+        _preDuckVolume = volume.value;
+        volume.value = volume.value * 0.5;
+        _videoPlayerController?.setVolume(volume.value * 100);
+      } else {
+        _isDucked = false;
+        volume.value = _preDuckVolume;
+        _videoPlayerController?.setVolume(volume.value * 100);
+      }
+    }
+    // 同步模式：使用原有逻辑，直接调用 setVolume 即可
   }
 
   /// Toggle Change the videofit accordingly
@@ -1504,7 +1612,7 @@ class PlPlayerController with BlockConfigMixin {
     controls = !val;
   }
 
-  void toggleFullScreen(bool val) {
+  void _setFullScreen(bool val) {
     isFullScreen.value = val;
     updateSubtitleStyle();
   }
@@ -1514,6 +1622,37 @@ class PlPlayerController with BlockConfigMixin {
   late final FullScreenMode mode = Pref.fullScreenMode;
   late final horizontalScreen = Pref.horizontalScreen;
   late final removeSafeArea = Pref.removeSafeArea;
+
+  Future<void>? changeOrientation({
+    required bool isVertical,
+    DeviceOrientation? orientation,
+  }) {
+    if (orientation == null && (mode == .none || mode == .gravity)) {
+      return null;
+    }
+    if (orientation == null &&
+        (mode == .vertical ||
+            (mode == .auto && isVertical) ||
+            (mode == .ratio && (isVertical || screenRatio < kScreenRatio)))) {
+      return portraitUpMode();
+    } else {
+      // https://github.com/flutter/flutter/issues/73651
+      // https://github.com/flutter/flutter/issues/183708
+      if (Platform.isAndroid) {
+        if ((orientation ?? _orientation) == .landscapeRight) {
+          return landscapeRightMode();
+        } else {
+          return landscapeLeftMode();
+        }
+      } else {
+        if (orientation == .landscapeLeft) {
+          return landscapeLeftMode();
+        } else {
+          return landscapeRightMode();
+        }
+      }
+    }
+  }
 
   // 全屏
   bool _fsProcessing = false;
@@ -1528,45 +1667,22 @@ class PlPlayerController with BlockConfigMixin {
 
     if (_fsProcessing) return;
     _fsProcessing = true;
-    toggleFullScreen(status);
     this.isManualFS = isManualFS;
     try {
       if (status) {
         if (PlatformUtils.isMobile) {
-          hideSystemBar();
-          if (orientation == null && mode == .none) {
-            return;
-          }
-          if (orientation == null &&
-              (mode == .vertical ||
-                  (mode == .auto && isVertical) ||
-                  (mode == .ratio &&
-                      (isVertical || screenRatio < kScreenRatio)))) {
-            await portraitUpMode();
-          } else {
-            // https://github.com/flutter/flutter/issues/73651
-            // https://github.com/flutter/flutter/issues/183708
-            if (Platform.isAndroid) {
-              if ((orientation ?? _orientation) == .landscapeRight) {
-                await landscapeRightMode();
-              } else {
-                await landscapeLeftMode();
-              }
-            } else {
-              if (orientation == .landscapeLeft) {
-                await landscapeLeftMode();
-              } else {
-                await landscapeRightMode();
-              }
-            }
-          }
+          hideStatusBar();
+          await changeOrientation(
+            isVertical: isVertical,
+            orientation: orientation,
+          );
         } else {
           await enterDesktopFullScreen(inAppFullScreen: inAppFullScreen);
         }
       } else {
         if (PlatformUtils.isMobile) {
           if (!removeSafeArea) {
-            showSystemBar();
+            showStatusBar();
           }
           if (orientation == null && mode == .none) {
             return;
@@ -1591,6 +1707,7 @@ class PlPlayerController with BlockConfigMixin {
         }
       }
     } finally {
+      _setFullScreen(status);
       _fsProcessing = false;
     }
   }
@@ -1614,7 +1731,7 @@ class PlPlayerController with BlockConfigMixin {
   // 记录播放记录
   Future<void>? makeHeartBeat(
     int progress, {
-    HeartBeatType type = HeartBeatType.playing,
+    HeartBeatType type = .playing,
     bool isManual = false,
     dynamic aid,
     dynamic bvid,
@@ -1624,22 +1741,12 @@ class PlPlayerController with BlockConfigMixin {
     dynamic pgcType,
     VideoType? videoType,
   }) {
-    if (isLive) {
+    if (isLive ||
+        !enableHeart ||
+        progress == 0 ||
+        (playerStatus.isPaused && !isManual)) {
       return null;
     }
-    if (!enableHeart || MineController.anonymity.value || progress == 0) {
-      return null;
-    } else if (playerStatus.isPaused) {
-      if (!isManual) {
-        return null;
-      }
-    }
-    bool isComplete =
-        playerStatus.isCompleted || type == HeartBeatType.completed;
-    if ((duration.value - position).inMilliseconds > 1000) {
-      isComplete = false;
-    }
-    // 播放状态变化时，更新
 
     Future<void> send() {
       return VideoHttp.heartBeat(
@@ -1655,18 +1762,21 @@ class PlPlayerController with BlockConfigMixin {
     }
 
     switch (type) {
-      case HeartBeatType.playing:
+      case .playing:
         if (progress - _heartDuration >= 5) {
           _heartDuration = progress;
           return send();
         }
-      case HeartBeatType.status:
+      case .status:
         if (progress - _heartDuration >= 2) {
           _heartDuration = progress;
           return send();
         }
-      case HeartBeatType.completed:
-        if (isComplete) progress = -1;
+      case .completed:
+        if (playerStatus.isCompleted &&
+            (duration.value - position).inMilliseconds <= 1000) {
+          progress = -1;
+        }
         return send();
     }
     return null;
@@ -1714,15 +1824,12 @@ class PlPlayerController with BlockConfigMixin {
     if (!_isCloseAll && _playerCount > 1) {
       _playerCount -= 1;
       _heartDuration = 0;
-      if (!_isPreviousVideoPage) {
-        pause();
-      }
       return;
     }
 
     _playerCount = 0;
     if (removeSafeArea) {
-      showSystemBar();
+      showStatusBar();
     }
     danmakuController = null;
     _stopOrientationListener();
@@ -1874,13 +1981,24 @@ class PlPlayerController with BlockConfigMixin {
     });
   }
 
-  void onPopInvokedWithResult(bool didPop, Object? result) {
+  void onPopInvokedWithResult(bool didPop, Object? result, {bool pauseOnPop = true}) {
     if (didPop) {
-      if (Platform.isAndroid) {
-        _disableAutoEnterPipIfNeeded();
+      if (pauseOnPop && playerStatus.isPlaying) {
+        pause();
       }
+
+      setPlayCallBack(null);
+
+      if (Platform.isAndroid && _playerCount <= 1) {
+        _disableAutoEnterPip();
+        if (!setSystemBrightness) {
+          ScreenBrightnessPlatform.instance.resetApplicationScreenBrightness();
+        }
+      }
+
       return;
     }
+
     if (controlsLock.value) {
       onLockControl(false);
       return;

@@ -63,6 +63,7 @@ import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:collection/collection.dart';
@@ -247,24 +248,41 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     if (PlatformUtils.isMobile) {
       Future.microtask(() async {
         try {
-          FlutterVolumeController.updateShowSystemUI(true);
-          plPlayerController.volume.value =
-              (await FlutterVolumeController.getVolume())!;
-          FlutterVolumeController.addListener((double value) {
-            if (mounted && !plPlayerController.volumeInterceptEventStream) {
-              plPlayerController.volume.value = value;
-              if (Platform.isIOS && !FlutterVolumeController.showSystemUI) {
-                plPlayerController
-                  ..volumeIndicator.value = true
-                  ..volumeTimer?.cancel()
-                  ..volumeTimer = Timer(const Duration(milliseconds: 800), () {
-                    if (mounted) {
-                      plPlayerController.volumeIndicator.value = false;
-                    }
-                  });
+          if (Pref.enableAppVolume) {
+            // 应用内音量模式：显示系统原生 HUD，不显示应用内指示器
+            FlutterVolumeController.updateShowSystemUI(true);
+            // 只保存系统音量，不改变播放器音量和显示指示器
+            plPlayerController.systemVolume.value =
+                (await FlutterVolumeController.getVolume())!;
+            FlutterVolumeController.addListener((double value) {
+              if (mounted && !plPlayerController.volumeInterceptEventStream) {
+                // 只更新系统音量记录，不影响播放器音量和指示器显示
+                plPlayerController.systemVolume.value = value;
+                // 注意：这里不更新 volume.value 和 volumeIndicator
               }
-            }
-          }, emitOnStart: false);
+            }, emitOnStart: false);
+          } else {
+            // 同步模式：隐藏系统原生 HUD，显示应用内指示器
+            FlutterVolumeController.updateShowSystemUI(false);
+            // 同步系统音量
+            plPlayerController.volume.value =
+                (await FlutterVolumeController.getVolume())!;
+            FlutterVolumeController.addListener((double value) {
+              if (mounted && !plPlayerController.volumeInterceptEventStream) {
+                plPlayerController.volume.value = value;
+                if (Platform.isIOS && !FlutterVolumeController.showSystemUI) {
+                  plPlayerController
+                    ..volumeIndicator.value = true
+                    ..volumeTimer?.cancel()
+                    ..volumeTimer = Timer(const Duration(milliseconds: 800), () {
+                      if (mounted) {
+                        plPlayerController.volumeIndicator.value = false;
+                      }
+                    });
+                }
+              }
+            }, emitOnStart: false);
+          }
         } catch (_) {}
       });
 
@@ -1112,14 +1130,25 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     } else if (_gestureType == GestureType.right) {
       // 右边区域
       final double level = _activeGestureHeight * 0.5;
-      EasyThrottle.throttle('setVolume', const Duration(milliseconds: 20), () {
-        final double volume = clampDouble(
-          plPlayerController.volume.value - delta.dy / level,
-          0.0,
-          PlPlayerController.maxVolume,
-        );
-        plPlayerController.setVolume(volume);
-      });
+      EasyThrottle.throttle(
+        'setVolume',
+        const Duration(milliseconds: 20),
+        () {
+          final double volume = clampDouble(
+            plPlayerController.volume.value - delta.dy / level,
+            0.0,
+            plPlayerController.gestureVolumeMax,
+          );
+          // 音量增强：触达 1.0 时提示再次滑动才能突破
+          if (volume >= 1.0 &&
+              !plPlayerController.volumeBoostUnlocked &&
+              Pref.enableAppVolume &&
+              Pref.enableVolumeBoost) {
+            SmartDialog.showToast('再次滑动以突破 100%');
+          }
+          plPlayerController.setVolume(volume);
+        },
+      );
     }
   }
 
@@ -1140,6 +1169,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     }
     interacting = false;
     initialFocalPoint = Offset.zero;
+    // 松手后：若音量已在 1.0，解锁下次可突破；否则重置
+    if (plPlayerController.volume.value >= 1.0) {
+      plPlayerController.volumeBoostUnlocked = true;
+    } else {
+      plPlayerController.onVolumeGestureEnd();
+    }
     _gestureType = null;
   }
 
@@ -1374,18 +1409,35 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       }
 
       final double level = _activeGestureHeight * 0.5;
-      EasyThrottle.throttle('setVolume', const Duration(milliseconds: 20), () {
-        final double volume = clampDouble(
-          plPlayerController.volume.value - event.localPanDelta.dy / level,
-          0.0,
-          PlPlayerController.maxVolume,
-        );
-        plPlayerController.setVolume(volume);
-      });
+      EasyThrottle.throttle(
+        'setVolume',
+        const Duration(milliseconds: 20),
+        () {
+          final double volume = clampDouble(
+            plPlayerController.volume.value - event.localPanDelta.dy / level,
+            0.0,
+            plPlayerController.gestureVolumeMax,
+          );
+          // 音量增强：触达 1.0 时提示再次滑动才能突破
+          if (volume >= 1.0 &&
+              !plPlayerController.volumeBoostUnlocked &&
+              Pref.enableAppVolume &&
+              Pref.enableVolumeBoost) {
+            SmartDialog.showToast('再次滑动以突破 100%');
+          }
+          plPlayerController.setVolume(volume);
+        },
+      );
     }
   }
 
   void _onPointerPanZoomEnd(PointerPanZoomEndEvent event) {
+    // 松手后：若音量已在 1.0，解锁下次可突破；否则重置
+    if (plPlayerController.volume.value >= 1.0) {
+      plPlayerController.volumeBoostUnlocked = true;
+    } else {
+      plPlayerController.onVolumeGestureEnd();
+    }
     _gestureType = null;
   }
 

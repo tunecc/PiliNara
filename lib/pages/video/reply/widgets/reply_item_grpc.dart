@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
+import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
 import 'package:PiliPlus/common/widgets/extra_hit_test_widget.dart';
 import 'package:PiliPlus/common/widgets/flutter/text/text.dart' as custom_text;
@@ -39,6 +40,7 @@ import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/url_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -1157,6 +1159,23 @@ class ReplyItemGrpc extends StatelessWidget {
               leading: Icon(Icons.error_outline, color: errorColor, size: 19),
               title: Text('举报', style: style.copyWith(color: errorColor)),
             ),
+          if (item.member.mid != Int64.ZERO)
+            ListTile(
+              onTap: () {
+                final mid = item.member.mid.toInt();
+                final rawName = item.member.name.trim();
+                final name = rawName.isEmpty ? 'UID:$mid' : rawName;
+                final mids = Map<int, String>.from(Pref.replyBlockedMids);
+                mids[mid] = name;
+                Pref.replyBlockedMids = mids;
+                ReplyGrpc.replyBlockedMids = mids;
+                Get.back();
+                SmartDialog.showToast('已屏蔽 $name');
+              },
+              minLeadingWidth: 0,
+              leading: const Icon(Icons.person_off_outlined, size: 19),
+              title: Text('屏蔽用户', style: style),
+            ),
           if (replyLevel == 1 && !isSubReply && ownerMid == upMid)
             ListTile(
               onTap: () {
@@ -1190,6 +1209,8 @@ class ReplyItemGrpc extends StatelessWidget {
                     child: SelectableText(
                       message,
                       style: const TextStyle(fontSize: 15, height: 1.7),
+                      contextMenuBuilder: (_, editableTextState) =>
+                          _filterMenuBuilder(context, editableTextState),
                     ),
                   ),
                 ),
@@ -1227,6 +1248,63 @@ class ReplyItemGrpc extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  static Widget _filterMenuBuilder(
+    BuildContext context,
+    EditableTextState editableTextState,
+  ) {
+    final items = editableTextState.contextMenuButtonItems;
+    if (!editableTextState.textEditingValue.selection.isCollapsed) {
+      items.add(
+        ContextMenuButtonItem(
+          onPressed: () {
+            Navigator.of(context).pop();
+            final select = editableTextState.textEditingValue;
+            final escapedText = RegExp.escape(
+              select.selection.textInside(select.text),
+            );
+
+            showConfirmDialog(
+              context: context,
+              title: const Text('是否确认评论过滤的变更：'),
+              content: Text.rich(
+                TextSpan(
+                  text: ReplyGrpc.replyRegExp.pattern.isEmpty
+                      ? ''
+                      : '${ReplyGrpc.replyRegExp.pattern}\n',
+                  children: [
+                    TextSpan(
+                      text: escapedText,
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontWeight: .bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              onConfirm: () {
+                final currentStored = Pref.banWordForReply;
+                final newStored = currentStored.isEmpty
+                    ? escapedText
+                    : '$currentStored\n$escapedText';
+                GStorage.setting.put(SettingBoxKey.banWordForReply, newStored);
+                final newPattern = Pref.parseBanWordToRegex(newStored);
+                ReplyGrpc.replyRegExp = RegExp(newPattern, caseSensitive: true);
+                ReplyGrpc.enableFilter = true;
+                SmartDialog.showToast('已保存');
+              },
+            );
+          },
+          label: '加入过滤',
+        ),
+      );
+    }
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      buttonItems: items,
+      anchors: editableTextState.contextMenuAnchors,
     );
   }
 }
