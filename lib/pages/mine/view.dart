@@ -8,6 +8,7 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/models_new/fav/fav_folder/list.dart';
+import 'package:PiliPlus/models_new/later/list.dart';
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/view.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
@@ -15,6 +16,7 @@ import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/pages/mine/widgets/history_card_item.dart';
 import 'package:PiliPlus/pages/mine/widgets/item.dart';
+import 'package:PiliPlus/pages/mine/widgets/later_card_item.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
@@ -85,6 +87,11 @@ class _MediaPageState extends CommonPageState<MinePage>
                   children: [
                     _buildUserInfo(theme, secondary),
                     _buildActions(secondary),
+                    Obx(
+                      () => controller.laterLoadingState.value is Loading
+                          ? const SizedBox.shrink()
+                          : _buildLater(theme, secondary),
+                    ),
                     Obx(
                       () => controller.historyLoadingState.value is Loading
                           ? const SizedBox.shrink()
@@ -452,6 +459,132 @@ class _MediaPageState extends CommonPageState<MinePage>
     () => controller.onRefresh(isManual: false),
   );
 
+  Widget _buildLater(ThemeData theme, Color secondary) {
+    return Column(
+      children: [
+        Divider(
+          height: 20,
+          color: theme.dividerColor.withValues(alpha: 0.1),
+        ),
+        ListTile(
+          onTap: () => Get.toNamed('/later')?.whenComplete(_autoRefresh),
+          dense: true,
+          title: Padding(
+            padding: const EdgeInsets.only(left: 10),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '稍后再看  ',
+                    style: TextStyle(
+                      fontSize: theme.textTheme.titleMedium!.fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (controller.laterCount != null)
+                    TextSpan(
+                      text: '${controller.laterCount}  ',
+                      style: TextStyle(
+                        fontSize: theme.textTheme.titleSmall!.fontSize,
+                        color: secondary,
+                      ),
+                    ),
+                  WidgetSpan(
+                    child: Icon(
+                      Icons.arrow_forward_ios,
+                      size: 18,
+                      color: secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          trailing: IconButton(
+            tooltip: '刷新',
+            onPressed: controller.queryLater,
+            icon: const Icon(Icons.refresh, size: 20),
+          ),
+        ),
+        _buildLaterBody(
+          theme,
+          secondary,
+          controller.laterLoadingState.value,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLaterBody(
+    ThemeData theme,
+    Color secondary,
+    LoadingState loadingState,
+  ) {
+    return switch (loadingState) {
+      Loading() => const SizedBox.shrink(),
+      Success(:final response) => Builder(
+        builder: (context) {
+          final list = response as List<LaterItemModel>?;
+          if (list == null || list.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return SizedBox(
+            height: 173,
+            child: ListView.separated(
+              padding: const EdgeInsets.only(left: 20, top: 10, right: 20),
+              itemCount: list.length + 1,
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (context, index) {
+                if (index == list.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 46),
+                    child: Center(
+                      child: IconButton(
+                        tooltip: '查看更多',
+                        style: ButtonStyle(
+                          padding: const WidgetStatePropertyAll(
+                            EdgeInsets.zero,
+                          ),
+                          backgroundColor: WidgetStatePropertyAll(
+                            theme.colorScheme.secondaryContainer.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                        ),
+                        onPressed: () =>
+                            Get.toNamed('/later')?.whenComplete(_autoRefresh),
+                        icon: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 18,
+                          color: secondary,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return LaterCardItem(
+                  item: list[index],
+                  index: index,
+                  count: controller.laterCount,
+                );
+              },
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+            ),
+          );
+        },
+      ),
+      Error(:final errMsg) => SizedBox(
+        height: 80,
+        child: Center(
+          child: Text(
+            errMsg ?? '',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    };
+  }
+
   Widget _buildHistory(ThemeData theme, Color secondary) {
     return Column(
       children: [
@@ -548,7 +681,7 @@ class _MediaPageState extends CommonPageState<MinePage>
                 }
                 return HistoryCardItem(item: list[index]);
               },
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
             ),
           );
         },

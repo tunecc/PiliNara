@@ -58,8 +58,6 @@ PODS:
     - OrderedSet (~> 6.0.3)
   - flutter_mailer (0.0.1):
     - Flutter
-  - flutter_native_splash (2.4.3):
-    - Flutter
   - flutter_volume_controller (0.0.1):
     - Flutter
   - fluttertoast (0.0.2):
@@ -122,7 +120,6 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_inappwebview_ios (from `.symlinks/plugins/flutter_inappwebview_ios/ios`)
   - flutter_mailer (from `.symlinks/plugins/flutter_mailer/ios`)
-  - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
   - flutter_volume_controller (from `.symlinks/plugins/flutter_volume_controller/ios`)
   - fluttertoast (from `.symlinks/plugins/fluttertoast/ios`)
   - gt3_flutter_plugin (from `.symlinks/plugins/gt3_flutter_plugin/ios`)
@@ -176,8 +173,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_inappwebview_ios/ios"
   flutter_mailer:
     :path: ".symlinks/plugins/flutter_mailer/ios"
-  flutter_native_splash:
-    :path: ".symlinks/plugins/flutter_native_splash/ios"
   flutter_volume_controller:
     :path: ".symlinks/plugins/flutter_volume_controller/ios"
   fluttertoast:
@@ -231,7 +226,6 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_inappwebview_ios: b89ba3482b96fb25e00c967aae065701b66e9b99
   flutter_mailer: 3a8cd4f36c960fb04528d5471097270c19fec1c4
-  flutter_native_splash: c32d145d68aeda5502d5f543ee38c192065986cf
   flutter_volume_controller: c2be490cb0487e8b88d0d9fc2b7e1c139a4ebccb
   fluttertoast: 2c67e14dce98bbdb200df9e1acf610d7a6264ea1
   gt3_flutter_plugin: 37090e5fa66ff2a52939eb9d208fc36fa49d36e5

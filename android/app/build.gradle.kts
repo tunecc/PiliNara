@@ -53,7 +53,10 @@ android {
 
     buildTypes {
         all {
-            signingConfig = config ?: signingConfigs["debug"]
+            // 允许通过 `-Punsigned=true` 生成未签名 release 包，默认行为保持不变。
+            if (!project.hasProperty("unsigned")) {
+                signingConfig = config ?: signingConfigs["debug"]
+            }
         }
         release {
             if (project.hasProperty("dev")) {
