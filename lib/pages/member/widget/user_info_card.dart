@@ -24,6 +24,8 @@ import 'package:PiliPlus/pages/member_guard/view.dart';
 import 'package:PiliPlus/pages/member_upower_rank/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
+import 'package:PiliPlus/utils/bili_utils.dart';
+import 'package:PiliPlus/utils/color_utils.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
@@ -47,6 +49,8 @@ class UserInfoCard extends StatelessWidget {
     required this.images,
     required this.relation,
     required this.onFollow,
+    required this.remark,
+    required this.onEditRemark,
     this.live,
     this.silence,
     required this.headerControllerBuilder,
@@ -59,6 +63,8 @@ class UserInfoCard extends StatelessWidget {
 
   final bool isOwner;
   final int relation;
+  final String remark;
+  final VoidCallback onEditRemark;
   final SpaceCard card;
   final SpaceImages images;
   final VoidCallback onFollow;
@@ -151,6 +157,7 @@ class UserInfoCard extends StatelessWidget {
       if (card.officialVerify?.desc?.isNotEmpty ?? false)
         _buildVerify(colorScheme),
       if (card.sign?.isNotEmpty ?? false) _buildSign(),
+      _buildRemarkRow(colorScheme),
       ?_buildChargeAndGuard(colorScheme, isPortrait),
       if (card.followingsFollowedUpper?.items?.isNotEmpty ?? false)
         _buildFollowedUp(colorScheme, card.followingsFollowedUpper!),
@@ -165,8 +172,8 @@ class UserInfoCard extends StatelessWidget {
       Color? nameColor;
       Color? backgroundColor;
       try {
-        nameColor = Utils.parseColor(detailV2.medalColorName!);
-        backgroundColor = Utils.parseColor(detailV2.medalColor!);
+        nameColor = ColourUtils.parseColor(detailV2.medalColorName!);
+        backgroundColor = ColourUtils.parseColor(detailV2.medalColor!);
       } catch (e, s) {
         if (kDebugMode) {
           Utils.reportError(e, s);
@@ -216,7 +223,7 @@ class UserInfoCard extends StatelessWidget {
             ),
           ),
           Image.asset(
-            Utils.levelName(
+            BiliUtils.levelName(
               card.levelInfo!.currentLevel!,
               isSeniorMember: card.levelInfo?.identity == 2,
             ),
@@ -311,6 +318,24 @@ class UserInfoCard extends StatelessWidget {
       child: SelectableText(
         card.sign!.trim().replaceAll(RegExp(r'\n{2,}'), '\n'),
         style: const TextStyle(fontSize: 14),
+      ),
+    );
+  }
+
+  Widget _buildRemarkRow(ColorScheme colorScheme) {
+    return GestureDetector(
+      onTap: onEditRemark,
+      child: Padding(
+        padding: const .only(left: 20, top: 6, right: 20),
+        child: remark.isNotEmpty
+            ? Text(
+                '备注：$remark',
+                style: TextStyle(fontSize: 13, color: colorScheme.primary),
+              )
+            : Text(
+                '添加备注',
+                style: TextStyle(fontSize: 13, color: colorScheme.outline),
+              ),
       ),
     );
   }
@@ -714,7 +739,7 @@ class UserInfoCard extends StatelessWidget {
     bool isLight,
     SpacePrInfo prInfo,
   ) {
-    final textColor = Utils.parseColor(
+    final textColor = ColourUtils.parseColor(
       isLight ? prInfo.textColor : prInfo.textColorNight,
     );
     String? icon = !isLight && prInfo.iconNight?.isNotEmpty == true
@@ -726,7 +751,9 @@ class UserInfoCard extends StatelessWidget {
     Widget child = Container(
       margin: const .only(top: 8),
       padding: const .symmetric(horizontal: 16, vertical: 10),
-      color: Utils.parseColor(isLight ? prInfo.bgColor : prInfo.bgColorNight),
+      color: ColourUtils.parseColor(
+        isLight ? prInfo.bgColor : prInfo.bgColorNight,
+      ),
       child: Row(
         children: [
           if (icon != null) ...[
@@ -1055,7 +1082,7 @@ class _HeaderTitleState extends State<HeaderTitle> {
                 fontSize: 12,
                 fontFamily: Assets.digitalNum,
                 color: title.subTitleColorFormat?.colors?.isNotEmpty == true
-                    ? Utils.parseMedalColor(
+                    ? ColourUtils.parseMedalColor(
                         title.subTitleColorFormat!.colors!.last,
                       )
                     : Colors.white,

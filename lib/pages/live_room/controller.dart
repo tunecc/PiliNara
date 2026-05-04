@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
@@ -28,6 +29,7 @@ import 'package:PiliPlus/services/live_pip_overlay_service.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/tcp/live.dart';
 import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/connectivity_utils.dart';
 import 'package:PiliPlus/utils/danmaku_utils.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
@@ -35,6 +37,7 @@ import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
@@ -105,7 +108,9 @@ class LiveRoomController extends GetxController {
   // dm
   LiveDmInfoData? dmInfo;
   List<RichTextItem>? savedDanmaku;
+  int builtLength = 0;
   RxList<dynamic> messages = <dynamic>[].obs;
+  bool get shouldRefresh => builtLength != messages.length;
   late final Rx<SuperChatItem?> fsSC = Rx<SuperChatItem?>(null);
   late final RxList<SuperChatItem> superChatMsg = <SuperChatItem>[].obs;
   RxBool disableAutoScroll = false.obs;
@@ -227,7 +232,7 @@ class LiveRoomController extends GetxController {
   }
 
   Future<void> queryLiveUrl({bool autoFullScreenFlag = false}) async {
-    currentQn ??= await Utils.isWiFi
+    currentQn ??= await ConnectivityUtils.isWiFi
         ? Pref.liveQuality
         : Pref.liveQualityCellular;
     final res = await LiveHttp.liveRoomInfo(
@@ -297,7 +302,7 @@ class LiveRoomController extends GetxController {
             onPressed: Get.back,
             child: Text(
               '关闭',
-              style: TextStyle(color: Get.theme.colorScheme.outline),
+              style: TextStyle(color: ThemeUtils.theme.colorScheme.outline),
             ),
           ),
           TextButton(
@@ -317,6 +322,7 @@ class LiveRoomController extends GetxController {
   }
 
   void scrollToBottom([_]) {
+    if (!scrollController.hasClients) return;
     EasyThrottle.throttle(
       'liveDm',
       const Duration(milliseconds: 500),
@@ -336,7 +342,17 @@ class LiveRoomController extends GetxController {
     }
   }
 
-  void jumpToBottom() {
+  void handleJumpToBottom() {
+    disableAutoScroll.value = false;
+    if (shouldRefresh) {
+      messages.refresh();
+      WidgetsBinding.instance.addPostFrameCallback(_jumpToBottom);
+    } else {
+      _jumpToBottom();
+    }
+  }
+
+  void _jumpToBottom([_]) {
     if (scrollController.hasClients) {
       scrollController.jumpTo(scrollController.position.maxScrollExtent);
     }
@@ -400,9 +416,18 @@ class LiveRoomController extends GetxController {
       disableAutoScroll.value = true;
     } else if (userScrollDirection == .reverse) {
       final pos = scrollController.position;
-      if (pos.maxScrollExtent - pos.pixels <= 100) {
+      if (pos.maxScrollExtent - pos.pixels <= 100 && disableAutoScroll.value) {
         disableAutoScroll.value = false;
+        refreshMsgIfNeeded();
       }
+    }
+  }
+
+  void refreshMsgIfNeeded() {
+    if (shouldRefresh) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        messages.refresh();
+      });
     }
   }
 
@@ -536,9 +561,13 @@ class LiveRoomController extends GetxController {
         case 'SUPER_CHAT_MESSAGE' when showSuperChat:
           final item = SuperChatItem.fromJson(obj['data']);
           superChatMsg.insert(0, item);
-          if (isFullScreen || plPlayerController.isDesktopPip) {
+          if (plPlayerController.showDanmaku &&
+              (isFullScreen || plPlayerController.isDesktopPip)) {
             fsSC.value = item.copyWith(
-              endTime: DateTime.now().millisecondsSinceEpoch ~/ 1000 + 10,
+              endTime: math.min(
+                item.endTime,
+                DateTime.now().millisecondsSinceEpoch ~/ 1000 + 10,
+              ),
             );
           }
           addDm(item);

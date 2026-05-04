@@ -34,6 +34,7 @@ import 'package:PiliPlus/services/pip_overlay_service.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/asset_utils.dart';
+import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/box_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
@@ -44,6 +45,7 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:archive/archive.dart' show getCrc32;
 import 'package:canvas_danmaku/canvas_danmaku.dart';
@@ -611,7 +613,7 @@ class PlPlayerController with BlockConfigMixin {
 
     if (Platform.isAndroid && autoPiP) {
       // 1. 直接同步获取 sdkInt，去掉 .then 嵌套
-      final sdkInt = Utils.sdkInt;
+      final sdkInt = DeviceUtils.sdkInt;
 
       // 2. 立即注册监听，不再等待异步回调
       Utils.channel.setMethodCallHandler((call) async {
@@ -874,12 +876,13 @@ class PlPlayerController with BlockConfigMixin {
       opt['ao'] = Pref.audioOutput;
     } else if (PlatformUtils.isDesktop) {
       opt['volume'] = (volume.value * 100).toString();
-    } else if (PlatformUtils.isMobile && Pref.enableAppVolume) {
+    }
+    if (PlatformUtils.isMobile && Pref.enableAppVolume) {
       // 移动平台应用内音量模式：初始化系统音量
       systemVolume.value = (await FlutterVolumeController.getVolume()) ?? 1.0;
       // 从持久化存储读取应用内音量
       volume.value = Pref.appVolume;
-      // 使用 media_kit 设置初始音量
+      // 使用 media_kit 设置初始音量（Android 上覆盖默认值）
       opt['volume'] = (volume.value * 100).toString();
     }
     final autosync = Pref.autosync;
@@ -1073,10 +1076,10 @@ class PlPlayerController with BlockConfigMixin {
           for (final element in _statusListeners) {
             element(PlayerStatus.completed);
           }
+          makeHeartBeat(positionSeconds.value, type: HeartBeatType.completed);
         } else {
           // playerStatus.value = PlayerStatus.playing;
         }
-        makeHeartBeat(positionSeconds.value, type: HeartBeatType.completed);
       }),
       stream.position.listen((event) {
         position = event;
@@ -1671,7 +1674,7 @@ class PlPlayerController with BlockConfigMixin {
     try {
       if (status) {
         if (PlatformUtils.isMobile) {
-          hideStatusBar();
+          hideSystemBar();
           await changeOrientation(
             isVertical: isVertical,
             orientation: orientation,
@@ -1682,26 +1685,12 @@ class PlPlayerController with BlockConfigMixin {
       } else {
         if (PlatformUtils.isMobile) {
           if (!removeSafeArea) {
-            showStatusBar();
+            showSystemBar();
           }
           if (orientation == null && mode == .none) {
             return;
           }
-          if (!horizontalScreen) {
-            await portraitUpMode();
-          } else {
-            switch (_orientation) {
-              case .portraitUp:
-                await portraitUpMode();
-              case .landscapeLeft:
-                await landscapeLeftMode();
-              case .portraitDown:
-                await portraitDownMode();
-              case .landscapeRight:
-                await landscapeRightMode();
-              case _:
-            }
-          }
+          await resetScreenRotation();
         } else {
           await exitDesktopFullScreen();
         }
@@ -1802,11 +1791,11 @@ class PlPlayerController with BlockConfigMixin {
   bool _isCloseAll = false;
   bool get isCloseAll => _isCloseAll;
 
-  void resetScreenRotation() {
+  Future<void>? resetScreenRotation() {
     if (horizontalScreen) {
-      fullMode();
+      return fullMode();
     } else {
-      portraitUpMode();
+      return portraitUpMode();
     }
   }
 
@@ -1818,7 +1807,9 @@ class PlPlayerController with BlockConfigMixin {
 
   void dispose() {
     // 每次减1，最后销毁
-    resetScreenRotation();
+    if (isFullScreen.value) {
+      resetScreenRotation();
+    }
     cancelLongPressTimer();
     _cancelSubForSeek();
     if (!_isCloseAll && _playerCount > 1) {
@@ -1829,7 +1820,7 @@ class PlPlayerController with BlockConfigMixin {
 
     _playerCount = 0;
     if (removeSafeArea) {
-      showStatusBar();
+      showSystemBar();
     }
     danmakuController = null;
     _stopOrientationListener();
@@ -1956,13 +1947,13 @@ class PlPlayerController with BlockConfigMixin {
                 padding: const EdgeInsets.only(right: 12),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxWidth: min(Get.width / 3, 350),
+                    maxWidth: min(DeviceUtils.size.width / 3, 350),
                   ),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       border: Border.all(
                         width: 5,
-                        color: Get.theme.colorScheme.surface,
+                        color: ThemeUtils.theme.colorScheme.surface,
                       ),
                     ),
                     child: Padding(
@@ -1981,7 +1972,11 @@ class PlPlayerController with BlockConfigMixin {
     });
   }
 
-  void onPopInvokedWithResult(bool didPop, Object? result, {bool pauseOnPop = true}) {
+  void onPopInvokedWithResult(
+    bool didPop,
+    Object? result, {
+    bool pauseOnPop = true,
+  }) {
     if (didPop) {
       if (pauseOnPop && playerStatus.isPlaying) {
         pause();
