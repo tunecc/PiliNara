@@ -54,10 +54,11 @@ jobs:
       - name: Build iOS
         run: |
           flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json
-          ln -sf ./build/ios/iphoneos Payload
-          # make AltSign happy...
-          find Payload/Runner.app/Frameworks -type d -name "*.framework" -exec codesign --force --sign - --preserve-metadata=identifier,entitlements {} \;
-          zip -r9 PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa Payload/runner.app
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa
+          cp PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.tipa
 
       - name: Release
         if: ${{ inputs.tag != '' }}
@@ -67,10 +68,13 @@ jobs:
           name: ${{ inputs.tag }}
           files: |
             PiliNara_ios_*${{ inputs.file_suffix }}.ipa
+            PiliNara_ios_*${{ inputs.file_suffix }}.tipa
 
       - name: Upload ios release
         uses: actions/upload-artifact@v7
         with:
           archive: false
           name: ${{ inputs.artifact_name }}
-          path: PiliNara_ios_*${{ inputs.file_suffix }}.ipa
+          path: |
+            PiliNara_ios_*${{ inputs.file_suffix }}.ipa
+            PiliNara_ios_*${{ inputs.file_suffix }}.tipa
