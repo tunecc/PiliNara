@@ -209,7 +209,7 @@ jobs:
 
       - name: Download Android artifacts
         if: ${{ needs.android.result == 'success' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: Android_*
           path: release-assets/
@@ -217,7 +217,7 @@ jobs:
 
       - name: Download iOS artifacts
         if: ${{ needs.ios.result == 'success' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: iOS-unsigned
           path: release-assets/
