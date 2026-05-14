@@ -211,9 +211,8 @@ jobs:
         if: ${{ needs.android.result == 'success' }}
         uses: actions/download-artifact@v7
         with:
-          pattern: Android_*
+          name: Android_arm64-v8a
           path: release-assets/
-          merge-multiple: true
 
       - name: Download iOS artifacts
         if: ${{ needs.ios.result == 'success' }}
