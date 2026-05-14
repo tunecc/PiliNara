@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show pow, sqrt;
 
@@ -434,6 +435,13 @@ abstract final class Pref {
     defaultValue: VideoQuality.high1080.code,
   );
 
+  /// 半屏默认画质。null = 跟随全屏默认画质
+  static int? get defaultVideoQaHalfScreen {
+    final val = _setting.get(SettingBoxKey.defaultVideoQaHalfScreen);
+    if (val == null || val == -1) return null;
+    return val as int;
+  }
+
   static int get defaultAudioQa => _setting.get(
     SettingBoxKey.defaultAudioQa,
     defaultValue: AudioQuality.hiRes.code,
@@ -746,6 +754,9 @@ abstract final class Pref {
   static bool get showMedal =>
       _setting.get(SettingBoxKey.showMedal, defaultValue: true);
 
+  static bool get showRcmdReason =>
+      _setting.get(SettingBoxKey.showRcmdReason, defaultValue: true);
+
   static bool get enableLivePhoto =>
       _setting.get(SettingBoxKey.enableLivePhoto, defaultValue: true);
 
@@ -1055,6 +1066,11 @@ abstract final class Pref {
 
   static bool get applyFilterToRankVideos =>
       _setting.get(SettingBoxKey.applyFilterToRankVideos, defaultValue: false);
+
+  static bool get applyFilterToSearch => _setting.get(
+    SettingBoxKey.applyFilterToSearch,
+    defaultValue: false,
+  );
 
   static bool get enableBackgroundPlay =>
       _setting.get(SettingBoxKey.enableBackgroundPlay, defaultValue: true);
@@ -1432,4 +1448,53 @@ abstract final class Pref {
 
   static bool get removeSafeArea =>
       _setting.get(SettingBoxKey.removeSafeArea, defaultValue: false);
+
+  // AI 视频分析设置
+  static bool get enableAiChat =>
+      _setting.get(SettingBoxKey.enableAiChat, defaultValue: false);
+
+  static set enableAiChat(bool value) =>
+      _setting.put(SettingBoxKey.enableAiChat, value);
+  static String get aiApiUrl =>
+      _setting.get(SettingBoxKey.aiApiUrl, defaultValue: '');
+
+  static set aiApiUrl(String value) =>
+      _setting.put(SettingBoxKey.aiApiUrl, value);
+
+  static String get aiApiKey =>
+      _setting.get(SettingBoxKey.aiApiKey, defaultValue: '');
+
+  static set aiApiKey(String value) =>
+      _setting.put(SettingBoxKey.aiApiKey, value);
+
+  static String get aiModel =>
+      _setting.get(SettingBoxKey.aiModel, defaultValue: '');
+
+  static set aiModel(String value) =>
+      _setting.put(SettingBoxKey.aiModel, value);
+
+  static List<String> get aiModelListCache {
+    final raw = _setting.get(SettingBoxKey.aiModelListCache, defaultValue: '');
+    if (raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List).cast<String>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static set aiModelListCache(List<String> value) =>
+      _setting.put(SettingBoxKey.aiModelListCache, jsonEncode(value));
+
+  static int get aiModelListCacheTime =>
+      _setting.get(SettingBoxKey.aiModelListCacheTime, defaultValue: 0);
+
+  static set aiModelListCacheTime(int value) =>
+      _setting.put(SettingBoxKey.aiModelListCacheTime, value);
+
+  static String get aiPromptTemplates =>
+      _setting.get(SettingBoxKey.aiPromptTemplates, defaultValue: '');
+
+  static set aiPromptTemplates(String value) =>
+      _setting.put(SettingBoxKey.aiPromptTemplates, value);
 }

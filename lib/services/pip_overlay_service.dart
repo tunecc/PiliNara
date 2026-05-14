@@ -241,7 +241,12 @@ class PipOverlayService {
     }
 
     isInPipMode = false;
-    isNativePip = false;
+    // isNativePip 是 Rx 变量，不能在 build 阶段（如 initState）同步修改，
+    // 否则会触发 Obx rebuild 导致 "setState during build" 错误。
+    // 延迟到当前帧结束后再更新。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      isNativePip = false;
+    });
 
     final closeCallback = callOnClose ? _onCloseCallback : null;
     final playerController = _savedPlayerController;
@@ -256,27 +261,12 @@ class PipOverlayService {
       );
     }
 
-    // 强制调用控制器的清理逻辑，特别是 SponsorBlock 相关的监听器
-    if (shouldResetState) {
-      try {
-        _savedPlayerController?.resetTempPlayerSettingsToDefault();
-        if (_savedController is VideoDetailController) {
-          if (kDebugMode) {
-            debugPrint(
-              '[PiP] Explicitly resetting SponsorBlock state for cached VideoDetailController',
-            );
-          }
-          (_savedController as VideoDetailController).resetBlock();
-        } else if (kDebugMode) {
-          debugPrint(
-            '[PiP] Cached controller is not a VideoDetailController, skipping resetBlock',
-          );
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[PiP] Error while resetting cached controller: $e');
-        }
-      }
+    // resetTempSettings 已在 PlPlayerController.setDataSource() 中同步执行。
+    // resetBlock 在新 VideoDetailController.onInit() 中同步调用。
+    // 旧 controller 进 PiP 时 onClose 跳过了清理，需要在此同步清除
+    // 其 SponsorBlock 监听器，防止旧片段数据污染新视频。
+    if (shouldResetState && _savedController is VideoDetailController) {
+      (_savedController as VideoDetailController).resetBlock();
     }
 
     _savedController = null;

@@ -37,6 +37,7 @@ import 'package:PiliPlus/models_new/video/video_detail/page.dart';
 import 'package:PiliPlus/models_new/video/video_pbp/data.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/subtitle.dart';
 import 'package:PiliPlus/models_new/video/video_stein_edgeinfo/data.dart';
+import 'package:PiliPlus/pages/ai_chat/controller.dart';
 import 'package:PiliPlus/pages/audio/view.dart';
 import 'package:PiliPlus/pages/common/publish/publish_route.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
@@ -133,6 +134,7 @@ class VideoDetailController extends GetxController
     ..brightness.value = -1;
   bool get setSystemBrightness => plPlayerController.setSystemBrightness;
   bool get removeSafeArea => plPlayerController.removeSafeArea;
+  double get uiScale => plPlayerController.uiScale;
 
   late VideoItem firstVideo;
   String? videoUrl;
@@ -273,7 +275,10 @@ class VideoDetailController extends GetxController
       final isVertical = height > width;
       if (_scrollCtr?.hasClients != true) {
         videoHeight = isVertical ? maxVideoHeight : minVideoHeight;
-        this.isVertical.value = isVertical;
+        if (this.isVertical.value != isVertical) {
+          this.isVertical.value = isVertical;
+          _needAnimOnDimensionChanged(isVertical);
+        }
         return;
       }
       if (this.isVertical.value != isVertical) {
@@ -295,11 +300,11 @@ class VideoDetailController extends GetxController
                 .toPrecision(2);
             double minVideoHeightPrecise = minVideoHeight.toPrecision(2);
             if (currentHeight == minVideoHeightPrecise) {
+              this.videoHeight = minVideoHeight;
               if (_needAnimOnDimensionChanged(isVertical)) {
                 isExpanding = true;
-                this.videoHeight = minVideoHeight;
+                animationController.forward(from: 1);
               }
-              animationController.forward(from: 1);
             } else if (currentHeight < minVideoHeightPrecise) {
               // expand
               if (_needAnimOnDimensionChanged(isVertical)) {
@@ -398,6 +403,9 @@ class VideoDetailController extends GetxController
         immediate: true,
         targetContextKey: PipOverlayService.contextKeyFromArgs(args),
       );
+      // 同步清理旧视频的 SponsorBlock 状态，避免污染新视频
+      // 不能放在 stopPip 里异步执行，否则会与新视频初始化竞态
+      resetBlock();
     }
 
     videoType = args['videoType'];
@@ -435,6 +443,38 @@ class VideoDetailController extends GetxController
       vsync: this,
       initialIndex: Pref.defaultShowComment ? 1 : 0,
     );
+
+    // 进入全屏时切换到全屏默认画质
+    if (PlatformUtils.isMobile) {
+      plPlayerController.onFullScreenChanged = (bool fs) async {
+        if (!fs || plPlayerController.isLive) return;
+        PlayUrlModel data;
+        try {
+          data = this.data;
+        } catch (_) {
+          return;
+        }
+        if (data.dash == null) return;
+        final halfScreenQa = Pref.defaultVideoQaHalfScreen;
+        if (halfScreenQa == null) return;
+        final isWiFi = await ConnectivityUtils.isWiFi;
+        final fsQa = isWiFi ? Pref.defaultVideoQa : Pref.defaultVideoQaCellular;
+        final curHighestVideoQa = data.dash!.video!.first.quality.code;
+        int targetQa = curHighestVideoQa;
+        if (data.acceptQuality?.isNotEmpty == true &&
+            fsQa <= curHighestVideoQa) {
+          targetQa = data.acceptQuality!.findClosestTarget(
+            (e) => e <= fsQa,
+            (a, b) => a > b ? a : b,
+          );
+        }
+        if (plPlayerController.cacheVideoQa != targetQa) {
+          plPlayerController.cacheVideoQa = targetQa;
+          currentVideoQa.value = VideoQuality.fromCode(targetQa);
+          updatePlayer();
+        }
+      };
+    }
   }
 
   Future<void> getMediaList({
@@ -691,7 +731,14 @@ class VideoDetailController extends GetxController
 
   VideoItem findVideoByQa(int qa) {
     /// 根据currentVideoQa和currentDecodeFormats 重新设置videoUrl
-    final videoList = data.dash!.video!.where((i) => i.id == qa).toList();
+    final allVideos = data.dash!.video!;
+    final videoList = allVideos.where((i) => i.id == qa).toList();
+
+    if (videoList.isEmpty) {
+      final fallback = allVideos.first;
+      currentVideoQa.value = VideoQuality.fromCode(fallback.id!);
+      return fallback;
+    }
 
     final currentDecodeFormats = this.currentDecodeFormats.codes;
     final defaultDecodeFormats = VideoDecodeFormatType.fromString(
@@ -840,8 +887,8 @@ class VideoDetailController extends GetxController
 
   bool isQuerying = false;
 
-  final Rx<List<LanguageItem>?> languages = Rx<List<LanguageItem>?>(null);
-  final Rx<String?> currLang = Rx<String?>(null);
+  final languages = Rxn<List<LanguageItem>>();
+  final currLang = Rxn<String>();
   void setLanguage(String language) {
     if (currLang.value == language) return;
     if (!isLoginVideo) {
@@ -868,15 +915,20 @@ class VideoDetailController extends GetxController
       return;
     }
     isQuerying = true;
+    try {
     if (plPlayerController.enableSponsorBlock && isBlock && !fromReset) {
       querySponsorBlock(bvid: bvid, cid: cid.value);
     }
     if (plPlayerController.cacheVideoQa == null) {
       final isWiFi = await ConnectivityUtils.isWiFi;
+      final halfScreenQa = Pref.defaultVideoQaHalfScreen;
       plPlayerController
-        ..cacheVideoQa = isWiFi
-            ? Pref.defaultVideoQa
-            : Pref.defaultVideoQaCellular
+        ..cacheVideoQa = !plPlayerController.isFullScreen.value &&
+                halfScreenQa != null
+            ? halfScreenQa
+            : isWiFi
+                ? Pref.defaultVideoQa
+                : Pref.defaultVideoQaCellular
         ..cacheAudioQa = isWiFi
             ? Pref.defaultAudioQa
             : Pref.defaultAudioQaCellular;
@@ -1064,7 +1116,9 @@ class VideoDetailController extends GetxController
       }
       result.toast();
     }
-    isQuerying = false;
+    } finally {
+      isQuerying = false;
+    }
   }
 
   late final List<PostSegmentModel> postList = <PostSegmentModel>[];
@@ -1477,6 +1531,7 @@ class VideoDetailController extends GetxController
       ..dispose();
     subtitles.clear();
     vttSubtitles.clear();
+    Get.delete<AiChatController>(tag: heroTag);
     super.onClose();
   }
 

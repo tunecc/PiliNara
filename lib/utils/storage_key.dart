@@ -4,6 +4,7 @@ abstract final class SettingBoxKey {
   static const String btmProgressBehavior = 'btmProgressBehavior',
       defaultVideoQa = 'defaultVideoQa',
       defaultVideoQaCellular = 'defaultVideoQaCellular',
+      defaultVideoQaHalfScreen = 'defaultVideoQaHalfScreen',
       defaultAudioQa = 'defaultAudioQa',
       defaultAudioQaCellular = 'defaultAudioQaCellular',
       autoPlayEnable = 'autoPlayEnable',
@@ -58,6 +59,7 @@ abstract final class SettingBoxKey {
       applyFilterToRelatedVideos = 'applyFilterToRelatedVideos',
       applyFilterToHotVideos = 'applyFilterToHotVideos',
       applyFilterToRankVideos = 'applyFilterToRankVideos',
+      applyFilterToSearch = 'applyFilterToSearch',
       autoUpdate = 'autoUpdate',
       preReleaseUpdate = 'preReleaseUpdate',
       skipVersion = 'skipVersion',
@@ -110,6 +112,7 @@ abstract final class SettingBoxKey {
       searchSuggestion = 'searchSuggestion',
       showDecorate = 'showDynDecorate',
       showMedal = 'showMedal',
+      showRcmdReason = 'showRcmdReason',
       enableLivePhoto = 'enableLivePhoto',
       showSeekPreview = 'showSeekPreview',
       showDmChart = 'showDmChart',
@@ -176,6 +179,14 @@ abstract final class SettingBoxKey {
       floatingNavBar = 'floatingNavBar',
       mixWithOthers = 'mixWithOthers',
       removeSafeArea = 'removeSafeArea';
+
+  static const String enableAiChat = 'enableAiChat',
+      aiApiUrl = 'aiApiUrl',
+      aiApiKey = 'aiApiKey',
+      aiModel = 'aiModel',
+      aiModelListCache = 'aiModelListCache',
+      aiModelListCacheTime = 'aiModelListCacheTime',
+      aiPromptTemplates = 'aiPromptTemplates';
 
   static const String minimizeOnExit = 'minimizeOnExit',
       windowSize = 'windowSize',

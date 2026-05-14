@@ -92,6 +92,12 @@ List<SettingsModel> get extraSettings => [
         .put(SettingBoxKey.pgcSkipType, value.index)
         .whenComplete(setState),
   ),
+  NormalModel(
+    title: 'AI 视频总结',
+    leading: const Icon(Icons.auto_awesome),
+    getSubtitle: () => '配置 OpenAI 兼容 API 和提示词模板',
+    onTap: (context, _) => Get.toNamed('/aiSetting'),
+  ),
   SplitModel(
     normalModel: const NormalModel.split(
       title: '检查未读动态',
@@ -359,6 +365,13 @@ List<SettingsModel> get extraSettings => [
     setKey: SettingBoxKey.showMedal,
     defaultVal: true,
     onChanged: (value) => GlobalData().showMedal = value,
+  ),
+  const SwitchModel(
+    title: '显示视频推荐理由',
+    subtitle: '显示首页视频卡片下方的已关注，x万点赞的标签',
+    leading: Icon(Icons.label_outline),
+    setKey: SettingBoxKey.showRcmdReason,
+    defaultVal: true,
   ),
   SwitchModel(
     title: '预览 Live Photo',

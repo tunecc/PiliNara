@@ -141,6 +141,7 @@ class PlPlayerController with BlockConfigMixin {
 
   /// 全屏状态
   final RxBool isFullScreen = false.obs;
+  void Function(bool isFullScreen)? onFullScreenChanged;
   // 系统原生 PiP 状态
   final RxBool isNativePip = false.obs;
   // 默认投稿视频格式
@@ -393,6 +394,7 @@ class PlPlayerController with BlockConfigMixin {
   late final showFsScreenshotBtn = Pref.showFsScreenshotBtn;
   late final showFsLockBtn = Pref.showFsLockBtn;
   late final keyboardControl = Pref.keyboardControl;
+  late final uiScale = Pref.uiScale;
 
   late final bool autoEnterFullScreen = Pref.autoEnterFullScreen;
   late final bool autoExitFullscreen = Pref.autoExitFullscreen;
@@ -657,14 +659,14 @@ class PlPlayerController with BlockConfigMixin {
 
   static bool _isAnimPgcType(int? pgcType) => pgcType == 1 || pgcType == 4;
 
-  void resetTempPlayerSettingsToDefault({int? nextPgcType}) {
+  void resetTempSettings({int? nextPgcType}) {
     if (!tempPlayerConf) {
       return;
     }
 
     if (kDebugMode) {
       debugPrint(
-        '[PlPlayer] Resetting temp player settings to defaults (currentContext: $_activeVideoContextKey, nextPgcType: $nextPgcType)',
+        '[PlPlayer] resetTempSettings (currentContext: $_activeVideoContextKey, nextPgcType: $nextPgcType)',
       );
     }
 
@@ -742,7 +744,7 @@ class PlPlayerController with BlockConfigMixin {
           nextVideoContextKey != null &&
           nextVideoContextKey != _activeVideoContextKey;
       if (shouldResetTempSettings) {
-        resetTempPlayerSettingsToDefault(nextPgcType: pgcType);
+        resetTempSettings(nextPgcType: pgcType);
       }
       _activeVideoContextKey = nextVideoContextKey;
       this.isLive = isLive;
@@ -1618,6 +1620,7 @@ class PlPlayerController with BlockConfigMixin {
   void _setFullScreen(bool val) {
     isFullScreen.value = val;
     updateSubtitleStyle();
+    onFullScreenChanged?.call(val);
   }
 
   double screenRatio = 0.0;

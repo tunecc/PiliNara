@@ -37,6 +37,7 @@ import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:expandable/expandable.dart';
 import 'package:flutter/material.dart';
@@ -50,6 +51,7 @@ class UgcIntroPanel extends StatefulWidget {
     super.key,
     required this.heroTag,
     required this.showAiBottomSheet,
+    required this.showAiChatBottomSheet,
     required this.showEpisodes,
     required this.onShowMemberPage,
     required this.isPortrait,
@@ -57,6 +59,7 @@ class UgcIntroPanel extends StatefulWidget {
   });
   final String heroTag;
   final Function showAiBottomSheet;
+  final VoidCallback showAiChatBottomSheet;
   final Function showEpisodes;
   final ValueChanged<int?> onShowMemberPage;
   final bool isPortrait;
@@ -606,6 +609,14 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                 ? NumUtils.numFormat(videoDetail.stat!.share!)
                 : null,
           ),
+          if (Pref.enableAiChat)
+            ActionItem(
+              icon: const Icon(Icons.auto_awesome),
+              onTap: widget.showAiChatBottomSheet,
+              selectStatus: false,
+              semanticsLabel: 'AI分析',
+              text: 'AI',
+            ),
         ],
       ),
     );

@@ -22,6 +22,8 @@ import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/danmaku/view.dart';
 import 'package:PiliPlus/pages/episode_panel/view.dart';
 import 'package:PiliPlus/pages/video/ai_conclusion/view.dart';
+import 'package:PiliPlus/pages/ai_chat/controller.dart';
+import 'package:PiliPlus/pages/ai_chat/view.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/local/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/local/view.dart';
@@ -96,6 +98,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   // 标志位：是否正在进入 PiP 模式（用于防止 dispose/didPushNext 时清理播放器状态）
   bool _isEnteringPipMode = false;
+
+  // 标志位：_onPopInvokedWithResult 触发了 didPop=true 但 PiP 被其他视频/直播抢占，
+  // 需要在 didPopNext 关闭其他 PiP 后重试启动
+  bool _pipRetryPending = false;
 
   // 标志位：是否刚从 PiP 返回（用于触发 UI 重建）
   bool _justReturnedFromPip = false;
@@ -301,6 +307,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       }
     }
 
+    // AI chat controller - create if not already registered (PiP reuse)
+    if (!Get.isRegistered<AiChatController>(tag: heroTag)) {
+      Get.put(AiChatController(heroTag: heroTag), tag: heroTag);
+    }
+
     if (fromPip) {
       _justReturnedFromPip = true;
 
@@ -458,6 +469,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   }
 
   Future<void>? playCallBack() {
+    if (!isShowing) {
+      plPlayerController
+        ?..addStatusLister(playerListener)
+        ..addPositionListener(positionListener);
+    }
     return plPlayerController?.play();
   }
 
@@ -729,6 +745,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           'Returning to video page but PiP has different controller, closing PiP',
         );
         PipOverlayService.stopPip(callOnClose: true, immediate: true);
+        // 当前页面之前可能曾尝试进入小窗（didPushNext 设置了 _isEnteringPipMode = true），
+        // 但被其他视频抢占。需要重置该标志，否则 dispose 会跳过播放器清理，
+        // 且 PopScope 不在 widget tree 中导致后续返回无法触发新的小窗
+        _isEnteringPipMode = false;
+        // 标记需要重试 PiP：关了别人的 PiP，恢复播放器后应尝试启动自己的 PiP
+        _pipRetryPending = true;
       }
     }
     // 视频页返回时，若直播小窗仍在运行，也需关闭
@@ -838,6 +860,19 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
     // 无论进入哪个分支，最后都刷新一下 UI
     if (mounted) setState(() {});
+
+    // 重试 PiP：_onPopInvokedWithResult 触发了 didPop=true 但被其他视频/直播的 PiP 抢先占用，
+    // 现在其他 PiP 已关闭、播放器已恢复，重新尝试启动 PiP
+    if (_pipRetryPending) {
+      _pipRetryPending = false;
+      _logSponsorBlock('Retrying PiP after closing other PiP');
+      _startInAppPipIfNeeded();
+      if (_isEnteringPipMode) {
+        _logSponsorBlock('PiP retry succeeded');
+      } else {
+        _logSponsorBlock('PiP retry failed');
+      }
+    }
   }
 
   @override
@@ -853,8 +888,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     maxWidth = size.width;
     maxHeight = size.height;
     isWindowMode = MaxScreenSize.isWindowMode(
-      width: maxWidth,
-      height: maxHeight,
+      width: maxWidth * videoDetailController.uiScale,
+      height: maxHeight * videoDetailController.uiScale,
     );
     videoDetailController.plPlayerController.screenRatio = maxHeight / maxWidth;
 
@@ -2119,6 +2154,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
               key: videoIntroKey,
               heroTag: heroTag,
               showAiBottomSheet: showAiBottomSheet,
+              showAiChatBottomSheet: showAiChatBottomSheet,
               showEpisodes: showEpisodes,
               onShowMemberPage: onShowMemberPage,
               isPortrait: isPortrait,
@@ -2332,6 +2368,15 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       constraints: const BoxConstraints(),
       (context) =>
           AiConclusionPanel(item: ugcIntroController.aiConclusionResult!),
+    );
+  }
+
+  // ai字幕分析
+  void showAiChatBottomSheet() {
+    videoDetailController.childKey.currentState?.showBottomSheet(
+      backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(),
+      (context) => AiChatPage(heroTag: heroTag),
     );
   }
 

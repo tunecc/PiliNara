@@ -111,6 +111,7 @@ dependencies:
   # 加密
   crypto: ^3.0.6
   encrypt: ^5.0.3
+  hashlib: ^1.12.0
 
   # 视频播放器
   media_kit: 1.1.11 # Primary package.
@@ -213,6 +214,9 @@ dependencies:
       url: https://github.com/wgh136/webdav_client.git
       ref: main
   re_highlight: ^0.0.3
+  markdown: ^7.3.1
+  flutter_markdown_plus: ^1.0.7
+  flutter_markdown_plus_latex: ^1.0.5
   flutter_sortable_wrap:
     git:
       url: https://github.com/bggRGjQaUbCoE/flutter_sortable_wrap.git
@@ -226,7 +230,10 @@ dependencies:
       path: packages/window_manager
       ref: main
   tray_manager: ^0.5.1
-  file_picker: ^12.0.0-beta.1
+  file_picker:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/flutter_file_picker.git
+      ref: dev
   super_sliver_list:
     git:
       url: https://github.com/bggRGjQaUbCoE/super_sliver_list.git
@@ -355,9 +362,9 @@ flutter:
     - path: assets/images/lv/
     - path: assets/images/logo/
     - path: assets/images/logo/ico/
-      platforms: [ windows ]
+      platforms: [windows]
     - path: assets/images/logo/desktop/
-      platforms: [ linux, macos ]
+      platforms: [linux, macos]
     - path: assets/images/live/
     - path: assets/images/video/
     - path: assets/images/paycoins/

@@ -232,6 +232,8 @@ abstract final class VideoHttp {
     String? language,
     bool voiceBalance = false,
   }) async {
+    final dmImgStr = Utils.base64EncodeRandomString(16, 64);
+    final dmCoverImgStr = Utils.base64EncodeRandomString(32, 128);
     final params = await WbiSign.makSign({
       'avid': ?avid,
       'bvid': ?bvid,
@@ -249,6 +251,10 @@ abstract final class VideoHttp {
       'web_location': 1315873,
       // 免登录查看1080p
       if (tryLook) 'try_look': 1,
+      'dm_img_list': '[]',
+      'dm_img_str': dmImgStr,
+      'dm_cover_img_str': dmCoverImgStr,
+      'dm_img_inter': '{"ds":[],"wh":[0,0,0],"of":[0,0,0]}',
       'cur_language': ?language,
     });
 
@@ -880,6 +886,45 @@ abstract final class VideoHttp {
       return compute<List, String>(processList, list);
     }
     return null;
+  }
+
+  static final _fillerWords = RegExp(
+    r'(嗯+|啊+|额+|呃+|那个|就是说|然后呢|对吧|是吧|对不对|你知道吗|反正就是|基本上|说实话)',
+  );
+
+  /// Fetch raw subtitle body JSON list from URL.
+  static Future<List?> fetchSubtitleBody(String subtitleUrl) async {
+    final res = await Request().get("https:$subtitleUrl");
+    return res.data?['body'] as List?;
+  }
+
+  /// Preprocess subtitle body JSON for AI analysis.
+  /// Returns (compressed text, isTooLong).
+  static ({String text, bool isTooLong}) preprocessSubtitlesForAi(
+    List body,
+  ) {
+    final sb = StringBuffer();
+    // Check if any subtitle exceeds 1 hour to determine format
+    final hasHour = body.isNotEmpty && (body.last['from'] as num) >= 3600;
+    for (final item in body) {
+      final from = item['from'] as num;
+      final content = (item['content'] as String?)?.trim() ?? '';
+      if (content.isEmpty) continue;
+      final h = from ~/ 3600;
+      final m = (from % 3600) ~/ 60;
+      final s = (from % 60).toInt();
+      final ts = hasHour
+          ? '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}'
+          : '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+      sb.writeln('[$ts] $content');
+    }
+
+    // Second level: remove filler words
+    var text = sb.toString().replaceAll(_fillerWords, '');
+    // Collapse multiple blank lines
+    text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+
+    return (text: text, isTooLong: text.length > 100000);
   }
 
   static bool _canAddRank(Map i) {
