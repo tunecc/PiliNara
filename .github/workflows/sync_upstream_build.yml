@@ -211,7 +211,7 @@ jobs:
         if: ${{ needs.android.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: Android-*
+          pattern: Android_*
           path: release-assets/
           merge-multiple: true
 
@@ -221,6 +221,9 @@ jobs:
         with:
           name: iOS-unsigned
           path: release-assets/
+
+      - name: List release assets
+        run: ls -la release-assets/ || echo "No assets found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
