@@ -376,6 +376,10 @@ class PlPlayerController with BlockConfigMixin {
       Duration(seconds: Pref.doubleTapBackwardDuration);
   Duration get fastForwardDuration =>
       Duration(seconds: Pref.doubleTapForwardDuration);
+
+  late final fastForBackwardDuration = Duration(
+    seconds: Pref.fastForBackwardDuration,
+  );
   bool get enableTwoFingerTapPause => Pref.enableTwoFingerTapPause;
   DoubleTapSeekLayout get doubleTapSeekLayout => DoubleTapSeekLayout.normalize(
     backwardPercent: Pref.doubleTapBackwardZone,
