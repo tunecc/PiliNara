@@ -63,7 +63,9 @@ jobs:
           rm -rf Payload
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          ditto -c -k --sequesterRsrc --keepParent Payload PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa
+          IPA_NAME="PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa"
+          ditto -c -k --sequesterRsrc --keepParent Payload "$IPA_NAME"
+          echo "ipa_path=$IPA_NAME" >> "$GITHUB_ENV"
 
       - name: Release
         if: ${{ inputs.tag != '' }}
@@ -71,12 +73,10 @@ jobs:
         with:
           tag_name: ${{ inputs.tag }}
           name: ${{ inputs.tag }}
-          files: |
-            PiliNara_ios_*${{ inputs.file_suffix }}.ipa
+          files: ${{ env.ipa_path }}
 
       - name: Upload ios release
         uses: actions/upload-artifact@v7
         with:
-          archive: false
           name: ${{ inputs.artifact_name }}
-          path: PiliNara_ios_*${{ inputs.file_suffix }}.ipa
+          path: ${{ env.ipa_path }}
