@@ -143,7 +143,6 @@ jobs:
         if: ${{ inputs.upload_arm64_v8a }}
         uses: actions/upload-artifact@v7
         with:
-          archive: false
           name: Android_arm64-v8a
           path: PiliNara_android_*_arm64-v8a.apk
 
@@ -151,7 +150,6 @@ jobs:
         if: ${{ inputs.upload_armeabi_v7a }}
         uses: actions/upload-artifact@v7
         with:
-          archive: false
           name: Android_armeabi-v7a
           path: PiliNara_android_*_armeabi-v7a.apk
 
@@ -159,6 +157,5 @@ jobs:
         if: ${{ inputs.upload_x86_64 }}
         uses: actions/upload-artifact@v7
         with:
-          archive: false
           name: Android_x86_64
           path: PiliNara_android_*_x86_64.apk
