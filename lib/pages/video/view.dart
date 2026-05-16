@@ -13,6 +13,7 @@ import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_pinned_dynamic_header.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
+import 'package:PiliPlus/models/common/list_order.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
 import 'package:PiliPlus/models_new/video/video_detail/page.dart';
@@ -532,7 +533,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           case PlayRepeat.listOrder:
           case PlayRepeat.listCycle:
           case PlayRepeat.autoPlayRelated:
-            exitFlag = !introController.nextPlay();
+            if (!introController.nextPlay()) {
+              if (videoDetailController.listOrder.isShuffle &&
+                  videoDetailController.isPlayAll) {
+                exitFlag = false;
+                videoDetailController.getMediaList().then((_) {
+                  introController.nextPlay();
+                });
+              }
+            } else {
+              exitFlag = false;
+            }
           case PlayRepeat.pause:
         }
       }
@@ -599,6 +610,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   void dispose() {
     VideoStackManager.decrement(); // 减少视频页面层级追踪
     final isInAppPip = PipOverlayService.isInPipMode;
+    // 如果 _pipRetryPending=true 但用户没有继续 pop（_onPopInvokedWithResult 未触发），
+    // 说明用户通过其他方式离开（点导航栏、Get.offAll 等），需要主动暂停播放器。
+    if (_pipRetryPending && !isInAppPip && !_isEnteringPipMode) {
+      plPlayerController?.pause();
+      _pipRetryPending = false;
+    }
+
     plPlayerController
       ?..removeStatusLister(playerListener)
       ..removePositionListener(positionListener);
@@ -725,7 +743,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     if (PipOverlayService.isInPipMode) {
       // 用视频上下文 key 比较（而非 controller 实例），因为 controller 可能已被
       // dispose 再重建，实例比较会失败
-      final isSameVideo = PipOverlayService.savedVideoContextKey ==
+      final isSameVideo =
+          PipOverlayService.savedVideoContextKey ==
           PipOverlayService.contextKeyFromArgs(videoDetailController.args);
       if (isSameVideo) {
         _logSponsorBlock(
@@ -2282,7 +2301,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                     bvid: videoDetailController.bvid,
                     aid: videoDetailController.aid,
                     cid: videoDetailController.cid.value,
-                    isReversed: videoDetail.isPageReversed,
+                    listOrder: videoDetail.listOrder,
                     onChangeEpisode: videoDetailController.isUgc
                         ? ugcIntroController.onChangeEpisode
                         : pgcIntroController.onChangeEpisode,
@@ -2328,12 +2347,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                   bvid: videoDetailController.bvid,
                   aid: videoDetailController.aid,
                   cid: videoDetailController.seasonCid ?? 0,
-                  isReversed: ugcIntroController
+                  listOrder: ugcIntroController
                       .videoDetail
                       .value
                       .ugcSeason!
                       .sections![videoDetailController.seasonIndex.value]
-                      .isReversed,
+                      .listOrder,
                   onChangeEpisode: videoDetailController.isUgc
                       ? ugcIntroController.onChangeEpisode
                       : pgcIntroController.onChangeEpisode,
@@ -2420,7 +2439,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       cid: cid,
       seasonId: season?.id,
       list: season != null ? season.sections! : [episodes],
-      isReversed: !videoDetailController.isUgc
+      listOrder: !videoDetailController.isUgc
           ? null
           : season != null
           ? ugcIntroController
@@ -2428,8 +2447,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 .value
                 .ugcSeason!
                 .sections![videoDetailController.seasonIndex.value]
-                .isReversed
-          : ugcIntroController.videoDetail.value.isPageReversed,
+                .listOrder
+          : ugcIntroController.videoDetail.value.listOrder,
       isSupportReverse: videoDetailController.isUgc,
       onChangeEpisode: videoDetailController.isUgc
           ? ugcIntroController.onChangeEpisode
@@ -2468,28 +2487,27 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
     final videoDetail = ugcIntroController.videoDetail.value;
     if (isSeason) {
-      // reverse season
       final item = videoDetail
           .ugcSeason!
           .sections![videoDetailController.seasonIndex.value];
-      item
-        ..isReversed = !item.isReversed
-        ..episodes = item.episodes!.reversed.toList();
-
-      if (!videoDetailController.plPlayerController.reverseFromFirst) {
-        // keep current episode
+      final nextOrder = item.listOrder.next;
+      _applyListOrder(
+        nextOrder: nextOrder,
+        list: item.episodes!,
+        getList: () => item.episodes,
+        setList: (v) => item.episodes = v,
+        backup: item.originalEpisodes,
+        setBackup: (v) => item.originalEpisodes = v,
+        setOrder: (v) => item.listOrder = v,
+      );
+      // refresh or switch episode
+      if (!videoDetailController.plPlayerController.reverseFromFirst ||
+          nextOrder.isShuffle) {
         videoDetailController
           ..seasonIndex.refresh()
           ..cid.refresh();
       } else {
-        // switch to first episode
-        final episode = ugcIntroController
-            .videoDetail
-            .value
-            .ugcSeason!
-            .sections![videoDetailController.seasonIndex.value]
-            .episodes!
-            .first;
+        final episode = item.episodes!.first;
         if (episode.cid != videoDetailController.cid.value) {
           ugcIntroController.onChangeEpisode(episode);
           videoDetailController.seasonCid = episode.cid;
@@ -2500,15 +2518,20 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         }
       }
     } else {
-      // reverse part
-      videoDetail
-        ..isPageReversed = !videoDetail.isPageReversed
-        ..pages = videoDetail.pages!.reversed.toList();
-      if (!videoDetailController.plPlayerController.reverseFromFirst) {
-        // keep current episode
+      final nextOrder = videoDetail.listOrder.next;
+      _applyListOrder(
+        nextOrder: nextOrder,
+        list: videoDetail.pages!,
+        getList: () => videoDetail.pages,
+        setList: (v) => videoDetail.pages = v,
+        backup: videoDetail.originalPages,
+        setBackup: (v) => videoDetail.originalPages = v,
+        setOrder: (v) => videoDetail.listOrder = v,
+      );
+      if (!videoDetailController.plPlayerController.reverseFromFirst ||
+          nextOrder.isShuffle) {
         videoDetailController.cid.refresh();
       } else {
-        // switch to first episode
         final episode = videoDetail.pages!.first;
         if (episode.cid != videoDetailController.cid.value) {
           ugcIntroController.onChangeEpisode(episode);
@@ -2517,6 +2540,42 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         }
       }
     }
+  }
+
+  void _applyListOrder<T>({
+    required ListOrder nextOrder,
+    required List<T> list,
+    required List<T>? Function() getList,
+    required void Function(List<T>) setList,
+    required List<T>? backup,
+    required void Function(List<T>?) setBackup,
+    required void Function(ListOrder) setOrder,
+  }) {
+    if (nextOrder.isShuffle) {
+      // entering shuffle: backup then shuffle
+      setBackup(List.of(list));
+      list.shuffle();
+    } else if (nextOrder.isDesc) {
+      if (backup != null) {
+        // shuffle → desc: restore backup then reverse
+        setList(backup.reversed.toList());
+        setBackup(null);
+      } else {
+        // asc → desc: reverse current
+        setList(list.reversed.toList());
+      }
+    } else {
+      // nextOrder == asc
+      if (backup != null) {
+        // shuffle → asc: restore backup
+        setList(List.of(backup));
+        setBackup(null);
+      } else {
+        // desc → asc: reverse current
+        setList(list.reversed.toList());
+      }
+    }
+    setOrder(nextOrder);
   }
 
   void showViewPoints() {

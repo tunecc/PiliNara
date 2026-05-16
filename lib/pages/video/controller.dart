@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert' show jsonDecode;
 import 'dart:io';
-import 'dart:math' show min;
+import 'dart:math' show Random, min;
 import 'dart:ui';
 
 import 'package:PiliPlus/common/style.dart';
@@ -15,6 +15,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/account_type.dart';
+import 'package:PiliPlus/models/common/list_order.dart';
 import 'package:PiliPlus/models/common/sponsor_block/action_type.dart';
 import 'package:PiliPlus/models/common/sponsor_block/post_segment_model.dart';
 import 'package:PiliPlus/models/common/sponsor_block/segment_model.dart';
@@ -71,6 +72,7 @@ import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
+import 'package:collection/collection.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -105,7 +107,11 @@ class VideoDetailController extends GetxController
   late SourceType sourceType;
   late BiliDownloadEntryInfo entry;
   late bool isFileSource;
-  late bool _mediaDesc = false;
+  late ListOrder _listOrder = ListOrder.asc;
+  ListOrder get listOrder => _listOrder;
+  static final _random = Random();
+  List<int> _shuffledPages = [];
+  int _shufflePageIdx = 0;
   late final RxList<MediaListItemModel> mediaList = <MediaListItemModel>[].obs;
   late String watchLaterTitle;
 
@@ -434,7 +440,7 @@ class VideoDetailController extends GetxController
       initFileSource(args['entry']);
     } else if (isPlayAll) {
       watchLaterTitle = args['favTitle'];
-      _mediaDesc = args['desc'];
+      _listOrder = args['desc'] == true ? ListOrder.desc : ListOrder.asc;
       getMediaList();
     }
 
@@ -480,17 +486,28 @@ class VideoDetailController extends GetxController
   Future<void> getMediaList({
     bool isReverse = false,
     bool isLoadPrevious = false,
+    int? pn,
   }) async {
     final count = args['count'];
-    if (!isReverse && count != null && mediaList.length >= count) {
-      return;
+    if (!isReverse && !isLoadPrevious) {
+      if (_listOrder.isShuffle && pn == null) {
+        // shuffle mode load-more: use next page from shuffled sequence
+        pn = _nextShufflePage();
+        if (pn == null) return;
+      } else if (count != null && mediaList.length >= count) {
+        return;
+      }
     }
+    final isShufflePn = pn != null;
     final res = await UserHttp.getMediaList(
       type: args['mediaType'] ?? sourceType.mediaType,
       bizId: args['mediaId'] ?? -1,
       ps: 20,
       direction: isLoadPrevious ? true : false,
-      oid: isReverse
+      pn: pn,
+      oid: isShufflePn
+          ? null
+          : isReverse
           ? null
           : mediaList.isEmpty
           ? args['isContinuePlaying'] == true
@@ -499,14 +516,16 @@ class VideoDetailController extends GetxController
           : isLoadPrevious
           ? mediaList.first.aid
           : mediaList.last.aid,
-      otype: isReverse
+      otype: isShufflePn
+          ? null
+          : isReverse
           ? null
           : mediaList.isEmpty
           ? null
           : isLoadPrevious
           ? mediaList.first.type
           : mediaList.last.type,
-      desc: _mediaDesc,
+      desc: _listOrder.isDesc,
       sortField: args['sortField'] ?? 1,
       withCurrent: mediaList.isEmpty && args['isContinuePlaying'] == true
           ? true
@@ -516,6 +535,9 @@ class VideoDetailController extends GetxController
       if (response.mediaList.isNotEmpty) {
         if (isReverse) {
           mediaList.value = response.mediaList;
+          if (_listOrder.isShuffle) {
+            mediaList.shuffle();
+          }
           for (final item in mediaList) {
             if (item.cid != null) {
               try {
@@ -528,6 +550,8 @@ class VideoDetailController extends GetxController
           }
         } else if (isLoadPrevious) {
           mediaList.insertAll(0, response.mediaList);
+        } else if (_listOrder.isShuffle) {
+          _shuffleInsert(response.mediaList);
         } else {
           mediaList.addAll(response.mediaList);
         }
@@ -535,6 +559,58 @@ class VideoDetailController extends GetxController
     } else {
       res.toast();
     }
+  }
+
+  void _shuffleInsert(List<MediaListItemModel> newItems) {
+    if (newItems.isEmpty) return;
+    final currentIdx = mediaList.indexWhere((e) => e.bvid == bvid);
+    final insertStart = currentIdx < 0 ? 0 : currentIdx + 1;
+    // Positions: insertStart..mediaList.length (inclusive, "append" is valid)
+    final available = mediaList.length - insertStart + 1;
+    final pickCount = newItems.length.clamp(0, available);
+    final range = List.generate(available, (i) => insertStart + i);
+    // Fisher-Yates partial shuffle for unique positions
+    for (int i = 0; i < pickCount; i++) {
+      final j = i + _random.nextInt(range.length - i);
+      final temp = range[i];
+      range[i] = range[j];
+      range[j] = temp;
+    }
+    final positions = range.sublist(0, pickCount)..sort();
+    // Insert back-to-front to preserve earlier indices
+    for (int i = pickCount - 1; i >= 0; i--) {
+      mediaList.insert(positions[i], newItems[i]);
+    }
+  }
+
+  void _initShufflePages() {
+    final count = args['count'];
+    if (count == null || count <= 0) {
+      _shuffledPages = [1];
+      _shufflePageIdx = 0;
+      return;
+    }
+    final totalPages = (count / 20).ceil();
+    _shuffledPages = List.generate(totalPages, (i) => i + 1);
+    _shuffledPages.shuffle(_random);
+    // Ensure first page has enough items to trigger load-more
+    final firstPageLastItem = count - (totalPages - 1) * 20;
+    if (_shuffledPages[0] == totalPages && firstPageLastItem < 2) {
+      for (int i = 1; i < _shuffledPages.length; i++) {
+        if (_shuffledPages[i] != totalPages) {
+          final temp = _shuffledPages[0];
+          _shuffledPages[0] = _shuffledPages[i];
+          _shuffledPages[i] = temp;
+          break;
+        }
+      }
+    }
+    _shufflePageIdx = 0;
+  }
+
+  int? _nextShufflePage() {
+    if (_shufflePageIdx >= _shuffledPages.length) return null;
+    return _shuffledPages[_shufflePageIdx++];
   }
 
   // 稍后再看面板展开
@@ -551,10 +627,18 @@ class VideoDetailController extends GetxController
         bvid: bvid,
         count: args['count'],
         loadMoreMedia: getMediaList,
-        desc: _mediaDesc,
+        listOrder: _listOrder,
         onReverse: () {
-          _mediaDesc = !_mediaDesc;
-          getMediaList(isReverse: true);
+          _listOrder = _listOrder.next;
+          if (_listOrder.isShuffle) {
+            _initShufflePages();
+            final pn = _nextShufflePage();
+            getMediaList(isReverse: true, pn: pn);
+          } else {
+            _shuffledPages = [];
+            _shufflePageIdx = 0;
+            getMediaList(isReverse: true);
+          }
         },
         loadPrevious: args['isContinuePlaying'] == true
             ? () => getMediaList(isLoadPrevious: true)
@@ -1490,7 +1574,7 @@ class VideoDetailController extends GetxController
   void updateMediaListHistory(int aid) {
     if (args['sortField'] != null) {
       VideoHttp.medialistHistory(
-        desc: _mediaDesc ? 1 : 0,
+        desc: _listOrder.isDesc ? 1 : 0,
         oid: aid,
         upperMid: args['mediaId'],
       );

@@ -5,7 +5,9 @@ import 'package:PiliPlus/pages/ai_chat/models.dart';
 import 'package:PiliPlus/pages/common/slide/common_slide_page.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/services/ai_chat/ai_chat_service.dart';
-import 'package:flutter/material.dart';
+import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
+import 'package:PiliPlus/common/widgets/flutter/text_field/text_field.dart';
+import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_markdown_plus_latex/flutter_markdown_plus_latex.dart';
@@ -25,7 +27,7 @@ class AiChatPage extends CommonSlidePage {
 class _AiChatPageState extends State<AiChatPage>
     with SingleTickerProviderStateMixin, CommonSlideMixin {
   late final AiChatController chatCtl;
-  final _inputCtl = TextEditingController();
+  final _inputCtl = RichTextEditingController();
   final _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
   final _scrollCtl = ScrollController();
   late List<AiPromptTemplate> _templates;
@@ -34,18 +36,26 @@ class _AiChatPageState extends State<AiChatPage>
   double _lastScrollOffset = 0;
   bool _scrollScheduled = false;
 
-  /// Desktop only: Enter sends, Shift+Enter inserts newline.
-  /// On mobile, returns ignored to let the system handle soft keyboard normally.
+  /// Desktop: Enter sends, Shift+Enter inserts newline.
+  /// Mobile: consume Enter to prevent it from bubbling up to PlayerFocus
+  /// (which would open the danmaku input panel).
   static KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (Platform.isAndroid || Platform.isIOS) return KeyEventResult.ignored;
     if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.enter &&
-        !HardwareKeyboard.instance.isShiftPressed) {
-      final state = node.context?.findAncestorStateOfType<_AiChatPageState>();
-      if (state != null && !state.chatCtl.isAnalyzing.value) {
-        state._sendCustomPrompt();
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      if (Platform.isAndroid || Platform.isIOS) {
+        // On mobile, stop the KeyEvent from propagating to ancestor focus
+        // handlers (e.g. PlayerFocus → send danmaku), but let the platform
+        // IME process it as text input so the newline gets inserted.
+        return KeyEventResult.skipRemainingHandlers;
       }
-      return KeyEventResult.handled;
+      if (!HardwareKeyboard.instance.isShiftPressed) {
+        final state =
+            node.context?.findAncestorStateOfType<_AiChatPageState>();
+        if (state != null && !state.chatCtl.isAnalyzing.value) {
+          state._sendCustomPrompt();
+        }
+        return KeyEventResult.handled;
+      }
     }
     return KeyEventResult.ignored;
   }
@@ -122,10 +132,11 @@ class _AiChatPageState extends State<AiChatPage>
   Widget buildPage(ThemeData theme) {
     _templates = AiChatService.getTemplates();
     final colorScheme = theme.colorScheme;
-    return Material(
-      color: colorScheme.surface,
-      child: Column(
-        children: [
+    return FocusScope(
+      child: Material(
+        color: colorScheme.surface,
+        child: Column(
+          children: [
           // Drag handle
           GestureDetector(
             onTap: Get.back,
@@ -187,7 +198,7 @@ class _AiChatPageState extends State<AiChatPage>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               color: colorScheme.errorContainer,
               child: Text(
-                '字幕文本较长，分析结果可能不够完整',
+                '提示：当前视频文本较长，AI 首次阅读需要几秒钟，请耐心等待',
                 style: TextStyle(
                   fontSize: 12,
                   color: colorScheme.onErrorContainer,
@@ -204,6 +215,7 @@ class _AiChatPageState extends State<AiChatPage>
           // Input bar
           _buildInputBar(theme),
         ],
+      ),
       ),
     );
   }
@@ -262,16 +274,31 @@ class _AiChatPageState extends State<AiChatPage>
           const SizedBox(width: 12),
           Obx(() {
             final analyzing = chatCtl.isAnalyzing.value;
-            final noSubtitle = !chatCtl.hasSubtitles;
-            return FilledButton.icon(
-              onPressed: (analyzing || noSubtitle) ? null : _sendSelectedPrompt,
-              icon: analyzing
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.play_arrow, size: 20),
-              label: const Text('分析'),
+            final hasContext = chatCtl.hasVideoContext.value;
+            final hasSubs = chatCtl.hasSubtitles;
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!hasContext && hasSubs)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      onPressed: analyzing ? null : () => chatCtl.loadVideoContext(),
+                      icon: const Icon(Icons.post_add, size: 22),
+                      tooltip: '载入上下文',
+                    ),
+                  ),
+                FilledButton.icon(
+                  onPressed: analyzing ? null : _sendSelectedPrompt,
+                  icon: analyzing
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow, size: 20),
+                  label: const Text('分析'),
+                ),
+              ],
             );
           }),
         ],
@@ -299,9 +326,11 @@ class _AiChatPageState extends State<AiChatPage>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  chatCtl.hasSubtitles
-                      ? '选择提示词后点击「分析」开始'
-                      : '输入问题开始对话',
+                  chatCtl.hasVideoContext.value
+                      ? '视频上下文已载入，请输入你的问题'
+                      : chatCtl.hasSubtitles
+                          ? '选择提示词后点击「分析」或「载入上下文」'
+                          : '输入问题开始对话',
                   style: TextStyle(color: colorScheme.outline),
                 ),
               ],
@@ -318,6 +347,7 @@ class _AiChatPageState extends State<AiChatPage>
         itemCount: msgs.length,
         itemBuilder: (context, index) {
           final msg = msgs[index];
+          if (msg.isDivider) return _buildDivider(theme);
           if (msg.role == 'user') {
             final displayText = msg.templateName != null
                 ? '/${msg.templateName}'
@@ -328,6 +358,29 @@ class _AiChatPageState extends State<AiChatPage>
         },
       );
     });
+  }
+
+  Widget _buildDivider(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: colorScheme.outlineVariant)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              '已载入视频上下文',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.outline,
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: colorScheme.outlineVariant)),
+        ],
+      ),
+    );
   }
 
   Widget _buildUserMessage(String content, ThemeData theme) {
@@ -525,11 +578,12 @@ class _AiChatPageState extends State<AiChatPage>
       child: Row(
         children: [
           Expanded(
-            child: TextField(
+            child: RichTextField(
               controller: _inputCtl,
               focusNode: _focusNode,
               maxLines: 3,
               minLines: 1,
+              keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
                 hintText: '输入问题继续对话...',
@@ -561,7 +615,7 @@ class _AiChatPageState extends State<AiChatPage>
 class TimestampSyntax extends md.InlineSyntax {
   TimestampSyntax()
       : super(
-          r'(?<![.\d])(?:\[|［|[\(])?(\d{1,2})[：:](\d{2})(?:[：:](\d{2}))?(?:\]|［|[\)])?(?![.\d])',
+        r'(?<![.\d])(?:\[| ［|【|[\(])?(\d{1,2})[：:](\d{2})(?:[：:](\d{2}))?(?:\]| ［|】|[\)])?(?![.\d])',
         );
 
   @override
