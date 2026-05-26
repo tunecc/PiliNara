@@ -39,14 +39,40 @@ class DanmakuClusterer {
       ..sort((a, b) => a.progress.compareTo(b.progress));
 
     final output = <DanmakuElem>[];
-    final activeClusters = <DanmakuMergeCluster>[];
+    
+    final List<DanmakuMergeCluster>? activeClustersFlat =
+        config.crossMode ? <DanmakuMergeCluster>[] : null;
+    final Map<int, List<DanmakuMergeCluster>>? activeClustersByMode =
+        config.crossMode ? null : <int, List<DanmakuMergeCluster>>{};
+
+    final exactMatchMap = <String, DanmakuMergeCluster>{};
+
+    String _getExactKey(DanmakuMergeCandidate c) =>
+        config.crossMode ? c.normalizedText : '${c.mode}:${c.normalizedText}';
+
+    void removeCluster(DanmakuMergeCluster cluster) {
+      output.add(_buildRepresentative(cluster));
+      for (final peer in cluster.peers) {
+        exactMatchMap.remove(_getExactKey(peer));
+      }
+    }
 
     // Inspired by pakku's active-cluster queue: clusters are emitted once they
     // are outside the configured merge window.
     Future<void> flushExpired(int currentProgress) async {
-      while (activeClusters.isNotEmpty &&
-          currentProgress - activeClusters.first.progress > config.windowMs) {
-        output.add(_buildRepresentative(activeClusters.removeAt(0)));
+      if (config.crossMode) {
+        while (activeClustersFlat!.isNotEmpty &&
+            currentProgress - activeClustersFlat.first.progress >
+                config.windowMs) {
+          removeCluster(activeClustersFlat.removeAt(0));
+        }
+      } else {
+        for (final clusters in activeClustersByMode!.values) {
+          while (clusters.isNotEmpty &&
+              currentProgress - clusters.first.progress > config.windowMs) {
+            removeCluster(clusters.removeAt(0));
+          }
+        }
       }
     }
 
@@ -59,17 +85,37 @@ class DanmakuClusterer {
 
       final candidate = _toCandidate(element, segmentIndex);
       var matched = false;
-      for (final cluster in activeClusters) {
+
+      final exactKey = _getExactKey(candidate);
+      final exactCluster = exactMatchMap[exactKey];
+      if (exactCluster != null) {
+        exactCluster.add(candidate);
+        continue;
+      }
+      
+      final Iterable<DanmakuMergeCluster> searchSpace = config.crossMode
+          ? activeClustersFlat!
+          : activeClustersByMode!.putIfAbsent(
+              candidate.mode, () => <DanmakuMergeCluster>[]);
+
+      for (final cluster in searchSpace) {
         final result = await _matcher.match(candidate, cluster.root);
         if (result != null) {
           cluster.add(candidate);
+          exactMatchMap[exactKey] = cluster;
           matched = true;
           break;
         }
       }
 
       if (!matched) {
-        activeClusters.add(DanmakuMergeCluster(candidate));
+        final newCluster = DanmakuMergeCluster(candidate);
+        exactMatchMap[exactKey] = newCluster;
+        if (config.crossMode) {
+          activeClustersFlat!.add(newCluster);
+        } else {
+          activeClustersByMode![candidate.mode]!.add(newCluster);
+        }
       }
     }
 
@@ -81,18 +127,40 @@ class DanmakuClusterer {
         continue;
       }
       final candidate = _toCandidate(element, segmentIndex + 1);
-      for (final cluster in activeClusters) {
+
+      final exactKey = _getExactKey(candidate);
+      final exactCluster = exactMatchMap[exactKey];
+      if (exactCluster != null) {
+        exactCluster.add(candidate);
+        continue;
+      }
+
+      final Iterable<DanmakuMergeCluster> searchSpace = config.crossMode
+          ? activeClustersFlat!
+          : (activeClustersByMode![candidate.mode] ?? const []);
+
+      for (final cluster in searchSpace) {
         final result = await _matcher.match(candidate, cluster.root);
         if (result != null) {
           cluster.add(candidate);
+          exactMatchMap[exactKey] = cluster;
           break;
         }
       }
     }
 
-    output
-      ..addAll(activeClusters.map(_buildRepresentative))
-      ..sort((a, b) => a.progress.compareTo(b.progress));
+    if (config.crossMode) {
+      while (activeClustersFlat!.isNotEmpty) {
+        removeCluster(activeClustersFlat.removeAt(0));
+      }
+    } else {
+      for (final clusters in activeClustersByMode!.values) {
+        while (clusters.isNotEmpty) {
+          removeCluster(clusters.removeAt(0));
+        }
+      }
+    }
+    output.sort((a, b) => a.progress.compareTo(b.progress));
     return output;
   }
 
