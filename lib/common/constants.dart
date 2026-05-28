@@ -1,6 +1,6 @@
 abstract final class Constants {
   static const appName = 'PiliNara';
-  static const sourceCodeUrl = 'https://github.com/Starfallan/PiliNara';
+  static const sourceCodeUrl = 'https://github.com/tunecc/PiliNara';
   static const upstreamCodeUrl = 'https://github.com/bggRGjQaUbCoE/PiliPlus';
     
 
