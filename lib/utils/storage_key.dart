@@ -83,6 +83,7 @@ abstract final class SettingBoxKey {
       dynamicPeriod = 'dynamicPeriod',
       schemeVariant = 'schemeVariant',
       showViewPoints = 'showViewPoints',
+      showViewPointsOverlay = 'showViewPointsOverlay',
       showRelatedVideo = 'showRelatedVideo',
       showVideoReply = 'showVideoReply',
       showBangumiReply = 'showBangumiReply',
@@ -178,7 +179,8 @@ abstract final class SettingBoxKey {
       touchSlopH = 'touchSlopH',
       floatingNavBar = 'floatingNavBar',
       mixWithOthers = 'mixWithOthers',
-      removeSafeArea = 'removeSafeArea';
+      removeSafeArea = 'removeSafeArea',
+      angleDegrees = 'angleDegrees';
 
   static const String enableAiChat = 'enableAiChat',
       aiApiUrl = 'aiApiUrl',
@@ -276,6 +278,8 @@ abstract final class SettingBoxKey {
       upPanelPosition = 'upPanelPosition',
       dynamicsShowAllFollowedUp = 'dynamicsShowAllFollowedUp',
       useSideBar = 'useSideBar',
+      autoSideBar = 'autoSideBar',
+      sideBarThreshold = 'sideBarThreshold',
       enableMYBar = 'enableMYBar',
       hideTopBar = 'hideSearchBar',
       hideBottomBar = 'hideTabBar',
