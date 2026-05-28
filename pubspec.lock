@@ -254,8 +254,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/chat_bottom_container"
-      ref: main
-      resolved-ref: dba2bf10db4a6f89564d9be63ce17b18f0f7e3e5
+      ref: "59ae27131e36f14a9cd1a18057a416360969ac42"
+      resolved-ref: "59ae27131e36f14a9cd1a18057a416360969ac42"
       url: "https://github.com/bggRGjQaUbCoE/flutter_chat_packages.git"
     source: git
     version: "0.3.2"
