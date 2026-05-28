@@ -65,15 +65,18 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination generic/platform=iOS \
+            -derivedDataPath build/ios/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             build
 
+          APP_PATH="build/ios/DerivedData/Build/Products/Release-iphoneos/Runner.app"
+          test -d "$APP_PATH"
           rm -rf Payload
           mkdir -p Payload
-          cp -R build/ios/iphoneos/Runner.app Payload/
+          cp -R "$APP_PATH" Payload/
           IPA_NAME="PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa"
           ditto -c -k --sequesterRsrc --keepParent Payload "$IPA_NAME"
           echo "ipa_path=$IPA_NAME" >> "$GITHUB_ENV"
