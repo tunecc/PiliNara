@@ -18,7 +18,6 @@
 import 'dart:io' show File, Platform;
 
 import 'package:PiliPlus/common/widgets/colored_box_transition.dart';
-import 'package:PiliPlus/common/widgets/flutter/layout_builder.dart';
 import 'package:PiliPlus/common/widgets/flutter/page/page_view.dart';
 import 'package:PiliPlus/common/widgets/gesture/image_horizontal_drag_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/image.dart';
@@ -40,7 +39,7 @@ import 'package:PiliPlus/utils/utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart' hide Image, PageView, LayoutBuilder;
+import 'package:flutter/material.dart' hide Image, PageView;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:get/get.dart';
 import 'package:media_kit/media_kit.dart';
@@ -561,6 +560,14 @@ class _GalleryViewerState extends State<GalleryViewer>
             ListTile(
               onTap: () {
                 Get.back();
+                ImageUtils.copyImg(item.url);
+              },
+              dense: true,
+              title: const Text('复制图片', style: TextStyle(fontSize: 14)),
+            ),
+            ListTile(
+              onTap: () {
+                Get.back();
                 ImageUtils.downloadImg([item.url]);
               },
               dense: true,
@@ -620,6 +627,11 @@ class _GalleryViewerState extends State<GalleryViewer>
           height: 42,
           onTap: () => Utils.copyText(item.url),
           child: const Text('复制链接', style: TextStyle(fontSize: 14)),
+        ),
+        PopupMenuItem(
+          height: 42,
+          onTap: () => ImageUtils.copyImg(item.url),
+          child: const Text('复制图片', style: TextStyle(fontSize: 14)),
         ),
         PopupMenuItem(
           height: 42,

@@ -35,6 +35,8 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   late final RxBool readOnly = false.obs;
   late final RxBool enablePublish = false.obs;
 
+  bool isPublishing = false;
+
   bool hasPub = false;
   void initPubState();
 
@@ -206,8 +208,14 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
 
   void onSubmitted(String value) {
     if (enablePublish.value) {
-      onPublish();
+      onPublishThrottle();
     }
+  }
+
+  void onPublishThrottle() {
+    if (isPublishing) return;
+    isPublishing = true;
+    onPublish().whenComplete(() => isPublishing = false);
   }
 
   Future<void> onPublish();

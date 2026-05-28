@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
+import 'package:flutter/services.dart' show SystemChrome;
 
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -459,6 +460,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final isResume = state == .resumed;
     final ctr = videoDetailController.plPlayerController..visible = isResume;
     if (isResume) {
+      // TODO: remove
+      // workaround for https://github.com/flutter/flutter/issues/186723
+      if (Platform.isAndroid && !showSystemBar_) {
+        SystemChrome.setEnabledSystemUIMode(.immersiveSticky);
+      }
       if (!ctr.showDanmaku) {
         introController.startTimer();
         ctr.showDanmaku = true;
@@ -866,6 +872,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         // 强制触发一次同步 UI 刷新，确保 sliver 和 layout 正确响应
         setState(() {});
       });
+    }
+
+    // 重注册全屏画质切换回调。
+    // PlPlayerController 是单例，新视频页面 push 时会覆盖回调为其 controller 的闭包，
+    // 返回本页后必须重新注册，否则进入全屏时会使用错误 controller 的数据。
+    if (Platform.isAndroid || Platform.isIOS) {
+      videoDetailController.setupFullScreenQualitySwitch();
     }
 
     plPlayerController
