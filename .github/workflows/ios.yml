@@ -51,15 +51,26 @@ jobs:
         run: lib/scripts/patch.ps1 iOS
         continue-on-error: true
 
-      - name: Disable code signing
-        run: |
-          sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = ""/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' '/DEVELOPMENT_TEAM/s/= ".*"/= ""/g' ios/Runner.xcodeproj/project.pbxproj
-
       - name: Build iOS
         run: |
-          flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --config-only \
+            --dart-define-from-file=pili_release.json
+
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination generic/platform=iOS \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
           rm -rf Payload
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
@@ -69,7 +80,7 @@ jobs:
 
       - name: Release
         if: ${{ inputs.tag != '' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
           name: ${{ inputs.tag }}
