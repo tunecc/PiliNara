@@ -586,6 +586,9 @@ abstract final class Pref {
   static bool get showViewPoints =>
       _setting.get(SettingBoxKey.showViewPoints, defaultValue: true);
 
+  static bool get showViewPointsOverlay =>
+      _setting.get(SettingBoxKey.showViewPointsOverlay, defaultValue: true);
+
   static bool get showRelatedVideo =>
       _setting.get(SettingBoxKey.showRelatedVideo, defaultValue: true);
 
@@ -1128,6 +1131,13 @@ abstract final class Pref {
   static bool get useSideBar =>
       _setting.get(SettingBoxKey.useSideBar, defaultValue: false);
 
+  static bool get autoSideBar =>
+      _setting.get(SettingBoxKey.autoSideBar, defaultValue: false);
+
+  static double get sideBarThreshold =>
+      (_setting.get(SettingBoxKey.sideBarThreshold, defaultValue: 600.0) as num)
+          .toDouble();
+
   static bool get dynamicsShowAllFollowedUp => _setting.get(
     SettingBoxKey.dynamicsShowAllFollowedUp,
     defaultValue: false,
@@ -1501,4 +1511,7 @@ abstract final class Pref {
 
   static set aiPromptTemplates(String value) =>
       _setting.put(SettingBoxKey.aiPromptTemplates, value);
+
+  static int get angleDegrees =>
+      _setting.get(SettingBoxKey.angleDegrees, defaultValue: 30);
 }

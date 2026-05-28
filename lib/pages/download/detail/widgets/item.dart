@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
-import 'package:PiliPlus/common/widgets/flutter/layout_builder.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/progress_bar/video_progress_indicator.dart';
 import 'package:PiliPlus/common/widgets/select_mask.dart';
@@ -19,11 +18,12 @@ import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
-import 'package:flutter/material.dart' hide LayoutBuilder;
+import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as path;
@@ -514,6 +514,33 @@ class DetailItem extends StatelessWidget {
                 ),
                 onTap: () => Get.toNamed('/member?mid=$mid'),
               ),
+            if (canDel && Platform.isAndroid)
+              PopupMenuItem(
+                height: 38,
+                child: const Text('导出', style: TextStyle(fontSize: 13)),
+                onTap: () async {
+                  if (!await ImageUtils.checkPermissionDependOnSdkInt()) return;
+                  final title = entry.showTitle;
+                  SmartDialog.show(
+                    tag: 'export',
+                    clickMaskDismiss: false,
+                    builder: (_) => _ExportDialog(title: title),
+                    maskColor: Colors.black.withValues(alpha: 0.35),
+                  );
+                  try {
+                    final dest = await DownloadService.exportEntry(entry, (
+                      progress,
+                    ) {
+                      _ExportDialog.progressNotifier.value = progress;
+                    });
+                    SmartDialog.showToast('已导出到 $dest');
+                  } catch (e) {
+                    SmartDialog.showToast('导出失败: $e');
+                  } finally {
+                    SmartDialog.dismiss(tag: 'export');
+                  }
+                },
+              ),
             ...?extraMoreItemsBuilder?.call(menuContext),
             if (canDel) const PopupMenuDivider(height: 8),
             if (canDel)
@@ -546,6 +573,79 @@ class DetailItem extends StatelessWidget {
           ];
           return items;
         },
+      ),
+    );
+  }
+}
+
+class _ExportDialog extends StatelessWidget {
+  _ExportDialog({required this.title}) {
+    progressNotifier.value = 0;
+  }
+
+  static final progressNotifier = ValueNotifier<double>(0);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(28),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '正在导出',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ValueListenableBuilder<double>(
+                valueListenable: progressNotifier,
+                builder: (_, progress, _) {
+                  return Column(
+                    children: [
+                      LinearProgressIndicator(
+                        year2023: true,
+                        value: progress,
+                        minHeight: 4,
+                        borderRadius: BorderRadius.circular(2),
+                        color: theme.colorScheme.primary,
+                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${(progress * 100).toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
