@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
@@ -47,7 +48,7 @@ abstract class BaseVideoWebState<
           Obx(
             () {
               final order = controller.order.value;
-              return PopupMenuButton<V>(
+              return StaticPopupMenuButton<V>(
                 tooltip: '排序',
                 icon: const Icon(Icons.sort),
                 initialValue: order,
@@ -121,6 +122,7 @@ abstract class BaseVideoWebState<
       child: Padding(
         padding: const .fromLTRB(14, 0, 8, 4),
         child: Stack(
+          clipBehavior: .none,
           alignment: .centerLeft,
           children: [
             ?buildCount(),

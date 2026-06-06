@@ -1,7 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
-import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/models_new/download/bili_download_entry_info.dart';
@@ -13,6 +13,7 @@ import 'package:PiliPlus/pages/download/folder/view.dart';
 import 'package:PiliPlus/pages/download/folder_manage/view.dart';
 import 'package:PiliPlus/pages/download/search/view.dart';
 import 'package:PiliPlus/pages/download/sort/view.dart';
+import 'package:PiliPlus/pages/download/utils/cache_delete_confirm.dart';
 import 'package:PiliPlus/pages/download/widgets/folder_card.dart';
 import 'package:PiliPlus/pages/download/widgets/folder_dialog.dart';
 import 'package:PiliPlus/services/download/download_collection_service.dart';
@@ -123,13 +124,11 @@ class _DownloadPageState extends State<DownloadPage>
   }
 
   Future<void> _deleteFolder(DownloadFolder folder) async {
-    showConfirmDialog(
+    await confirmDeleteFolders(
       context: context,
-      title: const Text('确定删除该文件夹？'),
-      content: const Text('只会删除文件夹关联，不会删除本地缓存文件。'),
-      onConfirm: () async {
-        await _collectionService.deleteFolder(folder.id);
-      },
+      collectionService: _collectionService,
+      downloadService: _downloadService,
+      folders: [folder],
     );
   }
 
@@ -292,22 +291,8 @@ class _DownloadPageState extends State<DownloadPage>
           size: 18,
         ),
         onPressed: () {
-          final RenderBox button = context.findRenderObject()! as RenderBox;
-          final RenderBox overlay =
-              Overlay.of(context).context.findRenderObject()! as RenderBox;
-          final position = RelativeRect.fromRect(
-            Rect.fromPoints(
-              button.localToGlobal(Offset.zero, ancestor: overlay),
-              button.localToGlobal(
-                button.size.bottomRight(Offset.zero),
-                ancestor: overlay,
-              ),
-            ),
-            Offset.zero & overlay.size,
-          );
-          showMenu<int>(
+          showStaticPositionMenu<int>(
             context: context,
-            position: position,
             items: [
               const PopupMenuItem(
                 value: 0,
@@ -341,22 +326,8 @@ class _DownloadPageState extends State<DownloadPage>
         tooltip: '排序',
         icon: const Icon(Icons.sort),
         onPressed: () {
-          final RenderBox button = context.findRenderObject()! as RenderBox;
-          final RenderBox overlay =
-              Overlay.of(context).context.findRenderObject()! as RenderBox;
-          final position = RelativeRect.fromRect(
-            Rect.fromPoints(
-              button.localToGlobal(Offset.zero, ancestor: overlay),
-              button.localToGlobal(
-                button.size.bottomRight(Offset.zero),
-                ancestor: overlay,
-              ),
-            ),
-            Offset.zero & overlay.size,
-          );
-          showMenu<_DownloadSortAction>(
+          showStaticPositionMenu<_DownloadSortAction>(
             context: context,
-            position: position,
             items: const [
               PopupMenuItem(
                 value: _DownloadSortAction.manual,

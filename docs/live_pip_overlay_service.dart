@@ -1,8 +1,8 @@
 // lib/services/live_pip_overlay_service.dart
 import 'dart:async';
 
-import 'package:PiliPro/plugin/pl_player/controller.dart';
-import 'package:PiliPro/plugin/pl_player/view.dart';
+import 'package:PiliPlus/plugin/pl_player/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/view/view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';

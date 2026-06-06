@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show SystemChrome;
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
@@ -57,6 +58,7 @@ import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/services/shutdown_timer_service.dart'
     show shutdownTimerService;
 import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
@@ -70,7 +72,6 @@ import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
-import 'package:floating/floating.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
@@ -460,8 +461,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final isResume = state == .resumed;
     final ctr = videoDetailController.plPlayerController..visible = isResume;
     if (isResume) {
-      // TODO: remove
-      // workaround for https://github.com/flutter/flutter/issues/186723
       if (Platform.isAndroid && !showSystemBar_) {
         SystemChrome.setEnabledSystemUIMode(.immersiveSticky);
       }
@@ -555,16 +554,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       }
 
       if (exitFlag) {
-        // 结束播放退出全屏
         if (autoExitFullscreen) {
           plPlayerController!.triggerFullScreen(status: false);
           if (plPlayerController!.controlsLock.value) {
             plPlayerController!.onLockControl(false);
           }
-        }
-        // 播放完展示控制栏
-        if (Platform.isAndroid) {
-          if (await Floating().pipStatus == PiPStatus.disabled) {
+        } else {
+          if (plPlayerController!.controlsLock.value &&
+              (!Platform.isAndroid || !AndroidHelper.isPipMode)) {
             plPlayerController!.onLockControl(false);
           }
         }
@@ -1679,7 +1676,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     return const SizedBox.shrink();
   });
 
-  Widget _moreBtn(Color color, {List<Shadow>? shadows}) => PopupMenuButton(
+  Widget _moreBtn(Color color, {List<Shadow>? shadows}) =>
+      StaticPopupMenuButton(
     icon: Icon(
       size: 22,
       Icons.more_vert,
@@ -2475,7 +2473,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     if (isFullScreen || videoDetailController.showVideoSheet) {
       PageUtils.showVideoBottomSheet(
         context,
-        isFullScreen: () => isFullScreen,
         child: videoDetailController.plPlayerController.darkVideoPage
             ? Theme(
                 data: themeData,
@@ -2595,7 +2592,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     if (isFullScreen || videoDetailController.showVideoSheet) {
       PageUtils.showVideoBottomSheet(
         context,
-        isFullScreen: () => isFullScreen,
         child: videoDetailController.plPlayerController.darkVideoPage
             ? Theme(
                 data: themeData,

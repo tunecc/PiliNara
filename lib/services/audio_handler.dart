@@ -1,8 +1,10 @@
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:get/get.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
+import 'package:PiliPlus/pages/video/introduction/local/controller.dart';
 import 'package:PiliPlus/pages/audio/controller.dart';
 
 import 'package:PiliPlus/common/constants.dart';
@@ -14,6 +16,7 @@ import 'package:PiliPlus/models_new/video/video_detail/data.dart';
 import 'package:PiliPlus/models_new/video/video_detail/page.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -60,6 +63,10 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
           Get.find<UgcIntroController>(tag: currentHeroTag!).nextPlay();
         } else if (Get.isRegistered<PgcIntroController>(tag: currentHeroTag!)) {
           Get.find<PgcIntroController>(tag: currentHeroTag!).nextPlay();
+        } else if (Get.isRegistered<LocalIntroController>(
+          tag: currentHeroTag!,
+        )) {
+          Get.find<LocalIntroController>(tag: currentHeroTag!).nextPlay();
         }
       } catch (_) {}
     }
@@ -77,6 +84,10 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
           Get.find<UgcIntroController>(tag: currentHeroTag!).prevPlay();
         } else if (Get.isRegistered<PgcIntroController>(tag: currentHeroTag!)) {
           Get.find<PgcIntroController>(tag: currentHeroTag!).prevPlay();
+        } else if (Get.isRegistered<LocalIntroController>(
+          tag: currentHeroTag!,
+        )) {
+          Get.find<LocalIntroController>(tag: currentHeroTag!).prevPlay();
         }
       } catch (_) {}
     }
@@ -131,6 +142,11 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
         return isSeason || isPart || isPlayAll;
       } else if (Get.isRegistered<PgcIntroController>(tag: currentHeroTag!)) {
         return true;
+      } else if (Get.isRegistered<LocalIntroController>(
+        tag: currentHeroTag!,
+      )) {
+        final ctr = Get.find<LocalIntroController>(tag: currentHeroTag!);
+        return ctr.list.length > 1;
       } else if (Get.isRegistered<AudioController>(tag: currentHeroTag!)) {
         final ctr = Get.find<AudioController>(tag: currentHeroTag!);
         return ctr.playlist != null && ctr.playlist!.isNotEmpty;
@@ -160,17 +176,24 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     }
 
     final playing = status.isPlaying;
-    
+
     final hasEpisodes = _hasEpisodes();
 
     final controls = <MediaControl>[
       if (!isLive && hasEpisodes) MediaControl.skipToPrevious,
       MediaControl.rewind.copyWith(
-        androidIcon: 'drawable/ic_baseline_replay_10_24',
+        androidIcon: 'drawable/ic_player_rewind_10s',
       ),
-      if (playing) MediaControl.pause else MediaControl.play,
+      if (playing)
+        MediaControl.pause.copyWith(
+          androidIcon: 'drawable/ic_player_pause',
+        )
+      else
+        MediaControl.play.copyWith(
+          androidIcon: 'drawable/ic_player_play',
+        ),
       MediaControl.fastForward.copyWith(
-        androidIcon: 'drawable/ic_baseline_forward_10_24',
+        androidIcon: 'drawable/ic_player_fast_forward_10s',
       ),
       if (!isLive && hasEpisodes) MediaControl.skipToNext,
     ];
@@ -181,7 +204,11 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     List<int> compactIndices;
     if (controls.length >= 3) {
       if (playPauseIndex > 0 && playPauseIndex < controls.length - 1) {
-        compactIndices = [playPauseIndex - 1, playPauseIndex, playPauseIndex + 1];
+        compactIndices = [
+          playPauseIndex - 1,
+          playPauseIndex,
+          playPauseIndex + 1,
+        ];
       } else {
         compactIndices = [0, 1, 2];
       }
@@ -206,6 +233,15 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
         },
       ),
     );
+    if (Platform.isAndroid &&
+        (AndroidHelper.isPipMode ||
+            PlPlayerController.instance?.isAutoEnterPip == true)) {
+      AndroidHelper.updatePipActions(
+        PlatformDispatcher.instance.engineId!,
+        isLive,
+        playing,
+      );
+    }
   }
 
   void onStatusChange(PlayerStatus status, bool isBuffering, isLive) {

@@ -683,7 +683,6 @@ class VideoDetailController extends GetxController
           child: plPlayerController.darkVideoPage
               ? Theme(data: ThemeUtils.darkTheme, child: panel())
               : panel(),
-          isFullScreen: () => plPlayerController.isFullScreen.value,
         );
       } else {
         childKey.currentState?.showBottomSheet(
@@ -1061,7 +1060,9 @@ class VideoDetailController extends GetxController
       final progress = args.remove('progress');
       if (progress != null) {
         this.defaultST = Duration(milliseconds: progress);
-      } else if (defaultST == null && data.lastPlayTime != null) {
+      } else if (defaultST == null &&
+          data.lastPlayTime != null &&
+          _canUseLastPlayTime(data.lastPlayCid)) {
         this.defaultST = Duration(milliseconds: data.lastPlayTime!);
       }
 
@@ -1257,7 +1258,6 @@ class VideoDetailController extends GetxController
                 videoDetailController: this,
                 plPlayerController: plPlayerController,
               ),
-        isFullScreen: () => plPlayerController.isFullScreen.value,
       );
     } else {
       childKey.currentState?.showBottomSheet(
@@ -1484,6 +1484,14 @@ class VideoDetailController extends GetxController
 
   late bool continuePlayingPart = Pref.continuePlayingPart;
 
+  bool _canUseLastPlayTime(int? lastPlayCid) {
+    if (lastPlayCid != null && lastPlayCid != 0) {
+      return lastPlayCid == cid.value;
+    }
+    // PGC/PUGV progress can come from watch_progress without last_play_cid.
+    return (_actualVideoType ?? videoType) != VideoType.ugc;
+  }
+
   Future<void> _queryPlayInfo() async {
     vttSubtitles.clear();
     vttSubtitlesIndex.value = 0;
@@ -1497,7 +1505,9 @@ class VideoDetailController extends GetxController
       epId: epId,
     );
     if (res case Success(:final response)) {
-      if (response.lastPlayTime != null && response.lastPlayTime! > 0) {
+      if (response.lastPlayTime != null &&
+          response.lastPlayTime! > 0 &&
+          _canUseLastPlayTime(response.lastPlayCid)) {
         if (Accounts.get(AccountType.video).mid !=
             Accounts.get(AccountType.heartbeat).mid) {
           if (plPlayerController.position.inSeconds <= 3) {
@@ -1743,7 +1753,6 @@ class VideoDetailController extends GetxController
                 isStein: graphVersion != null,
                 title: title,
               ),
-        isFullScreen: () => plPlayerController.isFullScreen.value,
       );
     } else {
       childKey.currentState?.showBottomSheet(

@@ -5,6 +5,7 @@ import 'dart:math' show max;
 import 'package:PiliPlus/models/common/publish_panel_type.dart';
 import 'package:PiliPlus/utils/extension/chat_bottom_panel_ext.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:chat_bottom_container/chat_bottom_container.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -27,8 +28,11 @@ abstract class CommonPublishPage<T> extends StatefulWidget {
 abstract class CommonPublishPageState<T extends CommonPublishPage>
     extends State<T>
     with WidgetsBindingObserver {
-  late final FocusNode focusNode;
-  late final controller = ChatBottomPanelContainerController<PanelType>();
+  late bool _paused = false;
+  final FocusNode focusNode = FocusNode();
+  late final controller = ChatBottomPanelContainerController<PanelType>(
+    uiScale: Pref.uiScale,
+  );
   TextEditingController get editController;
 
   final Rx<PanelType> panelType = PanelType.none.obs;
@@ -40,23 +44,19 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   bool hasPub = false;
   void initPubState();
 
+  bool get handleKeyboard => Platform.isAndroid && widget.autofocus;
+
   @override
   void initState() {
     super.initState();
-    if (Platform.isAndroid) {
+    if (handleKeyboard) {
       WidgetsBinding.instance.addObserver(this);
     }
-
-    focusNode = FocusNode();
 
     initPubState();
 
     if (widget.autofocus) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          focusNode.requestFocus();
-        }
-      });
+      _requestFocus(duration: const Duration(milliseconds: 300));
     }
   }
 
@@ -67,34 +67,42 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
     }
     focusNode.dispose();
     editController.dispose();
-    if (Platform.isAndroid) {
+    if (handleKeyboard) {
       WidgetsBinding.instance.removeObserver(this);
     }
     super.dispose();
   }
 
-  void _requestFocus() {
-    Future.delayed(const Duration(microseconds: 200), focusNode.requestFocus);
+  void _safeRequestFocus() {
+    if (mounted) {
+      focusNode.requestFocus();
+    }
+  }
+
+  void _requestFocus({Duration duration = const Duration(microseconds: 200)}) {
+    Future.delayed(duration, _safeRequestFocus);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      if (mounted &&
-          widget.autofocus &&
-          (panelType.value == PanelType.keyboard ||
-              panelType.value == PanelType.none)) {
+    if (state == .resumed) {
+      if (_paused) {
+        _paused = false;
         controller.restoreChatPanel();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (focusNode.hasFocus) {
-            focusNode.unfocus();
-            _requestFocus();
-          } else {
-            _requestFocus();
-          }
-        });
+        final panelType = this.panelType.value;
+        if (panelType == .keyboard || panelType == .none) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (focusNode.hasFocus) {
+              focusNode.unfocus();
+              _requestFocus();
+            } else {
+              _requestFocus();
+            }
+          });
+        }
       }
-    } else if (state == AppLifecycleState.paused) {
+    } else if (state == .paused) {
+      _paused = true;
       controller.keepChatPanel();
       if (focusNode.hasFocus) {
         focusNode.unfocus();

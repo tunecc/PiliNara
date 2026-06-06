@@ -44,6 +44,12 @@ android {
         }
     }
 
+    buildFeatures {
+        if (project.hasProperty("dev")) {
+            resValues = true
+        }
+    }
+
     buildTypes {
         all {
             // 允许通过 `-Punsigned=true` 生成未签名 release 包，默认行为保持不变。

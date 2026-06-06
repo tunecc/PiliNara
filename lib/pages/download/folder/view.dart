@@ -1,11 +1,13 @@
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/view_sliver_safe_area.dart';
 import 'package:PiliPlus/models_new/download/download_collection.dart';
 import 'package:PiliPlus/pages/download/detail/widgets/item.dart';
 import 'package:PiliPlus/pages/download/folder/controller.dart';
 import 'package:PiliPlus/pages/download/sort/view.dart';
+import 'package:PiliPlus/pages/download/utils/cache_delete_confirm.dart';
 import 'package:PiliPlus/pages/download/widgets/folder_dialog.dart';
 import 'package:PiliPlus/services/download/download_collection_service.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
@@ -199,24 +201,8 @@ class _DownloadFolderPageState extends State<DownloadFolderPage> {
                     tooltip: '排序',
                     icon: const Icon(Icons.sort),
                     onPressed: () {
-                      final RenderBox button =
-                          context.findRenderObject()! as RenderBox;
-                      final RenderBox overlay = Overlay.of(context)
-                          .context
-                          .findRenderObject()! as RenderBox;
-                      final position = RelativeRect.fromRect(
-                        Rect.fromPoints(
-                          button.localToGlobal(Offset.zero, ancestor: overlay),
-                          button.localToGlobal(
-                            button.size.bottomRight(Offset.zero),
-                            ancestor: overlay,
-                          ),
-                        ),
-                        Offset.zero & overlay.size,
-                      );
-                      showMenu<_FolderSortAction>(
+                      showStaticPositionMenu<_FolderSortAction>(
                         context: context,
-                        position: position,
                         items: const [
                           PopupMenuItem(
                             value: _FolderSortAction.manual,
@@ -237,24 +223,8 @@ class _DownloadFolderPageState extends State<DownloadFolderPage> {
                   builder: (context) => IconButton(
                     icon: const Icon(Icons.more_vert),
                     onPressed: () {
-                      final RenderBox button =
-                          context.findRenderObject()! as RenderBox;
-                      final RenderBox overlay = Overlay.of(context)
-                          .context
-                          .findRenderObject()! as RenderBox;
-                      final position = RelativeRect.fromRect(
-                        Rect.fromPoints(
-                          button.localToGlobal(Offset.zero, ancestor: overlay),
-                          button.localToGlobal(
-                            button.size.bottomRight(Offset.zero),
-                            ancestor: overlay,
-                          ),
-                        ),
-                        Offset.zero & overlay.size,
-                      );
-                      showMenu<int>(
+                      showStaticPositionMenu<int>(
                         context: context,
-                        position: position,
                         items: [
                           const PopupMenuItem(
                             value: 0,
@@ -309,9 +279,13 @@ class _DownloadFolderPageState extends State<DownloadFolderPage> {
                         progress: _progress,
                         downloadService: _downloadService,
                         showTitle: true,
-                        onDelete: () => _collectionService.removeVideosFromFolder(
-                          widget.folderId,
-                          [entry.cid],
+                        onDeleteRequested: (menuContext) =>
+                            confirmRemoveEntriesFromFolder(
+                          context: menuContext,
+                          collectionService: _collectionService,
+                          downloadService: _downloadService,
+                          folderId: widget.folderId,
+                          entries: [entry],
                         ),
                         deleteLabel: '移出文件夹',
                         deleteConfirmText: '确定从当前文件夹移除？',

@@ -5,6 +5,7 @@ import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/button/toolbar_icon_button.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/flutter/draggable_scrollable_sheet.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/text_field.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
@@ -383,7 +384,7 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
     final color = _isPrivate.value
         ? theme.colorScheme.error
         : theme.colorScheme.secondary;
-    return PopupMenuButton<bool>(
+    return StaticPopupMenuButton<bool>(
       requestFocus: false,
       initialValue: _isPrivate.value,
       onSelected: (value) => _isPrivate.value = value,
@@ -439,7 +440,7 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
     final color = _replyOption.value == ReplyOptionType.close
         ? theme.colorScheme.error
         : theme.colorScheme.secondary;
-    return PopupMenuButton<ReplyOptionType>(
+    return StaticPopupMenuButton<ReplyOptionType>(
       requestFocus: false,
       initialValue: _replyOption.value,
       onSelected: (item) => _replyOption.value = item,
@@ -503,7 +504,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
           onPressed: _isEdit || _isPrivate.value
               ? null
               : () async {
-                  controller.keepChatPanel();
                   DateTime nowDate = DateTime.now();
                   final selectedDate = await showDatePicker(
                     context: context,
@@ -549,7 +549,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
                       );
                     }
                   }
-                  controller.restoreChatPanel();
                 },
           child: const Text('定时发布'),
         )
@@ -654,7 +653,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
 
   Widget get voteBtn => ToolbarIconButton(
     onPressed: () async {
-      controller.keepChatPanel();
       final voteItem = editController.items.firstWhereOrNull(
         (e) => e.type == RichTextType.vote,
       );
@@ -699,7 +697,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
           );
         }
       }
-      controller.restoreChatPanel();
     },
     icon: const Icon(Icons.bar_chart_rounded, size: 24),
     tooltip: '投票',
@@ -815,7 +812,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
 
   double _topicOffset = 0;
   Future<void> _onSelectTopic() async {
-    controller.keepChatPanel();
     TopicItem? res = await SelectTopicPanel.onSelectTopic(
       context,
       offset: _topicOffset,
@@ -824,7 +820,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
     if (res != null) {
       _topic.value = Pair(first: res.id, second: res.name);
     }
-    controller.restoreChatPanel();
   }
 
   @override
@@ -882,7 +877,6 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
   }
 
   Future<void> _onReserve() async {
-    controller.keepChatPanel();
     final ReserveInfoData? reserveInfo = await Navigator.of(context).push(
       GetPageRoute(
         page: () => CreateReservePage(sid: _reserveCard.value?.id),
@@ -891,6 +885,5 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
     if (reserveInfo != null) {
       _reserveCard.value = reserveInfo;
     }
-    controller.restoreChatPanel();
   }
 }

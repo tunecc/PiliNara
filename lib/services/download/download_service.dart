@@ -21,12 +21,12 @@ import 'package:PiliPlus/models_new/video/video_detail/page.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/subtitle.dart';
 import 'package:PiliPlus/pages/danmaku/controller.dart';
 import 'package:PiliPlus/services/download/download_manager.dart';
+import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/extension/file_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as path;
@@ -41,6 +41,7 @@ class DownloadService extends GetxService {
   final _lock = Lock();
 
   final flagNotifier = SetNotifier();
+  final completedEntryNotifier = Set<ValueChanged<BiliDownloadEntryInfo>>();
   final waitDownloadQueue = RxList<BiliDownloadEntryInfo>();
   final downloadList = <BiliDownloadEntryInfo>[];
 
@@ -117,8 +118,10 @@ class DownloadService extends GetxService {
     Part page,
     VideoDetailData? videoDetail,
     ugc.EpisodeItem? videoArc,
-    VideoQuality videoQuality,
-  ) {
+    VideoQuality videoQuality, {
+    String? autoFolderTitle,
+    String? autoFolderSourceKey,
+  }) {
     final cid = page.cid!;
     if (downloadList.indexWhere((e) => e.cid == cid) != -1) {
       return;
@@ -169,6 +172,8 @@ class DownloadService extends GetxService {
       ownerId: videoDetail?.owner?.mid ?? videoArc?.arc?.author?.mid,
       ownerName: videoDetail?.owner?.name ?? videoArc?.arc?.author?.name,
       pageData: pageData,
+      autoFolderTitle: autoFolderTitle,
+      autoFolderSourceKey: autoFolderSourceKey,
     );
     _createDownload(entry);
   }
@@ -434,7 +439,7 @@ class DownloadService extends GetxService {
       if (File(filePath).existsSync()) {
         return true;
       }
-      final file = (await DefaultCacheManager().getFileFromCache(
+      final file = (await CacheManager.manager.getFileFromCache(
         entry.cover,
       ))?.file;
       if (file != null) {
@@ -707,6 +712,7 @@ class DownloadService extends GetxService {
     await _updateBiliDownloadEntryJson(entry);
     waitDownloadQueue.remove(entry);
     downloadList.insert(0, entry);
+    completedEntryNotifier.notify(entry);
     flagNotifier.refresh();
     _curCid = null;
     curDownload.value = null;
@@ -894,6 +900,14 @@ extension SetNotifierExt on SetNotifier {
   void refresh() {
     for (final i in this) {
       i();
+    }
+  }
+}
+
+extension EntryNotifierExt on Set<ValueChanged<BiliDownloadEntryInfo>> {
+  void notify(BiliDownloadEntryInfo entry) {
+    for (final i in this) {
+      i(entry);
     }
   }
 }

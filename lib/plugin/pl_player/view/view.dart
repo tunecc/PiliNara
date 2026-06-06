@@ -9,6 +9,7 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/cropped_image.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/disabled_icon.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/gesture/immediate_tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/gesture/mouse_interactive_viewer.dart';
 import 'package:PiliPlus/common/widgets/gesture/player_gesture_recognizer.dart';
@@ -52,6 +53,8 @@ import 'package:PiliPlus/plugin/pl_player/widgets/common_btn.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/forward_seek.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/mpv_convert_webp.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/play_pause_btn.dart';
+import 'package:PiliPlus/utils/android/bindings.g.dart';
+import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
@@ -74,7 +77,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show RenderProxyBox, SemanticsConfiguration;
 import 'package:flutter/services.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -501,7 +503,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       BottomControlType.superResolution => Obx(
         () {
           final type = plPlayerController.superResolutionType.value;
-          return PopupMenuButton<SuperResolutionType>(
+          return StaticPopupMenuButton<SuperResolutionType>(
             tooltip: '超分辨率',
             requestFocus: false,
             initialValue: type,
@@ -689,7 +691,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       BottomControlType.fit => Obx(
         () {
           final fit = plPlayerController.videoFit.value;
-          return PopupMenuButton<VideoFitType>(
+          return StaticPopupMenuButton<VideoFitType>(
             tooltip: '画面比例',
             requestFocus: false,
             initialValue: fit,
@@ -728,7 +730,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         () {
           final list = videoDetailController.languages.value;
           if (list != null && list.isNotEmpty) {
-            return PopupMenuButton<String>(
+            return StaticPopupMenuButton<String>(
               tooltip: '翻译',
               requestFocus: false,
               initialValue: videoDetailController.currLang.value,
@@ -783,7 +785,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         () {
           if (videoDetailController.subtitles.isNotEmpty) {
             final val = videoDetailController.vttSubtitlesIndex.value;
-            return PopupMenuButton<int>(
+            return StaticPopupMenuButton<int>(
               tooltip: '字幕',
               requestFocus: false,
               initialValue: val,
@@ -843,7 +845,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
       /// 播放速度
       BottomControlType.speed => Obx(
-        () => PopupMenuButton<double>(
+        () => StaticPopupMenuButton<double>(
           tooltip: '倍速',
           requestFocus: false,
           initialValue: plPlayerController.playbackSpeed,
@@ -899,7 +901,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               usefulQaSam++;
             }
           }
-          return PopupMenuButton<int>(
+          return StaticPopupMenuButton<int>(
             tooltip: '画质',
             requestFocus: false,
             initialValue: currentVideoQa.code,
@@ -1039,6 +1041,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   void didChangeDependencies() {
     super.didChangeDependencies();
     colorScheme = ColorScheme.of(context);
+  }
+
+  @override
+  void didUpdateWidget(covariant PLVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (Platform.isAndroid && AndroidHelper.isPipMode) {
+      plPlayerController.controls = false;
+    }
   }
 
   void _onPanStart(ScaleStartDetails details) {
