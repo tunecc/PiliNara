@@ -4,11 +4,17 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: "tag"
+        description: "Publish release when non-empty; actual tag uses build number"
         required: false
         default: ""
         type: string
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Publish release when non-empty; actual tag uses build number"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build-mac-app:
@@ -48,11 +54,11 @@ jobs:
         run: mv PiliNara*.dmg PiliNara_macos_${{ env.version }}.dmg
 
       - name: Release
-        if: ${{ github.event.inputs.tag != '' }}
+        if: ${{ inputs.tag != '' }}
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.event.inputs.tag }}
-          name: ${{ github.event.inputs.tag }}
+          tag_name: ${{ env.release_tag }}
+          name: ${{ env.release_tag }}
           files: |
             PiliNara_macos_*.dmg
 

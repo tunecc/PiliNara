@@ -18,7 +18,7 @@ on:
                 type: boolean
 
             tag:
-                description: "tag"
+                description: "Publish release when non-empty; actual tag uses build number"
                 required: false
                 default: ""
                 type: string

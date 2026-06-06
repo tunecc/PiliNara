@@ -40,6 +40,7 @@ try {
     $data | ConvertTo-Json -Compress | Out-File 'pili_release.json' -Encoding UTF8
 
     Add-Content -Path $env:GITHUB_ENV -Value "version=$versionName+$versionCode"
+    Add-Content -Path $env:GITHUB_ENV -Value "release_tag=$versionCode"
 }
 catch {
     Write-Error "Prebuild Error: $($_.Exception.Message)"

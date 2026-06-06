@@ -9,7 +9,7 @@ on:
         default: ""
         type: string
       tag:
-        description: "tag"
+        description: "Publish release when non-empty; actual tag uses build number"
         required: false
         default: ""
         type: string
@@ -24,6 +24,12 @@ on:
         default: ""
         type: string
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Publish release when non-empty; actual tag uses build number"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build-macos-app:
@@ -85,8 +91,8 @@ jobs:
         if: ${{ inputs.tag != '' }}
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ inputs.tag }}
-          name: ${{ inputs.tag }}
+          tag_name: ${{ env.release_tag }}
+          name: ${{ env.release_tag }}
           files: ${{ env.ipa_path }}
 
       - name: Upload ios release
