@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show File, Platform;
 import 'dart:math' as math;
 import 'dart:typed_data' show Uint8List;
+import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/http/init.dart';
@@ -61,7 +62,8 @@ abstract final class ImageUtils {
         url.http2https,
       ))?.file;
       File? tempFile;
-      final filePath = file?.path ??
+      final filePath =
+          file?.path ??
           () {
             final name = Utils.getFileName(url);
             final path = '$tmpDirPath/$name';
@@ -283,6 +285,23 @@ abstract final class ImageUtils {
       }
     }
     return src.http2https;
+  }
+
+  static Future<Uint8List?> uiImageToPngBytes(
+    ui.Image? image, {
+    bool dispose = false,
+  }) async {
+    if (image == null) {
+      return null;
+    }
+    try {
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } finally {
+      if (dispose) {
+        image.dispose();
+      }
+    }
   }
 
   static Future<SaveResult?> saveByteImg({

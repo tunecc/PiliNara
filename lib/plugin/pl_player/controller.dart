@@ -892,12 +892,14 @@ class PlPlayerController with BlockConfigMixin {
     if (autosync != '0') {
       opt['autosync'] = autosync;
     }
+    final bufferSize = Pref.expandBuffer
+        ? (isLive ? 64 * 1024 * 1024 : 32 * 1024 * 1024)
+        : (isLive ? 16 * 1024 * 1024 : 4 * 1024 * 1024);
+    opt['demuxer-max-bytes'] = bufferSize.toString();
+    opt['demuxer-max-back-bytes'] = bufferSize.toString();
 
     final player = await Player.create(
       configuration: PlayerConfiguration(
-        bufferSize: Pref.expandBuffer
-            ? (isLive ? 64 * 1024 * 1024 : 32 * 1024 * 1024)
-            : (isLive ? 16 * 1024 * 1024 : 4 * 1024 * 1024),
         logLevel: kDebugMode ? .warn : .error,
         options: opt,
       ),
@@ -1929,10 +1931,15 @@ class PlPlayerController with BlockConfigMixin {
     videoShot = await VideoHttp.videoshot(bvid: bvid, cid: cid!);
   }
 
-  void takeScreenshot() {
+  Future<void> takeScreenshot() async {
     SmartDialog.showToast('截图中');
-    videoPlayerController?.screenshot(format: .png).then((value) {
-      if (value != null) {
+    try {
+      final screenshot = await videoPlayerController?.screenshot();
+      final bytes = await ImageUtils.uiImageToPngBytes(
+        screenshot,
+        dispose: true,
+      );
+      if (bytes != null) {
         SmartDialog.showToast('点击弹窗保存截图');
         showDialog(
           context: Get.context!,
@@ -1940,7 +1947,7 @@ class PlPlayerController with BlockConfigMixin {
             onTap: () {
               Get.back();
               ImageUtils.saveByteImg(
-                bytes: value,
+                bytes: bytes,
                 fileName: 'screenshot_${ImageUtils.time}',
               );
             },
@@ -1961,7 +1968,7 @@ class PlPlayerController with BlockConfigMixin {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(5),
-                      child: Image.memory(value),
+                      child: Image.memory(bytes),
                     ),
                   ),
                 ),
@@ -1972,7 +1979,10 @@ class PlPlayerController with BlockConfigMixin {
       } else {
         SmartDialog.showToast('截图失败');
       }
-    });
+    } catch (e) {
+      debugPrint(e.toString());
+      SmartDialog.showToast('截图失败');
+    }
   }
 
   void onPopInvokedWithResult(
