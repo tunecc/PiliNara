@@ -16,6 +16,8 @@ class TwoFingerTapDetector {
   int _totalTouchPointers = 0;
   bool _isCandidate = false;
 
+  int get activePointerCount => _startPositions.length;
+
   void onPointerDown({
     required int pointer,
     required Offset position,

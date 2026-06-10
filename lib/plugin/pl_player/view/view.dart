@@ -45,6 +45,7 @@ import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/gesture_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/plugin/pl_player/models/two_finger_tap_detector.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/app_bar_ani.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/backward_seek.dart';
@@ -152,6 +153,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   late final RxBool showRestoreScaleBtn = false.obs;
 
   GestureType? _gestureType;
+  final TwoFingerTapDetector _twoFingerTapDetector = TwoFingerTapDetector();
+  DateTime? _ignoreTapUpBefore;
   Offset? _initialFocalPoint;
 
   bool _pauseDueToPauseUponEnteringBackgroundMode = false;
@@ -560,7 +563,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
               // Use TextPainter to manually truncate the string to ensure the Text widget
               // tight-wraps the text, avoiding the layout padding caused by TextOverflow.ellipsis
-              final textStyle = const TextStyle(
+              const textStyle = TextStyle(
                 color: Colors.white,
                 fontSize: 12,
               );
@@ -1267,6 +1270,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onTapUp(TapUpDetails details) {
+    if (_shouldIgnoreTapUp()) {
+      return;
+    }
+
     switch (details.kind) {
       case ui.PointerDeviceKind.mouse when PlatformUtils.isDesktop:
         plPlayerController.onDoubleTapCenter();
@@ -1331,6 +1338,93 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   StreamSubscription<bool>? _danmakuListener;
 
+  bool get _canTrackTwoFingerTap =>
+      PlatformUtils.isMobile &&
+      plPlayerController.enableTwoFingerTapPause &&
+      !plPlayerController.controlsLock.value &&
+      !plPlayerController.isLive;
+
+  void _ignoreTapUpFor(Duration duration) {
+    final until = DateTime.now().add(duration);
+    final current = _ignoreTapUpBefore;
+    if (current == null || current.isBefore(until)) {
+      _ignoreTapUpBefore = until;
+    }
+  }
+
+  bool _shouldIgnoreTapUp() {
+    final ignoreTapUpBefore = _ignoreTapUpBefore;
+    if (ignoreTapUpBefore == null) {
+      return false;
+    }
+
+    if (DateTime.now().isBefore(ignoreTapUpBefore)) {
+      return true;
+    }
+
+    _ignoreTapUpBefore = null;
+    return false;
+  }
+
+  bool _handleTwoFingerTapIfNeeded() {
+    if (!_canTrackTwoFingerTap) {
+      return false;
+    }
+
+    _ignoreTapUpFor(const Duration(milliseconds: 300));
+    unawaited(plPlayerController.onDoubleTapCenter());
+    return true;
+  }
+
+  void _onTwoFingerPointerDown(PointerDownEvent event) {
+    if (event.kind != ui.PointerDeviceKind.touch) {
+      return;
+    }
+
+    if (!_canTrackTwoFingerTap) {
+      _twoFingerTapDetector.reset();
+      return;
+    }
+
+    _twoFingerTapDetector.onPointerDown(
+      pointer: event.pointer,
+      position: event.localPosition,
+    );
+
+    if (_twoFingerTapDetector.activePointerCount >= 2) {
+      _ignoreTapUpFor(const Duration(milliseconds: 300));
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (event.kind != ui.PointerDeviceKind.touch) {
+      return;
+    }
+
+    _twoFingerTapDetector.onPointerMove(
+      pointer: event.pointer,
+      position: event.localPosition,
+    );
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    if (event.kind != ui.PointerDeviceKind.touch) {
+      return;
+    }
+
+    if (_twoFingerTapDetector.onPointerUp(pointer: event.pointer)) {
+      _handleTwoFingerTapIfNeeded();
+    }
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (event.kind != ui.PointerDeviceKind.touch) {
+      return;
+    }
+
+    _twoFingerTapDetector.onPointerCancel(event.pointer);
+  }
+
   static const _kOffsetThreshold = 25.0;
   bool _isPositionAllowed(Offset offset) {
     if (offset.dx < _kOffsetThreshold ||
@@ -1360,6 +1454,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         return;
       }
     }
+
+    _onTwoFingerPointerDown(event);
 
     final controlsUnlock = !plPlayerController.controlsLock.value;
     if (PlatformUtils.isMobile) {
@@ -2231,6 +2327,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
               onPointerPanZoomEnd: _onPointerPanZoomEnd,
               onPointerDown: _onPointerDown,
+              onPointerMove: _onPointerMove,
+              onPointerUp: _onPointerUp,
+              onPointerCancel: _onPointerCancel,
               onPanStart: _onPanStart,
               onPanUpdate: _onPanUpdate,
               onPanEnd: _onPanEnd,
