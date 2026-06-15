@@ -164,3 +164,6 @@ CLAUDE.md
 .vibeskills
 Payload
 outputs/runtime/vibe-sessions
+test*
+/pubspec_overrides.yaml
+.mindfs

@@ -11,6 +11,7 @@ import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/audio_normalization.dart';
+import 'package:PiliPlus/models/common/dm_chart_source.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/reply/reply_sort_type.dart';
@@ -33,6 +34,7 @@ import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/filtering_text.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
@@ -232,14 +234,6 @@ List<SettingsModel> get extraSettings => [
     getSubtitle: () => '关键词、用户屏蔽、等级过滤、屏蔽带货评论',
     onTap: (context, _) => Get.to(() => const ReplySetting()),
   ),
-  getListBanWordModel(
-    title: '动态关键词过滤',
-    key: SettingBoxKey.banWordForDyn,
-    onChanged: (value) {
-      DynamicsDataModel.banWordForDyn = value;
-      DynamicsDataModel.enableFilter = value.pattern.isNotEmpty;
-    },
-  ),
   const SwitchModel(
     title: '使用外部浏览器打开链接',
     leading: Icon(Icons.open_in_browser),
@@ -387,12 +381,12 @@ List<SettingsModel> get extraSettings => [
     setKey: SettingBoxKey.showSeekPreview,
     defaultVal: true,
   ),
-  const SwitchModel(
-    title: '显示高能进度条',
-    subtitle: '高能进度条反应了在时域上，单位时间内弹幕发送量的变化趋势',
-    leading: Icon(Icons.show_chart),
-    setKey: SettingBoxKey.showDmChart,
-    defaultVal: false,
+  NormalModel(
+    title: '高能进度条',
+    leading: const Icon(Icons.show_chart),
+    getSubtitle: () =>
+        '当前:「${Pref.dmChartSource.label}」\n显示视频弹幕热度趋势；官方无数据时可使用弹幕密度生成',
+    onTap: _showDmChartSourceDialog,
   ),
   const SwitchModel(
     title: '记录评论',
@@ -892,9 +886,7 @@ void _showDmHeightDialog(BuildContext context, VoidCallback setState) {
         initialValue: danmakuLineHeight,
         keyboardType: const .numberWithOptions(decimal: true),
         onChanged: (value) => danmakuLineHeight = value,
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[\d\.]+')),
-        ],
+        inputFormatters: FilteringText.decimal,
       ),
       actions: [
         TextButton(
@@ -936,9 +928,7 @@ void _showTouchSlopDialog(BuildContext context, VoidCallback setState) {
         initialValue: initialValue,
         keyboardType: const .numberWithOptions(decimal: true),
         onChanged: (value) => initialValue = value,
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[\d\.]+')),
-        ],
+        inputFormatters: FilteringText.decimal,
       ),
       actions: [
         TextButton(
@@ -974,7 +964,7 @@ Future<void> _showRefreshDragDialog(
   final res = await showDialog<double>(
     context: context,
     builder: (context) => SliderDialog(
-      title: '刷新滑动距离',
+      title: const Text('刷新滑动距离'),
       min: 0.1,
       max: 0.5,
       divisions: 8,
@@ -997,7 +987,7 @@ Future<void> _showRefreshDialog(
   final res = await showDialog<double>(
     context: context,
     builder: (context) => SliderDialog(
-      title: '刷新指示器高度',
+      title: const Text('刷新指示器高度'),
       min: 10.0,
       max: 100.0,
       divisions: 9,
@@ -1040,6 +1030,28 @@ Future<void> _showSuperResolutionDialog(
       SettingBoxKey.superResolutionType,
       res.index,
     );
+    setState();
+  }
+}
+
+Future<void> _showDmChartSourceDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<DmChartSource>(
+    context: context,
+    builder: (context) => SelectDialog<DmChartSource>(
+      title: '高能进度条',
+      value: Pref.dmChartSource,
+      values: DmChartSource.values.map((e) => (e, e.label)).toList(),
+      subtitleBuilder: (context, index) => Text(
+        DmChartSource.values[index].desc,
+        style: TextTheme.of(context).bodySmall,
+      ),
+    ),
+  );
+  if (res != null) {
+    await GStorage.setting.put(SettingBoxKey.dmChartSource, res.index);
     setState();
   }
 }
@@ -1097,7 +1109,7 @@ Future<void> _showReplyCountDialog(
   final res = await showDialog<double>(
     context: context,
     builder: (context) => SliderDialog(
-      title: '连接重试次数',
+      title: const Text('连接重试次数'),
       min: 0,
       max: 8,
       divisions: 8,
@@ -1119,7 +1131,7 @@ Future<void> _showReplyDelayDialog(
   final res = await showDialog<double>(
     context: context,
     builder: (context) => SliderDialog(
-      title: '连接重试间隔',
+      title: const Text('连接重试间隔'),
       min: 0,
       max: 1000,
       divisions: 10,
@@ -1222,9 +1234,7 @@ void _showProxyDialog(BuildContext context) {
             decoration: const InputDecoration(
               isDense: true,
               labelText: '请输入Port',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(6)),
-              ),
+              border: OutlineInputBorder(borderRadius: .all(.circular(6))),
             ),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (e) => systemProxyPort = e,
@@ -1268,9 +1278,7 @@ void _showCacheDialog(BuildContext context, VoidCallback setState) {
         autofocus: true,
         onChanged: (value) => valueStr = value,
         keyboardType: TextInputType.number,
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[\d\.]+')),
-        ],
+        inputFormatters: FilteringText.decimal,
         decoration: const InputDecoration(suffixText: 'MB'),
       ),
       actions: [

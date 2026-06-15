@@ -59,8 +59,8 @@ import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/services/pip_overlay_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
+import 'package:PiliPlus/utils/danmaku_density_trend.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
-import 'package:PiliPlus/utils/extension/file_ext.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
@@ -798,7 +798,7 @@ class VideoDetailController extends GetxController
     await Get.key.currentState!.push(
       PublishRoute(
         pageBuilder: (buildContext, animation, secondaryAnimation) {
-          return SendDanmakuPanel(
+          final child = SendDanmakuPanel(
             cid: cid.value,
             bvid: bvid,
             progress: plPlayerController.position.inMilliseconds,
@@ -808,10 +808,13 @@ class VideoDetailController extends GetxController
               savedDanmaku = null;
               plPlayerController.danmakuController?.addDanmaku(danmakuModel);
             },
-            darkVideoPage: plPlayerController.darkVideoPage,
             dmConfig: dmConfig,
             onSaveDmConfig: (dmConfig) => this.dmConfig = dmConfig,
           );
+          if (plPlayerController.darkVideoPage) {
+            return Theme(data: ThemeUtils.darkTheme, child: child);
+          }
+          return child;
         },
       ),
     );
@@ -897,12 +900,7 @@ class VideoDetailController extends GetxController
   }
 
   Future<void> playerInit({
-    String? video,
-    String? audio,
-    Duration? seekToTime,
-    Duration? duration,
     bool? autoplay,
-    Volume? volume,
     bool autoFullScreenFlag = false,
   }) async {
     // 如果播放器单例已被外部销毁（例如在二级页面关闭了小窗），重新获取一个新实例
@@ -912,7 +910,7 @@ class VideoDetailController extends GetxController
     if (isFileSource) {
       await _loadLocalPlaybackMeta();
     }
-    Duration? seek = seekToTime ?? defaultST ?? playedTime;
+    Duration? seek = defaultST ?? playedTime;
     if (seek == null || seek == Duration.zero) {
       seek = getFirstSegment();
     }
@@ -925,15 +923,13 @@ class VideoDetailController extends GetxController
               hasDashAudio: entry.hasDashAudio,
             )
           : NetworkSource(
-              videoSource: video ?? videoUrl!,
-              audioSource: audio ?? audioUrl,
+              videoSource: videoUrl!,
+              audioSource: audioUrl,
             ),
       seekTo: seek,
-      duration:
-          duration ??
-          (data.timeLength == null
-              ? null
-              : Duration(milliseconds: data.timeLength!)),
+      duration: data.timeLength == null
+          ? null
+          : Duration(milliseconds: data.timeLength!),
       isVertical: isVertical.value,
       aid: aid,
       bvid: bvid,
@@ -949,23 +945,32 @@ class VideoDetailController extends GetxController
       },
       width: firstVideo.width,
       height: firstVideo.height,
-      volume: volume ?? this.volume,
+      volume: volume,
       autoFullScreenFlag: autoFullScreenFlag,
     );
 
-    if (isClosed) return;
-
-    if (!isFileSource) {
-      if (plPlayerController.enableBlock) {
-        initSkip();
+    // 检查 controller 是否已关闭，如果已关闭则跳过后续的资源加载操作
+    // （播放信息、弹幕趋势、SponsorBlock 等），避免已销毁的 controller
+    // 触发不必要的异步操作和 UI 更新
+    if (isClosed) {
+      if (kDebugMode) {
+        debugPrint('[VideoDetail] playerInit: controller is closed, skipping resource loading');
       }
+      return;
+    }
 
+    // 需要活跃资源的操作
+    if (!isFileSource) {
       if (vttSubtitlesIndex.value == -1) {
         _queryPlayInfo();
       }
 
       if (plPlayerController.showDmChart && dmTrend.value == null) {
         _getDmTrend();
+      }
+
+      if (plPlayerController.enableBlock) {
+        initSkip();
       }
     } else {
       if (vttSubtitlesIndex.value == -1) {
@@ -990,14 +995,13 @@ class VideoDetailController extends GetxController
       return;
     }
     currLang.value = language;
-    queryVideoUrl(defaultST: playedTime);
+    queryVideoUrl(fromReset: true);
   }
 
   Volume? volume;
 
   // 视频链接
   Future<void> queryVideoUrl({
-    Duration? defaultST,
     bool fromReset = false,
     bool reinitializePlayer = true,
     bool autoFullScreenFlag = false,
@@ -1057,13 +1061,19 @@ class VideoDetailController extends GetxController
 
       volume = data.volume;
 
-      final progress = args.remove('progress');
-      if (progress != null) {
-        this.defaultST = Duration(milliseconds: progress);
-      } else if (defaultST == null &&
-          data.lastPlayTime != null &&
-          _canUseLastPlayTime(data.lastPlayCid)) {
-        this.defaultST = Duration(milliseconds: data.lastPlayTime!);
+      if (!fromReset) {
+        final progress = args.remove('progress');
+        final playUrlStartTime = defaultST == null
+            ? _resolvePlayUrlStartTime(
+                lastPlayTime: data.lastPlayTime,
+                lastPlayCid: data.lastPlayCid,
+              )
+            : null;
+        if (progress != null) {
+          this.defaultST = Duration(milliseconds: progress);
+        } else if (playUrlStartTime != null) {
+          this.defaultST = playUrlStartTime;
+        }
       }
 
       if (!isUgc && !fromReset && plPlayerController.enablePgcSkip) {
@@ -1242,22 +1252,16 @@ class VideoDetailController extends GetxController
       );
     }
     if (plPlayerController.isFullScreen.value || showVideoSheet) {
+      final child = PostPanel(
+        enableSlide: false,
+        videoDetailController: this,
+        plPlayerController: plPlayerController,
+      );
       PageUtils.showVideoBottomSheet(
         context,
         child: plPlayerController.darkVideoPage
-            ? Theme(
-                data: ThemeUtils.darkTheme,
-                child: PostPanel(
-                  enableSlide: false,
-                  videoDetailController: this,
-                  plPlayerController: plPlayerController,
-                ),
-              )
-            : PostPanel(
-                enableSlide: false,
-                videoDetailController: this,
-                plPlayerController: plPlayerController,
-              ),
+            ? Theme(data: ThemeUtils.darkTheme, child: child)
+            : child,
       );
     } else {
       childKey.currentState?.showBottomSheet(
@@ -1419,19 +1423,8 @@ class VideoDetailController extends GetxController
       final sub = subtitles[index - 1];
 
       String subUri = subtitle.id;
-      File? file;
       if (subtitle.isData) {
-        subUri = path.join(tmpDirPath, '${cid.value}-${sub.lan}.vtt');
-        file = File(subUri);
-        if (!file.existsSync()) {
-          await file.writeAsString(subtitle.id);
-          if (plPlayerController.videoPlayerController?.disposed == false) {
-            plPlayerController.videoPlayerController!.release.add(file.tryDel);
-          } else {
-            file.tryDel();
-            return;
-          }
-        }
+        subUri = 'memory://$subUri';
       }
       await plPlayerController.videoPlayerController?.setSubtitleTrack(
         SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
@@ -1483,6 +1476,18 @@ class VideoDetailController extends GetxController
   }
 
   late bool continuePlayingPart = Pref.continuePlayingPart;
+
+  Duration? _resolvePlayUrlStartTime({
+    required int lastPlayTime,
+    required int? lastPlayCid,
+  }) {
+    if (lastPlayTime <= 0) {
+      return Duration.zero;
+    }
+    return _canUseLastPlayTime(lastPlayCid)
+        ? Duration(milliseconds: lastPlayTime)
+        : Duration.zero;
+  }
 
   bool _canUseLastPlayTime(int? lastPlayCid) {
     if (lastPlayCid != null && lastPlayCid != 0) {
@@ -1630,7 +1635,9 @@ class VideoDetailController extends GetxController
       // 正在进入小窗，保留资源
       return;
     }
+    plPlayerController.pause();
     cancelBlockListener();
+    _dmTrendTaskId++;
     cid.close();
     if (isFileSource) {
       cacheLocalProgress();
@@ -1656,6 +1663,7 @@ class VideoDetailController extends GetxController
     }
 
     playedTime = null;
+    _dmTrendTaskId++;
     defaultST = null;
     videoUrl = null;
     audioUrl = null;
@@ -1701,9 +1709,46 @@ class VideoDetailController extends GetxController
   late final Rx<LoadingState<List<double>>?> dmTrend =
       Rx<LoadingState<List<double>>?>(null);
   late final RxBool showDmTrendChart = true.obs;
+  int _dmTrendTaskId = 0;
 
   Future<void> _getDmTrend() async {
+    final source = plPlayerController.dmChartSource;
+    if (!source.isEnabled) {
+      dmTrend.value = null;
+      return;
+    }
+
+    final taskId = ++_dmTrendTaskId;
+    bool shouldCancel() => taskId != _dmTrendTaskId || isClosed;
+
     dmTrend.value = LoadingState<List<double>>.loading();
+
+    if (source.enableOfficial) {
+      final official = await _tryGetOfficialDmTrend();
+      if (shouldCancel()) return;
+      if (official?.isNotEmpty == true) {
+        dmTrend.value = Success(official!);
+        return;
+      }
+      if (!source.enableLocalDensity) {
+        dmTrend.value = const Error(null);
+        return;
+      }
+    }
+
+    if (source.enableLocalDensity) {
+      final local = await _tryBuildLocalDmTrend(shouldCancel);
+      if (shouldCancel()) return;
+      if (local?.isNotEmpty == true) {
+        dmTrend.value = Success(local!);
+        return;
+      }
+    }
+
+    dmTrend.value = const Error(null);
+  }
+
+  Future<List<double>?> _tryGetOfficialDmTrend() async {
     try {
       final res = await Request().get(
         'https://bvc.bilivideo.com/pbp/data',
@@ -1715,13 +1760,29 @@ class VideoDetailController extends GetxController
       PbpData data = PbpData.fromJson(res.data);
       int stepSec = data.stepSec ?? 0;
       if (stepSec != 0 && data.events?.eDefault?.isNotEmpty == true) {
-        dmTrend.value = Success(data.events!.eDefault!);
-        return;
+        return data.events!.eDefault!;
       }
-      dmTrend.value = const Error(null);
     } catch (e) {
-      dmTrend.value = const Error(null);
-      if (kDebugMode) debugPrint('_getDmTrend: $e');
+      if (kDebugMode) debugPrint('_tryGetOfficialDmTrend: $e');
+    }
+    return null;
+  }
+
+  Future<List<double>?> _tryBuildLocalDmTrend(
+    bool Function() shouldCancel,
+  ) async {
+    try {
+      final durationMs = data.timeLength ??
+          plPlayerController.duration.value.inMilliseconds;
+      return await DanmakuDensityTrend.build(
+        cid: cid.value,
+        durationMs: durationMs,
+        shouldCancel: shouldCancel,
+      );
+    } catch (e, s) {
+      if (kDebugMode) debugPrint('_tryBuildLocalDmTrend: $e');
+      Utils.reportError(e, s);
+      return null;
     }
   }
 
@@ -1733,26 +1794,18 @@ class VideoDetailController extends GetxController
       ).videoDetail.value.title;
     } catch (_) {}
     if (plPlayerController.isFullScreen.value || showVideoSheet) {
+      final child = NoteListPage(
+        oid: aid,
+        enableSlide: false,
+        heroTag: heroTag,
+        isStein: graphVersion != null,
+        title: title,
+      );
       PageUtils.showVideoBottomSheet(
         context,
         child: plPlayerController.darkVideoPage
-            ? Theme(
-                data: ThemeUtils.darkTheme,
-                child: NoteListPage(
-                  oid: aid,
-                  enableSlide: false,
-                  heroTag: heroTag,
-                  isStein: graphVersion != null,
-                  title: title,
-                ),
-              )
-            : NoteListPage(
-                oid: aid,
-                enableSlide: false,
-                heroTag: heroTag,
-                isStein: graphVersion != null,
-                title: title,
-              ),
+            ? Theme(data: ThemeUtils.darkTheme, child: child)
+            : child,
       );
     } else {
       childKey.currentState?.showBottomSheet(

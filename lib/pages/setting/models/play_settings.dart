@@ -15,6 +15,7 @@ import 'package:PiliPlus/plugin/pl_player/models/double_tap_seek_layout.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/service_locator.dart';
+import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -138,24 +139,36 @@ List<SettingsModel> get playSettings => [
     SwitchModel(
       title: '应用内音量',
       subtitle: '开启后在应用内调节音量不会改变系统音量',
-      leading: Icon(Icons.volume_up_outlined),
+      leading: const Icon(Icons.volume_up_outlined),
       setKey: SettingBoxKey.enableAppVolume,
       defaultVal: false,
       onChanged: (value) async {
-        // 设置变更时通知播放器控制器
-        final controller = PlPlayerController.getInstance();
-        if (controller != null) {
-          await controller.onAppVolumeSettingChanged();
-        }
+        await PlPlayerController.instance?.onAppVolumeSettingChanged();
       },
     ),
   if (PlatformUtils.isMobile && Pref.enableAppVolume)
-    SwitchModel(
+    const SwitchModel(
       title: '音量增强',
       subtitle: '在应用内音量模式下允许放大至 200%',
       leading: Icon(Icons.volume_up_outlined),
       setKey: SettingBoxKey.enableVolumeBoost,
       defaultVal: false,
+    ),
+  if (PlatformUtils.isMobile)
+    NormalModel(
+      title: '播放器音量',
+      leading: const Icon(Icons.volume_up),
+      getSubtitle: () =>
+          '当前:「${Pref.playerVolume.toStringAsFixed(0)}%」\n'
+          '在系统音量基础上增益；开启应用内音量后不生效',
+      onTap: showPlayerVolumeDialog,
+    )
+  else
+    NormalModel(
+      title: '最高音量',
+      leading: const Icon(Icons.volume_up),
+      getSubtitle: () => '当前:「${(Pref.maxVolume * 100).toStringAsFixed(0)}%」',
+      onTap: _showMaxVolumeDialog,
     ),
   const SwitchModel(
     title: '中间滑动进入/退出全屏',
@@ -448,7 +461,7 @@ Future<void> _showAngleDegreesDialog(
   final res = await showDialog<double>(
     context: context,
     builder: (context) => SliderDialog(
-      title: '倾斜角度阈值',
+      title: const Text('倾斜角度阈值'),
       min: 10.0,
       max: 90.0,
       divisions: 90,
@@ -460,5 +473,73 @@ Future<void> _showAngleDegreesDialog(
   if (res != null) {
     await GStorage.setting.put(SettingBoxKey.angleDegrees, res.toInt());
     setState();
+  }
+}
+
+Future<void> showPlayerVolumeDialog(
+  BuildContext context,
+  VoidCallback setState, {
+  ValueChanged<double>? onChanged,
+}) {
+  if (Pref.enableAppVolume) {
+    SmartDialog.showToast('应用内音量开启时，播放器音量设置不生效');
+    return Future.value();
+  }
+  return showVolumeDialog(
+    context,
+    title: const Text('播放器音量'),
+    value: Pref.playerVolume,
+    onChanged: (value) => GStorage.setting
+        .put(SettingBoxKey.playerVolume, value)
+        .whenComplete(() {
+          setState();
+          onChanged?.call(value);
+        }),
+  );
+}
+
+Future<void> _showMaxVolumeDialog(
+  BuildContext context,
+  VoidCallback setState,
+) {
+  return showVolumeDialog(
+    context,
+    title: const Text('最高音量'),
+    value: Pref.maxVolume * 100,
+    onChanged: (rawValue) {
+      final maxVolume = (rawValue / 100).toPrecision(2);
+      if (Pref.desktopVolume > maxVolume) {
+        GStorage.setting.put(SettingBoxKey.desktopVolume, maxVolume);
+      }
+      GStorage.setting
+          .put(SettingBoxKey.maxVolume, maxVolume)
+          .whenComplete(setState);
+    },
+  );
+}
+
+const kMinVolume = 100.0;
+const kMaxVolume = 300.0;
+
+Future<void> showVolumeDialog(
+  BuildContext context, {
+  required Widget title,
+  required double value,
+  required ValueChanged<double> onChanged,
+}) async {
+  final res = await showDialog<double>(
+    context: context,
+    builder: (context) => SliderDialog(
+      title: title,
+      min: kMinVolume,
+      max: kMaxVolume,
+      divisions: 40,
+      precise: 0,
+      value: value,
+      suffix: '%',
+    ),
+  );
+  if (res != null) {
+    onChanged(res);
   }
 }

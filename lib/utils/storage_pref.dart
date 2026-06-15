@@ -8,6 +8,7 @@ import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/models/common/bar_hide_type.dart';
 import 'package:PiliPlus/models/common/danmaku/danmaku_font_sync_mode.dart';
+import 'package:PiliPlus/models/common/dm_chart_source.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
@@ -15,6 +16,7 @@ import 'package:PiliPlus/models/common/follow_order_type.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
+import 'package:PiliPlus/models/common/rcmd_mode.dart';
 import 'package:PiliPlus/models/common/reply/reply_sort_type.dart';
 import 'package:PiliPlus/models/common/sponsor_block/segment_type.dart';
 import 'package:PiliPlus/models/common/sponsor_block/skip_type.dart';
@@ -498,6 +500,16 @@ abstract final class Pref {
   static bool get appRcmd =>
       _setting.get(SettingBoxKey.appRcmd, defaultValue: true);
 
+  /// 推荐流模式，首次读取时从旧 key appRcmd 迁移
+  static RcmdMode get rcmdMode {
+    final index = _setting.get(SettingBoxKey.rcmdMode);
+    if (index != null) {
+      return RcmdMode.values.elementAtOrNull(index) ?? RcmdMode.app;
+    }
+    // 旧版迁移：appRcmd true→App, false→Web
+    return appRcmd ? RcmdMode.app : RcmdMode.web;
+  }
+
   static bool get removeBlockedRcmd =>
       _setting.get(SettingBoxKey.removeBlockedRcmd, defaultValue: false);
 
@@ -767,6 +779,16 @@ abstract final class Pref {
 
   static bool get showSeekPreview =>
       _setting.get(SettingBoxKey.showSeekPreview, defaultValue: true);
+
+  static DmChartSource get dmChartSource {
+    final index = _setting.get(SettingBoxKey.dmChartSource);
+    if (index is int) {
+      return DmChartSource.values.elementAtOrNull(index) ??
+          DmChartSource.disabled;
+    }
+    // Backward compatibility with the old boolean switch.
+    return showDmChart ? DmChartSource.officialFirst : DmChartSource.disabled;
+  }
 
   static bool get showDmChart =>
       _setting.get(SettingBoxKey.showDmChart, defaultValue: false);
@@ -1253,8 +1275,31 @@ abstract final class Pref {
   static bool get enableLongShowControl =>
       _setting.get(SettingBoxKey.enableLongShowControl, defaultValue: false);
 
-  static bool get expandBuffer =>
-      _setting.get(SettingBoxKey.expandBuffer, defaultValue: false);
+  static double get bufferSize =>
+      _setting.get(SettingBoxKey.bufferSize, defaultValue: 4.0);
+
+  static double get bufferSec =>
+      _setting.get(SettingBoxKey.bufferSec, defaultValue: 16.0);
+
+  static Map<String, String> initBuffer([double playbackSpeed = 1.0]) {
+    final bufSec = Pref.bufferSec * playbackSpeed;
+    final bufSiz = (Pref.bufferSize * 0x100000).toStringAsFixed(0);
+    return {
+      'cache': 'yes',
+      'cache-secs': bufSec.toStringAsFixed(3),
+      'demuxer-hysteresis-secs': (bufSec / 1.5).toStringAsFixed(3),
+      'demuxer-max-bytes': bufSiz,
+      'demuxer-max-back-bytes': bufSiz,
+    };
+  }
+
+  static Map<String, String> initLiveBuffer() {
+    return {
+      'cache': 'yes',
+      'demuxer-max-bytes': (Pref.bufferSize * 0x200000).toStringAsFixed(0),
+      'demuxer-max-back-bytes': '0',
+    };
+  }
 
   static String get audioOutput => _setting.get(
     SettingBoxKey.audioOutput,
@@ -1514,4 +1559,10 @@ abstract final class Pref {
 
   static int get angleDegrees =>
       _setting.get(SettingBoxKey.angleDegrees, defaultValue: 30);
+
+  static double get playerVolume => // mobile
+      _setting.get(SettingBoxKey.playerVolume, defaultValue: 100.0);
+
+  static double get maxVolume => // desktop
+      _setting.get(SettingBoxKey.maxVolume, defaultValue: 2.0);
 }

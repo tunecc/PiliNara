@@ -11,7 +11,6 @@ import 'package:PiliPlus/pages/setting/slide_color_picker.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/utils/extension/chat_bottom_panel_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:canvas_danmaku/models/danmaku_content_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
@@ -25,7 +24,6 @@ class SendDanmakuPanel extends CommonTextPubPage {
   final dynamic progress;
 
   final ValueChanged<DanmakuContentItem<DanmakuExtra>> onSuccess;
-  final bool darkVideoPage;
 
   // config
   final ({int? mode, int? fontSize, Color? color})? dmConfig;
@@ -39,7 +37,6 @@ class SendDanmakuPanel extends CommonTextPubPage {
     this.bvid,
     this.progress,
     required this.onSuccess,
-    required this.darkVideoPage,
     this.dmConfig,
     this.onSaveDmConfig,
   });
@@ -139,14 +136,14 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    themeData = widget.darkVideoPage ? ThemeUtils.darkTheme : Theme.of(context);
+    themeData = Theme.of(context);
   }
 
   late ThemeData themeData;
 
   @override
   Widget build(BuildContext context) {
-    Widget child = ViewSafeArea(
+    return ViewSafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
@@ -165,7 +162,6 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
         ),
       ),
     );
-    return widget.darkVideoPage ? Theme(data: themeData, child: child) : child;
   }
 
   @override
