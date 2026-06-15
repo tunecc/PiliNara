@@ -60,7 +60,7 @@ jobs:
       - name: Apply Patch
         shell: pwsh
         run: lib/scripts/patch.ps1 Linux
-
+        continue-on-error: true
         #TODO: deb and rpm packages need to be build
       - name: Build Linux
         run: flutter build linux --release -v --pub --dart-define-from-file=pili_release.json
