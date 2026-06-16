@@ -906,11 +906,6 @@ class PlPlayerController with BlockConfigMixin {
     if (autosync != '0') {
       opt['autosync'] = autosync;
     }
-    final bufferSize = Pref.expandBuffer
-        ? (isLive ? 64 * 1024 * 1024 : 32 * 1024 * 1024)
-        : (isLive ? 16 * 1024 * 1024 : 4 * 1024 * 1024);
-    opt['demuxer-max-bytes'] = bufferSize.toString();
-    opt['demuxer-max-back-bytes'] = bufferSize.toString();
 
     final player = await Player.create(
       configuration: PlayerConfiguration(
@@ -1985,37 +1980,27 @@ class PlPlayerController with BlockConfigMixin {
               ImageUtils.saveByteImg(
                 bytes: bytes,
                 fileName: 'screenshot_${cid}_$time',
-        context: Get.context!,
-        builder: (context) => GestureDetector(
-          onTap: () async {
-            final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-            if (bytes != null) {
-              ImageUtils.saveByteImg(
-                bytes: bytes.buffer.asUint8List(),
-                fileName: 'screenshot_${cid}_$time',
->>>>>>> upstream/main
               );
-            }
-            Get.back();
-          },
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: min(MediaQuery.widthOf(context) / 3, 350),
-                ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      width: 5,
-                      color: ColorScheme.of(context).surface,
-                    ),
+            },
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: min(MediaQuery.widthOf(context) / 3, 350),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: Image.memory(bytes),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        width: 5,
+                        color: ColorScheme.of(context).surface,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Image.memory(bytes),
+                    ),
                   ),
                 ),
               ),
