@@ -210,6 +210,7 @@ jobs:
       - name: Download Android artifacts
         if: ${{ needs.android.result == 'success' }}
         uses: actions/download-artifact@v7
+        continue-on-error: true
         with:
           name: Android_arm64-v8a
           path: release-assets/
@@ -217,6 +218,7 @@ jobs:
       - name: Download iOS artifacts
         if: ${{ needs.ios.result == 'success' }}
         uses: actions/download-artifact@v7
+        continue-on-error: true
         with:
           name: iOS-unsigned
           path: release-assets/
