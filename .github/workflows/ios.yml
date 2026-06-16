@@ -59,33 +59,11 @@ jobs:
 
       - name: Build iOS
         run: |
-          flutter build ios \
-            --release \
-            --no-codesign \
-            --config-only \
-            --dart-define-from-file=pili_release.json
-
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination generic/platform=iOS \
-            -derivedDataPath build/ios/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            build
-
-          APP_PATH="build/ios/DerivedData/Build/Products/Release-iphoneos/Runner.app"
-          test -d "$APP_PATH"
-          rm -rf Payload
-          mkdir -p Payload
-          cp -R "$APP_PATH" Payload/
-          IPA_NAME="PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa"
-          ditto -c -k --sequesterRsrc --keepParent Payload "$IPA_NAME"
-          echo "ipa_path=$IPA_NAME" >> "$GITHUB_ENV"
+          flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json
+          ln -sf ./build/ios/iphoneos Payload
+          # make AltSign happy...
+          find Payload/Runner.app/Frameworks -type d -name "*.framework" -exec codesign --force --sign - --preserve-metadata=identifier,entitlements {} \;
+          zip -r9 PiliNara_ios_${{env.version}}${{ inputs.file_suffix }}.ipa Payload/runner.app
 
       - name: Release
         if: ${{ inputs.tag != '' }}
@@ -93,10 +71,11 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
-          files: ${{ env.ipa_path }}
+          files: PiliNara_ios_*.ipa
 
       - name: Upload ios release
         uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: ${{ inputs.artifact_name }}
-          path: ${{ env.ipa_path }}
+          path: PiliNara_ios_*.ipa

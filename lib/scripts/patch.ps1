@@ -44,11 +44,10 @@ if ($platform.ToLower() -eq "ios") {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "$BottomSheetIOSPiliPlusPatch applied"
     }
-    # Note: geetest_ios.patch is intentionally disabled as gt3_flutter_plugin has been removed upstream
-    # git apply $GeetestIOSPatch
-    # if ($LASTEXITCODE -eq 0) {
-    #     Write-Host "$GeetestIOSPatch applied"
-    # }
+    git apply $GeetestIOSPatch
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "$GeetestIOSPatch applied"
+    }
 }
 
 Set-Location $env:FLUTTER_ROOT
