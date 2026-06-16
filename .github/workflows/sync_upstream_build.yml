@@ -184,16 +184,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Try to find the latest upstream tag that points to an ancestor of our HEAD
-          upstream_tag=$(git tag --sort=-creatordate --merged HEAD | head -1)
-
-          if [ -n "$upstream_tag" ]; then
-            release_tag="${upstream_tag}"
-          else
-            # Fallback: use version from pubspec + date
-            version=$(grep -m1 'version:' pubspec.yaml | sed 's/version: //')
-            release_tag="sync-${version}-$(date +%Y%m%d)"
-          fi
+          # Always use current version from pubspec.yaml + date
+          version=$(grep -m1 'version:' pubspec.yaml | sed 's/version: *//')
+          release_tag="v${version}-$(date +%Y%m%d)"
 
           # If tag already exists, append a revision suffix
           if git rev-parse "refs/tags/${release_tag}" >/dev/null 2>&1; then
