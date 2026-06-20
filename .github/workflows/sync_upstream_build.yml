@@ -106,6 +106,9 @@ jobs:
             exit 0
           fi
 
+          # 合并前保存目标分支自己的 README.md，防止被上游覆盖
+          git show "origin/${target_branch}:README.md" > /tmp/keep-readme.md
+
           if ! git merge --no-ff --no-edit "upstream/${UPSTREAM_BRANCH}"; then
             {
               echo "Merge conflict while syncing upstream/${UPSTREAM_BRANCH} into ${target_branch}";
@@ -118,6 +121,13 @@ jobs:
             } > sync-conflict.txt
             git merge --abort || true
             exit 1
+          fi
+
+          # 还原目标分支自己的 README.md（始终不同步上游的 README.md）
+          cp /tmp/keep-readme.md README.md
+          if ! git diff --quiet -- README.md; then
+            git add README.md
+            git commit -m "chore: keep local README.md (never sync from upstream)"
           fi
 
           target_sha="$(git rev-parse HEAD)"
