@@ -229,6 +229,24 @@ jobs:
       - name: List release assets
         run: ls -la release-assets/ || echo "No assets found"
 
+      - name: Generate release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(grep -m1 'version:' pubspec.yaml | sed 's/version: *//')
+          version_code=$(git rev-list --count HEAD)
+          commit_hash=$(git rev-parse HEAD)
+
+          cat > release-assets/release-manifest.json <<EOF
+          {
+            "schema_version": 1,
+            "version_name": "${version%%+*}",
+            "version_code": ${version_code},
+            "commit_hash": "${commit_hash}",
+            "release_tag": "${{ steps.tag.outputs.tag }}"
+          }
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:

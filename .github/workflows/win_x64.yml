@@ -75,6 +75,7 @@ jobs:
           files: |
             PiliNara_windows_*.zip
             PiliNara-Win-Setup/PiliNara_windows_*.exe
+            release-manifest.json
 
       - name: Upload windows file release
         uses: actions/upload-artifact@v7

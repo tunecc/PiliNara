@@ -17,7 +17,101 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
+class UpdateVersionInfo {
+  const UpdateVersionInfo({
+    required this.versionCode,
+    required this.releaseTag,
+  });
+
+  final int versionCode;
+  final String releaseTag;
+}
+
 abstract final class Update {
+  static const String _releaseManifestName = 'release-manifest.json';
+  static final RegExp _legacyAssetVersionCodeRegExp = RegExp(
+    r'\+(\d+)(?:[^0-9]|$)',
+  );
+
+  static UpdateVersionInfo? parseReleaseManifest(Map<String, dynamic>? json) {
+    if (json == null) return null;
+
+    final versionCode = json['version_code'];
+    final releaseTag = json['release_tag'];
+    if (versionCode is! int || releaseTag is! String || releaseTag.isEmpty) {
+      return null;
+    }
+
+    return UpdateVersionInfo(
+      versionCode: versionCode,
+      releaseTag: releaseTag,
+    );
+  }
+
+  static int? extractVersionCodeFromAssets(List assets) {
+    for (final item in assets) {
+      final name = item is Map ? item['name']?.toString() : null;
+      if (name == null || name.isEmpty) continue;
+
+      final match = _legacyAssetVersionCodeRegExp.firstMatch(name);
+      final value = match?.group(1);
+      if (value != null) {
+        final versionCode = int.tryParse(value);
+        if (versionCode != null) return versionCode;
+      }
+    }
+    return null;
+  }
+
+  static bool shouldNotifyUpdate({
+    required int localVersionCode,
+    required int remoteVersionCode,
+  }) => remoteVersionCode > localVersionCode;
+
+  static UpdateVersionInfo? resolveRemoteVersionInfo(
+    Map release, {
+    Map<String, dynamic>? manifest,
+  }) {
+    final manifestInfo = parseReleaseManifest(manifest);
+    if (manifestInfo != null) return manifestInfo;
+
+    final versionCode = extractVersionCodeFromAssets(release['assets'] ?? []);
+    final releaseTag = release['tag_name']?.toString();
+    if (versionCode == null || releaseTag == null || releaseTag.isEmpty) {
+      return null;
+    }
+
+    return UpdateVersionInfo(
+      versionCode: versionCode,
+      releaseTag: releaseTag,
+    );
+  }
+
+  static Future<Map<String, dynamic>?> _fetchReleaseManifest(Map release) async {
+    final List assets = release['assets'] ?? [];
+    final manifestAsset = assets.firstWhereOrNull(
+      (item) => item is Map && item['name'] == _releaseManifestName,
+    );
+    if (manifestAsset is! Map) return null;
+
+    final String? url = manifestAsset['browser_download_url']?.toString();
+    if (url == null || url.isEmpty) return null;
+
+    final manifestRes = await Request().get(
+      url,
+      options: Options(
+        headers: {'user-agent': BrowserUa.mob},
+        extra: {'account': const NoAccount()},
+      ),
+    );
+
+    return manifestRes.data is Map<String, dynamic>
+        ? manifestRes.data as Map<String, dynamic>
+        : manifestRes.data is Map
+        ? Map<String, dynamic>.from(manifestRes.data)
+        : null;
+  }
+
   // 检查更新
   static Future<void> checkUpdate([bool isAuto = true]) async {
     if (kDebugMode) return;
@@ -47,13 +141,27 @@ abstract final class Update {
         }
         return;
       }
-      final int latest =
-          DateTime.parse(data['created_at']).millisecondsSinceEpoch ~/ 1000;
-      if (BuildConfig.buildTime >= latest) {
+
+      final manifest = await _fetchReleaseManifest(data);
+      final remoteVersionInfo = resolveRemoteVersionInfo(
+        data,
+        manifest: manifest,
+      );
+      if (remoteVersionInfo == null) {
+        if (!isAuto) {
+          SmartDialog.showToast('无法解析远端版本信息');
+        }
+        return;
+      }
+
+      if (!shouldNotifyUpdate(
+        localVersionCode: BuildConfig.versionCode,
+        remoteVersionCode: remoteVersionInfo.versionCode,
+      )) {
         if (!isAuto) {
           SmartDialog.showToast('已是最新版本');
         }
-      } else if (isAuto && Pref.skipVersion == data['tag_name']) {
+      } else if (isAuto && Pref.skipVersion == remoteVersionInfo.releaseTag) {
         // 用户已选择跳过此版本，静默忽略
       } else {
         Map<String, dynamic>? bestAsset;
@@ -103,7 +211,7 @@ abstract final class Update {
                       SmartDialog.dismiss();
                       GStorage.setting.put(
                         SettingBoxKey.skipVersion,
-                        data['tag_name'],
+                        remoteVersionInfo.releaseTag,
                       );
                     },
                     child: Text(

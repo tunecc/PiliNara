@@ -60,6 +60,7 @@ jobs:
           name: ${{ env.release_tag }}
           files: |
             PiliNara_macos_*.dmg
+            release-manifest.json
 
       - name: Upload macos release
         uses: actions/upload-artifact@v7

@@ -244,6 +244,7 @@ jobs:
             PiliNara_linux_*.deb
             PiliNara_linux_*.rpm
             PiliNara_linux_*.AppImage
+            release-manifest.json
 
       - name: Upload linux targz package
         uses: actions/upload-artifact@v7

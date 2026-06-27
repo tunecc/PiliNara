@@ -137,7 +137,9 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
-          files: PiliNara_android_*.apk
+          files: |
+            PiliNara_android_*.apk
+            release-manifest.json
 
       - name: Upload arm64-v8a
         if: ${{ inputs.upload_arm64_v8a }}

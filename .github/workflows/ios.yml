@@ -71,7 +71,9 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
-          files: PiliNara_ios_*.ipa
+          files: |
+            PiliNara_ios_*.ipa
+            release-manifest.json
 
       - name: Upload ios release
         uses: actions/upload-artifact@v7
