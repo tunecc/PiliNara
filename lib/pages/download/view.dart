@@ -6,6 +6,7 @@ import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/models_new/download/bili_download_entry_info.dart';
 import 'package:PiliPlus/models_new/download/download_collection.dart';
+import 'package:PiliPlus/pages/common/fab_mixin.dart';
 import 'package:PiliPlus/pages/common/multi_select/base.dart';
 import 'package:PiliPlus/pages/download/controller.dart';
 import 'package:PiliPlus/pages/download/detail/widgets/item.dart';
@@ -15,6 +16,7 @@ import 'package:PiliPlus/pages/download/search/view.dart';
 import 'package:PiliPlus/pages/download/sort/view.dart';
 import 'package:PiliPlus/pages/download/utils/cache_delete_confirm.dart';
 import 'package:PiliPlus/pages/download/utils/cache_export.dart';
+import 'package:PiliPlus/pages/download/utils/open_download_entry.dart';
 import 'package:PiliPlus/pages/download/widgets/folder_card.dart';
 import 'package:PiliPlus/pages/download/widgets/folder_dialog.dart';
 import 'package:PiliPlus/services/download/download_collection_service.dart';
@@ -49,7 +51,7 @@ class DownloadPage extends StatefulWidget {
 }
 
 class _DownloadPageState extends State<DownloadPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin, BaseFabMixin, FabMixin {
   final _downloadService = Get.find<DownloadService>();
   final _collectionService = Get.find<DownloadCollectionService>();
   final _controller = Get.put(DownloadPageController());
@@ -60,6 +62,7 @@ class _DownloadPageState extends State<DownloadPage>
 
   late final TabController _tabController;
   int _tabIndex = 0;
+  bool _isOpeningContinue = false;
 
   @override
   void initState() {
@@ -85,6 +88,11 @@ class _DownloadPageState extends State<DownloadPage>
     if (_tabController.index != 1 &&
         _folderSelectController.enableMultiSelect.value) {
       _folderSelectController.handleSelect();
+    }
+    if (_tabController.index == 0 &&
+        !_controller.enableMultiSelect.value &&
+        _controller.continueTarget.value != null) {
+      showFab();
     }
   }
 
@@ -170,6 +178,33 @@ class _DownloadPageState extends State<DownloadPage>
     await exportDownloadEntries(entries);
   }
 
+  Future<void> _openContinueTarget(DownloadContinueTarget target) async {
+    if (_isOpeningContinue) {
+      return;
+    }
+    setState(() {
+      _isOpeningContinue = true;
+    });
+    try {
+      await openDownloadEntry(
+        entry: target.entry,
+        playContext: target.playContext,
+      );
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) {
+        return;
+      }
+      _progress.notifyListeners();
+      await _controller.refreshContinueTarget();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningContinue = false;
+        });
+      }
+    }
+  }
+
   Future<void> _openAllSortPage() async {
     if (_controller.allVideos.isEmpty) {
       return;
@@ -214,7 +249,7 @@ class _DownloadPageState extends State<DownloadPage>
     final folders = _controller.folders;
     if (folders.isEmpty) {
       return [
-        PopupMenuItem(
+        CustomPopupMenuItem<void>(
           height: 38,
           child: const Text('添加到文件夹', style: TextStyle(fontSize: 13)),
           onTap: () async {
@@ -238,7 +273,7 @@ class _DownloadPageState extends State<DownloadPage>
     return [
       const PopupMenuDivider(height: 8),
       ...folders.map(
-        (folder) => PopupMenuItem(
+        (folder) => CustomPopupMenuItem<void>(
           height: 38,
           child: Text(
             '添加到「${folder.title}」',
@@ -253,7 +288,7 @@ class _DownloadPageState extends State<DownloadPage>
           },
         ),
       ),
-      PopupMenuItem(
+      CustomPopupMenuItem<void>(
         height: 38,
         child: const Text('添加到其他文件夹', style: TextStyle(fontSize: 13)),
         onTap: () async {
@@ -288,12 +323,12 @@ class _DownloadPageState extends State<DownloadPage>
           showStaticPositionMenu<int>(
             context: context,
             items: [
-              const PopupMenuItem(
+              const CustomPopupMenuItem(
                 value: 0,
                 height: 38,
                 child: Text('重命名', style: TextStyle(fontSize: 13)),
               ),
-              PopupMenuItem(
+              CustomPopupMenuItem(
                 value: 1,
                 height: 38,
                 child: Text(
@@ -323,11 +358,11 @@ class _DownloadPageState extends State<DownloadPage>
           showStaticPositionMenu<_DownloadSortAction>(
             context: context,
             items: const [
-              PopupMenuItem(
+              CustomPopupMenuItem(
                 value: _DownloadSortAction.manual,
                 child: Text('手动排序'),
               ),
-              PopupMenuItem(
+              CustomPopupMenuItem(
                 value: _DownloadSortAction.reset,
                 child: Text('按缓存时间'),
               ),
@@ -338,6 +373,43 @@ class _DownloadPageState extends State<DownloadPage>
         },
       ),
     );
+  }
+
+  Widget _buildContinueFab() {
+    return Obx(() {
+      final target = _controller.continueTarget.value;
+      final shouldShow =
+          _tabIndex == 0 &&
+          !_controller.enableMultiSelect.value &&
+          target != null;
+      if (!shouldShow) {
+        return const SizedBox.shrink();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showFab();
+        }
+      });
+      final padding = MediaQuery.viewPaddingOf(context);
+      return Positioned(
+        right: padding.right + kFloatingActionButtonMargin,
+        bottom: 0,
+        child: SlideTransition(
+          position: fabAnimation,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: padding.bottom + kFloatingActionButtonMargin,
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: _isOpeningContinue
+                  ? null
+                  : () => _openContinueTarget(target),
+              label: const Text('继续播放'),
+            ),
+          ),
+        ),
+      );
+    });
   }
 
   @override
@@ -435,7 +507,10 @@ class _DownloadPageState extends State<DownloadPage>
                       if (!mounted) {
                         return;
                       }
-                      Get.to(DownloadSearchPage(progress: _progress));
+                      await Get.to(DownloadSearchPage(progress: _progress));
+                      if (mounted) {
+                        await _controller.refreshContinueTarget();
+                      }
                     },
                     icon: const Icon(Icons.search),
                   ),
@@ -493,11 +568,31 @@ class _DownloadPageState extends State<DownloadPage>
               ),
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
+          body: Stack(
+            clipBehavior: Clip.none,
             children: [
-              _buildAllVideosTab(),
-              _buildFoldersTab(),
+              NotificationListener<UserScrollNotification>(
+                onNotification: (notification) {
+                  if (_tabIndex != 0) {
+                    return false;
+                  }
+                  final direction = notification.direction;
+                  if (direction == .forward) {
+                    showFab();
+                  } else if (direction == .reverse) {
+                    hideFab();
+                  }
+                  return false;
+                },
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAllVideosTab(),
+                    _buildFoldersTab(),
+                  ],
+                ),
+              ),
+              _buildContinueFab(),
             ],
           ),
         ),
@@ -577,14 +672,18 @@ class _DownloadPageState extends State<DownloadPage>
                     downloadService: _downloadService,
                     showTitle: true,
                     onDelete: () async {
+                      await GStorage.watchProgress.delete(entry.cid.toString());
+                      await _collectionService.clearLastLocalPlayedIfCid(
+                        entry.cid,
+                      );
                       await _downloadService.deleteDownload(
                         entry: entry,
                         removeList: true,
                       );
-                      GStorage.watchProgress.delete(entry.cid.toString());
                     },
                     controller: _controller,
                     playContext: const DownloadVideoPlayContext.all(),
+                    onPlayReturned: _controller.refreshContinueTarget,
                     customOnLongPress: () => _controller
                       ..enableMultiSelect.value = true
                       ..onSelect(entry),
@@ -648,9 +747,12 @@ class _DownloadPageState extends State<DownloadPage>
                     checked: folder.checked,
                     onTap: _folderSelectController.enableMultiSelect.value
                         ? () => _folderSelectController.onSelect(folder)
-                        : () => Get.to(
-                            DownloadFolderPage(folderId: folder.id),
-                          ),
+                        : () async {
+                            await Get.to(
+                              DownloadFolderPage(folderId: folder.id),
+                            );
+                            await _controller.refreshContinueTarget();
+                          },
                     onLongPress: () => _folderSelectController
                       ..enableMultiSelect.value = true
                       ..onSelect(folder),

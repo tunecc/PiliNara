@@ -9,8 +9,7 @@ abstract final class SettingBoxKey {
       defaultAudioQaCellular = 'defaultAudioQaCellular',
       autoPlayEnable = 'autoPlayEnable',
       fullScreenMode = 'fullScreenMode',
-      defaultDecode = 'defaultDecode',
-      secondDecode = 'secondDecode',
+      preferCodecs = 'preferCodecs',
       defaultToastOp = 'defaultToastOp',
       defaultPicQa = 'defaultPicQa',
       enableHA = 'enableHA',
@@ -38,6 +37,7 @@ abstract final class SettingBoxKey {
   static const String enableVerticalExpand = 'enableVerticalExpand',
       feedBackEnable = 'feedBackEnable',
       enableLongShowControl = 'enableLongShowControl',
+      showControlsOnManualEpisodeChange = 'showControlsOnManualEpisodeChange',
       horizontalScreen = 'horizontalScreen',
       CDNService = 'CDNService',
       disableAudioCDN = 'disableAudioCDN',
@@ -67,7 +67,6 @@ abstract final class SettingBoxKey {
       autoUpdate = 'autoUpdate',
       preReleaseUpdate = 'preReleaseUpdate',
       skipVersion = 'skipVersion',
-      autoClearCache = 'autoClearCache',
       maxCacheSize = 'maxCacheSize',
       defaultShowComment = 'defaultShowComment',
       replySortType = 'replySortType',
@@ -132,6 +131,8 @@ abstract final class SettingBoxKey {
       removeOnlyFansVideoDyn = 'removeOnlyFansVideoDyn',
       antiGoodsReply = 'antiGoodsReply',
       replyMinLevel = 'replyMinLevel',
+      keepUpOwnerReply = 'keepUpOwnerReply',
+      keepUpTopReply = 'keepUpTopReply',
       keepUpLikeReply = 'keepUpLikeReply',
       keepUpReplyReply = 'keepUpReplyReply',
       expandDynLivePanel = 'expandDynLivePanel',
@@ -183,9 +184,11 @@ abstract final class SettingBoxKey {
       showDynDispute = 'showDynDispute',
       touchSlopH = 'touchSlopH',
       floatingNavBar = 'floatingNavBar',
+      enableCurrentPageRefresh = 'enableCurrentPageRefresh',
       mixWithOthers = 'mixWithOthers',
       removeSafeArea = 'removeSafeArea',
-      angleDegrees = 'angleDegrees';
+      angleDegrees = 'angleDegrees',
+      liveStream = 'liveStream';
 
   static const String enableAiChat = 'enableAiChat',
       aiApiUrl = 'aiApiUrl',
@@ -226,6 +229,7 @@ abstract final class SettingBoxKey {
       blockUserID = 'blockUserID',
       blockToast = 'blockToast',
       blockServer = 'blockServer',
+      blockSkipWhenSeekIntoSegment = 'blockSkipWhenSeekIntoSegment',
       blockTrack = 'blockTrack';
 
   static const String enableShowDanmaku = 'enableShowDanmaku',
@@ -311,6 +315,7 @@ abstract final class LocalCacheKey {
       replyBlockedMids = 'replyBlockedMids',
       danmakuFilterRules = 'danmakuFilterRules',
       downloadCollections = 'downloadCollections',
+      lastLocalPlayed = 'lastLocalPlayed',
       mixinKey = 'mixinKey',
       timeStamp = 'timeStamp',
       buvid = 'buvid',

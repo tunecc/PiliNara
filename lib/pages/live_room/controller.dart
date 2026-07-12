@@ -1,5 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
+import 'dart:async' show Timer, StreamSubscription;
+import 'dart:convert' show jsonDecode;
 import 'dart:math' as math;
 
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
@@ -156,6 +156,27 @@ class LiveRoomController extends GetxController {
     return const SizedBox.shrink();
   });
 
+  StreamSubscription? _sizeSub;
+
+  void _onSizeChanged((int, int) value) {
+    final isVertical = value.$2 > value.$1;
+    isPortrait.value = isVertical;
+    plPlayerController.isVertical = isVertical;
+  }
+
+  void _startSizeSub() {
+    if (isPortrait.value) return;
+    _stopSizeSub();
+    _sizeSub = plPlayerController.videoPlayerController?.stream.size.listen(
+      _onSizeChanged,
+    );
+  }
+
+  void _stopSizeSub() {
+    _sizeSub?.cancel();
+    _sizeSub = null;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -265,6 +286,7 @@ class LiveRoomController extends GetxController {
       if (isReturningFromPip) {
         isReturningFromPip = false;
       }
+      _initStreamIndex();
       await initLiveUrl(
         streamIndex: streamIndex,
         formatIndex: formatIndex,
@@ -282,6 +304,33 @@ class LiveRoomController extends GetxController {
   int formatIndex = 0;
   int codecIndex = 0;
   int liveUrlIndex = 0;
+
+  void _initStreamIndex() {
+    final pref = Pref.liveStream;
+    if (pref != null) {
+      try {
+        final String protocolName = pref[0];
+        final String formatName = pref[1];
+        final String codecName = pref[2];
+        for (var (i, s) in stream.indexed) {
+          if (s.protocolName == protocolName) {
+            streamIndex = i;
+            for (var (j, f) in s.format.indexed) {
+              if (f.formatName == formatName) {
+                formatIndex = j;
+                for (var (k, c) in f.codec.indexed) {
+                  if (c.codecName == codecName) {
+                    codecIndex = k;
+                    return;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
 
   Future<void>? initLiveUrl({
     int streamIndex = 0,
@@ -311,7 +360,79 @@ class LiveRoomController extends GetxController {
     currentQnDesc.value =
         LiveQuality.fromCode(currentQn)?.desc ?? currentQn.toString();
     videoUrl = VideoUtils.getLiveCdnUrl(item, index: liveUrlIndex);
-    return playerInit();
+    return playerInit()?.whenComplete(_startSizeSub);
+  }
+
+  // 直播投屏时，优先选择 HLS 协议的播放地址，且不使用 AV1 编码
+  // 实测发现http_stream协议在投屏时会报版权问题，导致无法播放，HLS协议则没有这个问题
+  String? _preferredCastUrl() {
+    final currentCastUrl = _currentCastUrl();
+    if (currentCastUrl != null) {
+      return currentCastUrl;
+    }
+
+    final candidates = <({String url, int score})>[];
+    for (final streamItem in stream) {
+      final protocolName = streamItem.protocolName?.toLowerCase() ?? '';
+      for (final formatItem in streamItem.format) {
+        final formatName = formatItem.formatName?.toLowerCase() ?? '';
+        for (final codecItem in formatItem.codec) {
+          final codecName = codecItem.codecName?.toLowerCase() ?? '';
+          for (final urlInfo in codecItem.urlInfo.indexed) {
+            final url = VideoUtils.getLiveCdnUrl(codecItem, index: urlInfo.$1);
+            final lowerUrl = url.toLowerCase();
+            final isHls =
+                protocolName.contains('hls') || lowerUrl.contains('.m3u8');
+            if (!isHls) {
+              continue;
+            }
+            var score = 0;
+            if (formatName.contains('ts')) {
+              score += 40;
+            }
+            if (formatName.contains('fmp4')) {
+              score += 20;
+            }
+            if (codecName.contains('avc') || codecName.contains('h264')) {
+              score += 30;
+            }
+            if (codecName.contains('hevc') || codecName.contains('h265')) {
+              score -= 20;
+            }
+            if (codecName.contains('av1')) {
+              score -= 30;
+            }
+            if (codecItem.currentQn == currentQn) {
+              score += 10;
+            }
+            if (urlInfo.$1 == liveUrlIndex) {
+              score += 5;
+            }
+            candidates.add((url: url, score: score));
+          }
+        }
+      }
+    }
+    if (candidates.isEmpty) {
+      return null;
+    }
+    candidates.sort((a, b) => b.score.compareTo(a.score));
+    return candidates.first.url;
+  }
+
+  String? _currentCastUrl() {
+    final streamItem = stream.getOrFirst(streamIndex);
+    final formatItem = streamItem.format.getOrFirst(formatIndex);
+    final codecItem = formatItem.codec.getOrFirst(codecIndex);
+    final url = VideoUtils.getLiveCdnUrl(codecItem, index: liveUrlIndex);
+    final protocolName = streamItem.protocolName?.toLowerCase() ?? '';
+    final codecName = codecItem.codecName?.toLowerCase() ?? '';
+    final lowerUrl = url.toLowerCase();
+    final isHls = protocolName.contains('hls') || lowerUrl.contains('.m3u8');
+    if (!isHls || codecName.contains('av1')) {
+      return null;
+    }
+    return url;
   }
 
   Future<void> queryLiveInfoH5() async {
@@ -324,6 +445,23 @@ class LiveRoomController extends GetxController {
     } else {
       res.toast();
     }
+  }
+
+  Future<void> onCast() async {
+    final currentUrl = videoUrl;
+    final url = _preferredCastUrl() ?? currentUrl;
+    if (url == null || url.isEmpty) {
+      SmartDialog.showToast('播放地址未就绪');
+      return;
+    }
+    final castTitle = title.value.isNotEmpty ? title.value : null;
+    await Get.toNamed(
+      '/dlna',
+      parameters: {
+        'url': url,
+        'title': ?castTitle,
+      },
+    );
   }
 
   void _showDialog(String title) {
@@ -467,6 +605,7 @@ class LiveRoomController extends GetxController {
 
   @override
   void onClose() {
+    _stopSizeSub();
     // 心跳定时器是静态的，无论是否小窗都要取消
     LiveHttp.cancelLiveHeartbeat();
     // 如果在小窗模式，不清理资源
@@ -520,7 +659,7 @@ class LiveRoomController extends GetxController {
 
   void addDm(dynamic msg, [DanmakuContentItem<DanmakuExtra>? item]) {
     if (plPlayerController.showDanmaku) {
-      if (item != null) {
+      if (item != null && plPlayerController.enableShowLiveDanmaku.value) {
         danmakuController?.addDanmaku(item);
       }
       if (autoScroll && !disableAutoScroll.value) {

@@ -93,8 +93,13 @@ class _AudioPageState extends State<AudioPage> {
     super.initState();
     // 进入听视频界面时，确保关闭所有应用内小窗
     if (PipOverlayService.isInPipMode) {
-      PipOverlayService.stopPip(callOnClose: false, immediate: true);
-      PipOverlayService.releaseSavedVideoOwner();
+      PipOverlayService.stopPip(
+        callOnClose: false,
+        immediate: true,
+        releaseSavedOwner: true,
+        // 小窗 owner 的视频页仍在栈内时只暂停不 dispose，避免破坏其计数
+        disposeSavedOwnerPlayer: VideoStackManager.getCount() == 0,
+      );
     }
     if (LivePipOverlayService.isInPipMode) {
       LivePipOverlayService.stopLivePip(callOnClose: false);
@@ -774,19 +779,19 @@ class _AudioPageState extends State<AudioPage> {
   }
 
   void _onDragStart(ThumbDragDetails details) {
-    // do nothing
+    _controller
+      ..isDragging = true
+      ..position.value = details.seconds;
   }
 
   void _onDragUpdate(ThumbDragDetails details) {
-    _controller
-      ..isDragging = true
-      ..position.value = details.timeStamp;
+    _controller.position.value = details.seconds;
   }
 
-  void _onSeek(Duration value) {
+  void _onSeek(int milliseconds) {
     _controller
-      ..player?.seek(value)
-      ..isDragging = false;
+      ..isDragging = false
+      ..player?.seek(Duration(milliseconds: milliseconds));
   }
 
   Widget _buildProgressBar(ColorScheme colorScheme) {
@@ -858,7 +863,7 @@ class _AudioPageState extends State<AudioPage> {
               final position = _controller.position.value;
               if (_controller.player != null) {
                 return Text(
-                  DurationUtils.formatDuration(position.inSeconds),
+                  DurationUtils.formatDuration(position),
                 );
               }
               return const SizedBox.shrink();
@@ -867,7 +872,7 @@ class _AudioPageState extends State<AudioPage> {
               final duration = _controller.duration.value;
               if (_controller.player != null) {
                 return Text(
-                  DurationUtils.formatDuration(duration.inSeconds),
+                  DurationUtils.formatDuration(duration),
                 );
               }
               return const SizedBox.shrink();

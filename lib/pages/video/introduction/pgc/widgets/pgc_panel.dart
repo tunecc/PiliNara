@@ -13,6 +13,7 @@ import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 
 class PgcPanel extends StatefulWidget {
@@ -28,7 +29,8 @@ class PgcPanel extends StatefulWidget {
 
   final List<EpisodeItem> pages;
   final int? cid;
-  final ValueChanged<BaseEpisodeItem> onChangeEpisode;
+  final Future<bool> Function(BaseEpisodeItem episode, {bool manual})
+  onChangeEpisode;
   final Function showEpisodes;
   final String heroTag;
   final NewEp? newEp;
@@ -170,7 +172,7 @@ class _PgcPanelState extends State<PgcPanel> {
             if (item.badge == '会员' && Accounts.mainEqVideo && vipStatus) {
               SmartDialog.showToast('需要大会员');
             }
-            widget.onChangeEpisode(item);
+            widget.onChangeEpisode(item, manual: true);
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
@@ -213,11 +215,10 @@ class _PgcPanelState extends State<PgcPanel> {
                     if (item.badge?.isNotEmpty == true) ...[
                       const SizedBox(width: 2),
                       if (item.badge == '会员')
-                        Image.asset(
+                        SvgPicture.asset(
                           Assets.vipIcon,
                           height: 16,
-                          cacheHeight: 16.cacheSize(context),
-                          semanticLabel: "大会员",
+                          semanticsLabel: "大会员",
                         )
                       else
                         Text(

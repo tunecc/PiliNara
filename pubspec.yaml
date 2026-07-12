@@ -21,7 +21,7 @@ version: 2.0.9+1
 
 environment:
   sdk: ">=3.12.0"
-  flutter: 3.44.2
+  flutter: 3.44.6
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -47,7 +47,7 @@ dependencies:
   brotli: ^0.6.0
   cached_network_image_ce:
     git:
-      url: https://github.com/bggRGjQaUbCoE/flutter_cached_network_image_ce.git
+      url: https://github.com/My-Responsitories/flutter_cached_network_image_ce.git
       path: cached_network_image
       ref: develop
   canvas_danmaku:
@@ -80,7 +80,6 @@ dependencies:
   dynamic_color: ^1.8.1
   easy_debounce: ^2.0.3
   encrypt: ^5.0.3
-  expandable: ^5.0.1
   extended_nested_scroll_view:
     git:
       url: https://github.com/bggRGjQaUbCoE/extended_nested_scroll_view.git
@@ -228,11 +227,11 @@ dependency_overrides:
       url: https://github.com/My-Responsitories/media-kit.git
       path: media_kit_video
       ref: version_1.2.5
-  screen_brightness_android:
+  cached_network_image_ce:
     git:
-      url: https://github.com/bggRGjQaUbCoE/screen_brightness.git
-      path: screen_brightness_android
-      ref: main
+      url: https://github.com/My-Responsitories/flutter_cached_network_image_ce.git
+      path: cached_network_image
+      ref: develop
 
 dev_dependencies:
   flutter_test:
@@ -245,6 +244,7 @@ dev_dependencies:
     git:
       url: https://github.com/dart-lang/native.git
       path: pkgs/jnigen
+      ref: 55520836d363aac7f1ebae47387d03a30302be7b
 
 flutter_launcher_icons:
   android: true
@@ -274,7 +274,6 @@ flutter:
 
   assets:
     - path: assets/images/
-    - path: assets/images/lv/
     - path: assets/images/logo/
     - path: assets/images/logo/ico/
       platforms: [windows]

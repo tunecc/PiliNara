@@ -7,7 +7,6 @@ import 'package:PiliPlus/pages/download/utils/cache_delete_confirm.dart';
 import 'package:PiliPlus/services/download/download_collection_service.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/storage.dart';
-import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart' show Text;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -19,6 +18,7 @@ class DownloadPageController extends GetxController
 
   final allVideos = RxList<BiliDownloadEntryInfo>();
   final folders = RxList<DownloadFolder>();
+  final continueTarget = Rxn<DownloadContinueTarget>();
 
   @override
   List<BiliDownloadEntryInfo> get list => allVideos;
@@ -49,10 +49,22 @@ class DownloadPageController extends GetxController
     }
     allVideos.value = collectionService.resolveAllEntries();
     folders.value = collectionService.folders;
+    continueTarget.value = collectionService.resolveLastLocalPlayed();
     rxCount.value = allChecked.length;
     if (checkedCount == 0) {
       enableMultiSelect.value = false;
     }
+  }
+
+  Future<void> refreshContinueTarget() async {
+    await Future.wait([
+      downloadService.waitForInitialization,
+      collectionService.waitForInitialization,
+    ]);
+    if (isClosed) {
+      return;
+    }
+    continueTarget.value = collectionService.resolveLastLocalPlayed();
   }
 
   List<BiliDownloadEntryInfo> resolveFolderEntries(String folderId) =>
@@ -68,6 +80,7 @@ class DownloadPageController extends GetxController
         final selected = allChecked.toSet();
         for (final entry in selected) {
           await GStorage.watchProgress.delete(entry.cid.toString());
+          await collectionService.clearLastLocalPlayedIfCid(entry.cid);
           await downloadService.deleteDownload(
             entry: entry,
             removeList: true,

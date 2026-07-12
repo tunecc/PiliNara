@@ -47,6 +47,10 @@ abstract final class Api {
   // https://api.bilibili.com/x/web-interface/archive/like
   // static const String likeVideo = '/x/web-interface/archive/like';
 
+  /// web端点赞接口（无access_key时fallback）
+  static const String likeVideoWeb = '/x/web-interface/archive/like';
+
+
   // 改用app端点赞接口
   static const String likeVideo = '${HttpString.appBaseUrl}/x/v2/view/like';
   //判断视频是否被点赞（双端）Get
@@ -74,6 +78,10 @@ abstract final class Api {
   /// select_like	num	是否附加点赞	非必要	0：不点赞 1：同时点赞 默认为0
   // csrf	str	CSRF Token（位于cookie）	必要
   // https://api.bilibili.com/x/web-interface/coin/add
+
+  /// web端投币接口（无access_key时fallback）
+  static const String coinVideoWeb = '/x/web-interface/coin/add';
+
   // static const String coinVideo = '/x/web-interface/coin/add';
 
   // 改用app端投币接口
@@ -612,6 +620,8 @@ abstract final class Api {
   static const String oauth2AccessToken =
       '${HttpString.passBaseUrl}/x/passport-login/oauth2/access_token';
 
+  static const String memberWebAccount = '/x/member/web/account';
+
   /// 密码加密密钥
   /// disable_rcmd
   /// local_id
@@ -813,6 +823,8 @@ abstract final class Api {
 
   static const String topicFeed = '/x/polymer/web-dynamic/v1/feed/topic';
 
+  static const String topicFold = '/x/topic/web/details/fold';
+
   static const String spaceOpus = '/x/polymer/web-dynamic/v1/opus/feed/space';
 
   static const String articleList = '/x/article/list/web/articles';
@@ -1013,4 +1025,8 @@ abstract final class Api {
   static const String bubble = '/x/tribee/v1/dyn/all';
 
   static const String sortFollowTag = '/x/relation/tags/update_sort';
+
+  static const String replyReport = '/x/v2/reply/report';
+
+  static const String dynReaction = '/x/polymer/web-dynamic/v1/detail/reaction';
 }

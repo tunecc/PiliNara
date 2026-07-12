@@ -1,7 +1,9 @@
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/animated_height.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
+import 'package:PiliPlus/common/widgets/expandable.dart';
 import 'package:PiliPlus/common/widgets/gesture/tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
@@ -39,7 +41,6 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:expandable/expandable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -86,13 +87,6 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    const expandTheme = ExpandableThemeData(
-      animationDuration: Duration(milliseconds: 300),
-      scrollAnimationDuration: Duration(milliseconds: 300),
-      crossFadePoint: 0,
-      fadeCurve: Curves.ease,
-      sizeCurve: Curves.linear,
-    );
     final isPortrait = widget.isPortrait;
     final isHorizontal = !isPortrait && widget.isHorizontal;
     return SliverPadding(
@@ -106,6 +100,25 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
           VideoDetailData videoDetail = introController.videoDetail.value;
           bool isLoading = videoDetail.bvid == null;
           int? mid = videoDetail.owner?.mid;
+          void onOpenMemberPage() {
+            if (mid != null) {
+              Get.toNamed(
+                '/member?mid=$mid&from_view_aid=${videoDetailCtr.aid}',
+              );
+            }
+          }
+
+          void onPushMember() {
+            if (mid != null) {
+              feedBack();
+              if (!isPortrait && introController.horizontalMemberPage) {
+                widget.onShowMemberPage(mid);
+              } else {
+                onOpenMemberPage();
+              }
+            }
+          }
+
           return SliverToBoxAdapter(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -114,7 +127,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   return;
                 }
                 feedBack();
-                introController.expandableCtr.toggle();
+                introController.expand.toggle();
               },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,23 +139,17 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                       children: [
                         if (videoDetail.staff.isNullOrEmpty) ...[
                           Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: _buildAvatar(
-                                theme,
-                                () {
-                                  if (mid != null) {
-                                    feedBack();
-                                    if (!isPortrait &&
-                                        introController.horizontalMemberPage) {
-                                      widget.onShowMemberPage(mid);
-                                    } else {
-                                      Get.toNamed(
-                                        '/member?mid=$mid&from_view_aid=${videoDetailCtr.aid}',
-                                      );
-                                    }
-                                  }
-                                },
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: onPushMember,
+                              onSecondaryTap:
+                                  PlatformUtils.isDesktop &&
+                                      introController.horizontalMemberPage
+                                  ? onOpenMemberPage
+                                  : null,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: _buildAvatar(theme),
                               ),
                             ),
                           ),
@@ -195,11 +202,16 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                       ),
                     )
                   else
-                    ExpandablePanel(
-                      controller: introController.expandableCtr,
-                      collapsed: _buildTitle(theme, videoDetail),
-                      expanded: _buildTitle(theme, videoDetail, isExpand: true),
-                      theme: expandTheme,
+                    Obx(
+                      () => ExpandablePanel(
+                        collapsed: _buildTitle(theme, videoDetail),
+                        expanded: _buildTitle(
+                          theme,
+                          videoDetail,
+                          isExpand: true,
+                        ),
+                        expand: introController.expand.value,
+                      ),
                     ),
                   const SizedBox(height: 8),
                   Stack(
@@ -240,15 +252,16 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   if (isHorizontal && PlatformUtils.isDesktop)
                     ..._infos(theme, videoDetail)
                   else
-                    ExpandablePanel(
-                      controller: introController.expandableCtr,
-                      collapsed: const SizedBox.shrink(),
-                      expanded: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: _infos(theme, videoDetail),
+                    Obx(
+                      () => AnimatedHeight(
+                        expand: introController.expand.value,
+                        duration: const Duration(milliseconds: 300),
+                        child: Column(
+                          mainAxisSize: .min,
+                          crossAxisAlignment: .start,
+                          children: _infos(theme, videoDetail),
+                        ),
                       ),
-                      theme: expandTheme,
                     ),
                   Obx(
                     () => introController.status.value
@@ -662,9 +675,7 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                               videoDetailCtr.data.timeLength ??
                               videoDetailCtr
                                   .plPlayerController
-                                  .duration
-                                  .value
-                                  .inMilliseconds;
+                                  .durationInMilliseconds;
                           if (duration > 0) {
                             final ytbId = youtubeRegExp
                                 .firstMatch(matchStr)
@@ -907,37 +918,25 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     );
   }
 
-  Widget _buildAvatar(
-    ThemeData theme,
-    VoidCallback onPushMember,
-  ) => GestureDetector(
-    onTap: onPushMember,
-    behavior: HitTestBehavior.opaque,
-    onSecondaryTap:
-        PlatformUtils.isDesktop && introController.horizontalMemberPage
-        ? () => Get.toNamed(
-            '/member?mid=${introController.userStat.value.card?.mid}&from_view_aid=${videoDetailCtr.aid}',
-          )
-        : null,
-    child: Obx(
-      () {
-        final userStat = introController.userStat.value;
-        final isVip = (userStat.card?.vip?.status ?? 0) > 0;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PendantAvatar(
-              userStat.card?.face,
-              size: 35,
-              badgeSize: 14,
-              vipStatus: userStat.card?.vip?.status,
-              officialType: userStat.card?.official?.type,
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+  Widget _buildAvatar(ThemeData theme) => Obx(
+    () {
+      final userStat = introController.userStat.value;
+      final isVip = (userStat.card?.vip?.status ?? 0) > 0;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PendantAvatar(
+            userStat.card?.face,
+            size: 35,
+            badgeSize: 14,
+            vipStatus: userStat.card?.vip?.status,
+            officialType: userStat.card?.official?.type,
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text.rich(
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -952,10 +951,10 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                               : null,
                         ),
                       ),
-                      if (GlobalData().remarkMids[
-                              int.tryParse(userStat.card?.mid ?? '')]
-                          case final String remark
-                          when remark.isNotEmpty)
+                      if (GlobalData().remarkMids[int.tryParse(
+                            userStat.card?.mid ?? '',
+                          )]
+                          case final String remark when remark.isNotEmpty)
                         TextSpan(
                           text: '（$remark）',
                           style: TextStyle(
@@ -975,12 +974,11 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
                   ),
                 ),
               ],
-              ),
             ),
-          ],
-        );
-      },
-    ),
+          ),
+        ],
+      );
+    },
   );
 
   Widget _buildInfo(ThemeData theme, VideoDetailData videoDetail) => Row(

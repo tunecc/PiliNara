@@ -1,3 +1,6 @@
+import 'dart:async' show unawaited;
+import 'dart:io' show Directory;
+
 import 'package:PiliPlus/models_new/download/bili_download_entry_info.dart';
 import 'package:PiliPlus/models_new/download/download_collection.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
@@ -10,6 +13,8 @@ class DownloadCollectionService extends GetxService {
   final _downloadService = Get.find<DownloadService>();
 
   static const _version = 1;
+  static const _minContinueProgressMs = 5000;
+  static const _completedThresholdMs = 400;
 
   final flagNotifier = SetNotifier();
 
@@ -30,7 +35,11 @@ class DownloadCollectionService extends GetxService {
   Future<void> _init() async {
     _readFromStorage();
     await _downloadService.waitForInitialization;
-    await _syncWithDownloads(notify: false);
+    final customTitleChanged = _markExistingCustomTitles();
+    final syncChanged = await _syncWithDownloads(notify: false);
+    if (customTitleChanged && !syncChanged) {
+      await _save();
+    }
     _downloadService.flagNotifier.add(_handleDownloadRefresh);
     _downloadService.completedEntryNotifier.add(_handleDownloadCompleted);
   }
@@ -69,6 +78,130 @@ class DownloadCollectionService extends GetxService {
 
   Future<void> syncWithDownloads({bool notify = true}) =>
       _syncWithDownloads(notify: notify);
+
+  bool _isContinueProgress(int progressMs, int durationMs) =>
+      durationMs > 0 &&
+      progressMs > _minContinueProgressMs &&
+      progressMs < durationMs - _completedThresholdMs;
+
+  Future<void> updateLastLocalPlayed({
+    required BiliDownloadEntryInfo entry,
+    required int progressMs,
+    required DownloadVideoPlayContext playContext,
+  }) async {
+    if (!_isContinueProgress(progressMs, entry.totalTimeMilli)) {
+      await clearLastLocalPlayedIfCid(entry.cid);
+      return;
+    }
+    final scope = playContext.scope == DownloadPlaylistScope.folder &&
+            playContext.folderId?.isNotEmpty == true
+        ? DownloadPlaylistScope.folder
+        : DownloadPlaylistScope.all;
+    final record = DownloadContinueRecord(
+      cid: entry.cid,
+      updatedAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      scope: scope,
+      folderId: scope == DownloadPlaylistScope.folder
+          ? playContext.folderId
+          : null,
+    );
+    await GStorage.localCache.put(
+      LocalCacheKey.lastLocalPlayed,
+      record.toJson(),
+    );
+  }
+
+  Future<void> clearLastLocalPlayed() =>
+      GStorage.localCache.delete(LocalCacheKey.lastLocalPlayed);
+
+  Future<void> clearLastLocalPlayedIfCid(int cid) async {
+    final record = DownloadContinueRecord.fromJson(
+      GStorage.localCache.get(LocalCacheKey.lastLocalPlayed),
+    );
+    if (record?.cid == cid) {
+      await clearLastLocalPlayed();
+    }
+  }
+
+  DownloadContinueTarget? resolveLastLocalPlayed() {
+    final raw = GStorage.localCache.get(LocalCacheKey.lastLocalPlayed);
+    final record = DownloadContinueRecord.fromJson(raw);
+    if (raw != null && record == null) {
+      unawaited(clearLastLocalPlayed());
+      return null;
+    }
+    if (record == null) {
+      return null;
+    }
+
+    final entry = _downloadService.downloadList.firstWhereOrNull(
+      (item) => item.cid == record.cid && item.isCompleted,
+    );
+    if (entry == null ||
+        entry.totalTimeMilli <= 0 ||
+        !Directory(entry.entryDirPath).existsSync()) {
+      unawaited(clearLastLocalPlayed());
+      return null;
+    }
+
+    final progressMs = GStorage.watchProgress.get(record.cid.toString());
+    if (progressMs == null ||
+        !_isContinueProgress(progressMs, entry.totalTimeMilli)) {
+      unawaited(clearLastLocalPlayed());
+      return null;
+    }
+
+    var playContext = const DownloadVideoPlayContext.all();
+    if (record.scope == DownloadPlaylistScope.folder) {
+      final folderId = record.folderId;
+      if (folderId == null || folderId.isEmpty) {
+        unawaited(clearLastLocalPlayed());
+        return null;
+      }
+      final folder = getFolder(folderId);
+      if (folder != null && folder.videoCids.contains(record.cid)) {
+        playContext = DownloadVideoPlayContext.folder(folderId);
+      }
+    }
+
+    return DownloadContinueTarget(
+      entry: entry,
+      playContext: playContext,
+      progressMs: progressMs,
+      durationMs: entry.totalTimeMilli,
+    );
+  }
+
+  bool _markExistingCustomTitles() {
+    final autoTitles = <String, Set<String>>{};
+    for (final entry in _downloadService.downloadList.followedBy(
+      _downloadService.waitDownloadQueue,
+    )) {
+      final title = entry.autoFolderTitle?.trim();
+      final sourceKey = entry.autoFolderSourceKey;
+      if (title == null ||
+          title.isEmpty ||
+          sourceKey == null ||
+          sourceKey.isEmpty) {
+        continue;
+      }
+      (autoTitles[sourceKey] ??= <String>{}).add(title);
+    }
+
+    var changed = false;
+    for (final folder in _folders) {
+      final sourceKey = folder.sourceKey;
+      if (folder.isCustomTitle || sourceKey == null || sourceKey.isEmpty) {
+        continue;
+      }
+      final titles = autoTitles[sourceKey];
+      if (titles != null && !titles.contains(folder.title.trim())) {
+        folder.isCustomTitle = true;
+        changed = true;
+      }
+    }
+    return changed;
+  }
 
   void _readFromStorage() {
     final raw = GStorage.localCache.get(LocalCacheKey.downloadCollections);
@@ -184,7 +317,7 @@ class DownloadCollectionService extends GetxService {
     await waitForInitialization;
     final existed = getFolderBySourceKey(sourceKey);
     if (existed != null) {
-      if (existed.title != title) {
+      if (!existed.isCustomTitle && existed.title != title) {
         existed.title = title;
         await _save();
         flagNotifier.refresh();
@@ -223,6 +356,9 @@ class DownloadCollectionService extends GetxService {
       return;
     }
     folder.title = title;
+    if (folder.sourceKey != null) {
+      folder.isCustomTitle = true;
+    }
     await _save();
     flagNotifier.refresh();
   }

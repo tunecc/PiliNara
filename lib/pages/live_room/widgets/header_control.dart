@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/flutter/draggable_scrollable_sheet.dart';
+import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/marquee.dart';
 import 'package:PiliPlus/models/common/video/live_quality.dart';
 import 'package:PiliPlus/pages/live_room/controller.dart';
@@ -16,8 +17,10 @@ import 'package:PiliPlus/services/shutdown_timer_service.dart'
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
-import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
@@ -68,6 +71,8 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
     final isFullScreen = this.isFullScreen;
     showCurrTimeIfNeeded(isFullScreen);
     final liveController = widget.liveController;
+    final showCastButton =
+        PlatformUtils.isDesktop || !context.mediaQuerySize.isPortrait;
     Widget child;
     child = Obx(
       key: titleKey,
@@ -75,11 +80,8 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
         liveController.title.value,
         spacing: 30,
         velocity: 30,
-        style: const TextStyle(
-          fontSize: 15,
-          height: 1,
-          color: Colors.white,
-        ),
+        strutStyle: const StrutStyle(fontSize: 15, leading: 0),
+        style: const TextStyle(fontSize: 15, height: 1, color: Colors.white),
       ),
     );
     if (isFullScreen) {
@@ -183,6 +185,17 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                 color: Colors.white,
               ),
             ),
+          if (showCastButton)
+            ComBtn(
+              height: 30,
+              tooltip: '投屏',
+              onTap: liveController.onCast,
+              icon: const Icon(
+                size: 18,
+                Icons.cast,
+                color: Colors.white,
+              ),
+            ),
           Obx(
             () {
               final onlyPlayAudio = plPlayerController.onlyPlayAudio.value;
@@ -245,28 +258,42 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
           if (plPlayerController.videoPlayerController case final player?)
             SizedBox.square(
               dimension: 30,
-              child: PopupMenuButton(
+              child: StaticPopupMenuButton(
                 iconSize: 18,
                 padding: .zero,
-                iconColor: Colors.white,
+                menuPadding: EdgeInsets.zero,
+                menuItemOuterPadding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert, color: Colors.white),
                 itemBuilder: (context) => [
                   PopupMenuItem(
-                    height: 35,
+                    height: 42,
                     onTap: _showLiveStreamDialog,
                     child: const Row(
                       spacing: 8,
                       children: [
-                        Icon(Icons.alt_route, size: 17),
+                        Icon(Icons.alt_route, size: 20),
                         Text('切换路线', style: TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
+                  if (!showCastButton)
+                    PopupMenuItem(
+                      height: 42,
+                      onTap: liveController.onCast,
+                      child: const Row(
+                        spacing: 8,
+                        children: [
+                          Icon(Icons.cast, size: 20),
+                          Text('投屏', style: TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                    ),
                   PopupMenuItem(
-                    height: 35,
+                    height: 42,
                     child: const Row(
                       spacing: 8,
                       children: [
-                        Icon(Icons.info_outline, size: 17),
+                        Icon(Icons.info_outline, size: 20),
                         Text('播放信息', style: TextStyle(fontSize: 14)),
                       ],
                     ),
@@ -277,13 +304,13 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                   ),
                   if (PlatformUtils.isMobile)
                     PopupMenuItem(
-                      height: 35,
+                      height: 42,
                       child: Row(
                         spacing: 8,
                         children: [
-                          const Icon(Icons.volume_up, size: 17),
+                          const Icon(Icons.volume_up, size: 20),
                           Text(
-                            '播放器音量: ${player.getProperty('volume').subLength(3)}%',
+                            '播放器音量: ${(double.tryParse(player.getProperty('volume')) ?? 0).toStringAsFixed(1)}%',
                             style: const TextStyle(fontSize: 14),
                           ),
                         ],
@@ -355,9 +382,8 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                       padding: .only(
                         bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
                       ),
-                      children: controller.stream.indexed.map((stream) {
-                        final isCurrStream =
-                            stream.$1 == controller.streamIndex;
+                      children: controller.stream.mapIndexed((si, stream) {
+                        final isCurrStream = si == controller.streamIndex;
                         final streamColor = isCurrStream
                             ? secondary
                             : onSurfaceVariant;
@@ -366,15 +392,14 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                           iconColor: streamColor,
                           collapsedIconColor: streamColor,
                           title: Text(
-                            stream.$2.protocolName ?? stream.$1.toString(),
+                            stream.protocolName ?? si.toString(),
                             style: isCurrStream
                                 ? currStyle
                                 : const TextStyle(fontSize: 14),
                           ),
-                          children: stream.$2.format.indexed.map((format) {
+                          children: stream.format.mapIndexed((fi, format) {
                             final isCurrFormat =
-                                isCurrStream &&
-                                format.$1 == controller.formatIndex;
+                                isCurrStream && fi == controller.formatIndex;
                             final formatColor = isCurrFormat
                                 ? secondary
                                 : onSurfaceVariant;
@@ -383,16 +408,14 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                               iconColor: formatColor,
                               collapsedIconColor: formatColor,
                               title: Text(
-                                format.$2.formatName ?? format.$1.toString(),
+                                format.formatName ?? fi.toString(),
                                 style: isCurrFormat
                                     ? currStyle
                                     : const TextStyle(fontSize: 14),
                               ),
-                              children: format.$2.codec.indexed.map((codec) {
-                                final e = codec.$2;
+                              children: format.codec.mapIndexed((ci, codec) {
                                 final isCurrCodec =
-                                    isCurrFormat &&
-                                    codec.$1 == controller.codecIndex;
+                                    isCurrFormat && ci == controller.codecIndex;
                                 final codecColor = isCurrCodec
                                     ? secondary
                                     : onSurfaceVariant;
@@ -401,19 +424,19 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                                   iconColor: codecColor,
                                   collapsedIconColor: codecColor,
                                   title: Text(
-                                    '${e.codecName ?? codec.$1.toString()} (${LiveQuality.fromCode(e.currentQn)?.desc ?? e.currentQn})',
+                                    '${codec.codecName ?? ci.toString()} (${LiveQuality.fromCode(codec.currentQn)?.desc ?? codec.currentQn})',
                                     style: isCurrCodec
                                         ? currStyle
                                         : const TextStyle(fontSize: 14),
                                   ),
-                                  children: e.urlInfo.indexed.map((url) {
+                                  children: codec.urlInfo.mapIndexed((ui, url) {
                                     final isCurrUrl =
-                                        (isCurrCodec &&
-                                        url.$1 == controller.liveUrlIndex);
+                                        isCurrCodec &&
+                                        ui == controller.liveUrlIndex;
                                     return ListTile(
                                       dense: true,
                                       title: Text(
-                                        '${url.$2.host}${e.baseUrl}...',
+                                        '${url.host}...',
                                         style: isCurrUrl
                                             ? const TextStyle(fontSize: 14)
                                             : TextStyle(
@@ -427,10 +450,18 @@ class _LiveHeaderControlState extends State<LiveHeaderControl>
                                           : () {
                                               Get.back();
                                               controller.initLiveUrl(
-                                                streamIndex: stream.$1,
-                                                formatIndex: format.$1,
-                                                codecIndex: codec.$1,
-                                                liveUrlIndex: url.$1,
+                                                streamIndex: si,
+                                                formatIndex: fi,
+                                                codecIndex: ci,
+                                                liveUrlIndex: ui,
+                                              );
+                                              GStorage.setting.put(
+                                                SettingBoxKey.liveStream,
+                                                [
+                                                  stream.protocolName!,
+                                                  format.formatName!,
+                                                  codec.codecName!,
+                                                ],
                                               );
                                             },
                                     );

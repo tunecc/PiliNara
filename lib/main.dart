@@ -112,11 +112,9 @@ void main() async {
   ]);
   Get
     ..lazyPut(AccountService.new)
-    ..lazyPut(DownloadCollectionService.new)
-    ..lazyPut(DownloadService.new);
+    ..lazyPut(DownloadService.new)
+    ..put(DownloadCollectionService());
   HttpOverrides.global = _CustomHttpOverrides();
-
-  CacheManager.autoClearCache();
 
   if (PlatformUtils.isMobile) {
     if (Platform.isAndroid) MaxScreenSize.init();
