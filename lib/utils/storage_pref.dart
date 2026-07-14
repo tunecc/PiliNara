@@ -685,6 +685,33 @@ abstract final class Pref {
   static int get subtitleFontWeight =>
       _setting.get(SettingBoxKey.subtitleFontWeight, defaultValue: 5);
 
+  // 副字幕默认小一号(80%/全屏120%),其余默认同主字幕
+  static double get subtitleSecondaryFontScale =>
+      _setting.get(SettingBoxKey.subtitleSecondaryFontScale, defaultValue: 0.8);
+
+  static double get subtitleSecondaryFontScaleFS => _setting.get(
+    SettingBoxKey.subtitleSecondaryFontScaleFS,
+    defaultValue: 1.1,
+  );
+
+  static double get subtitleSecondaryBgOpacity => _setting.get(
+    SettingBoxKey.subtitleSecondaryBgOpacity,
+    defaultValue: 0.67,
+  );
+
+  static double get subtitleSecondaryStrokeWidth => _setting.get(
+    SettingBoxKey.subtitleSecondaryStrokeWidth,
+    defaultValue: 2.0,
+  );
+
+  static int get subtitleSecondaryFontWeight =>
+      _setting.get(SettingBoxKey.subtitleSecondaryFontWeight, defaultValue: 5);
+
+  static double get subtitleSecondarySpacing => _setting.get(
+    SettingBoxKey.subtitleSecondarySpacing,
+    defaultValue: 4.0,
+  );
+
   static bool get badCertificateCallback =>
       _setting.get(SettingBoxKey.badCertificateCallback, defaultValue: false);
 

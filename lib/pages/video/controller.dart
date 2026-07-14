@@ -1337,6 +1337,8 @@ class VideoDetailController extends GetxController
   }
 
   Future<void> _loadFileSubtitles() async {
+    // 与 _queryPlayInfo 一致:清理副字幕状态及 mpv secondary-sid 残留
+    await setSecondarySubtitle(0);
     final indexFile = File(
       path.join(
         entry.entryDirPath,
@@ -1396,32 +1398,57 @@ class VideoDetailController extends GetxController
       return;
     }
 
-    Future<void> setSub(({bool isData, String id}) subtitle) async {
-      final sub = subtitles[index - 1];
-
-      String subUri = subtitle.id;
-      if (subtitle.isData) {
-        subUri = 'memory://$subUri';
-      }
-      await plPlayerController.videoPlayerController?.setSubtitleTrack(
-        SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
-      );
-      vttSubtitlesIndex.value = index;
+    // 防御性兜底:主副不能同轨。正常路径下选择器已将副字幕所在轨置灰,
+    // 此处仅防绕过 UI 的调用或面板打开期间的状态竞态;冲突时副字幕让位。
+    if (index == vttSecondarySubtitlesIndex.value) {
+      await setSecondarySubtitle(0);
     }
 
-    ({bool isData, String id})? subtitle = vttSubtitles[index - 1];
-    if (subtitle != null) {
-      await setSub(subtitle);
-    } else {
-      final result = await VideoHttp.vttSubtitles(
-        subtitles[index - 1].subtitleUrl!,
-      );
-      if (!isClosed && result != null) {
-        final subtitle = (isData: true, id: result);
-        vttSubtitles[index - 1] = subtitle;
-        await setSub(subtitle);
-      }
+    final subUri = await _resolveVttUri(index - 1);
+    if (isClosed || subUri == null) return;
+    final sub = subtitles[index - 1];
+    await plPlayerController.videoPlayerController?.setSubtitleTrack(
+      SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
+    );
+    vttSubtitlesIndex.value = index;
+  }
+
+  // 副字幕(双语字幕):0 表示关闭,>0 对应 subtitles[index - 1]
+  late final RxInt vttSecondarySubtitlesIndex = 0.obs;
+
+  Future<void> setSecondarySubtitle(int index) async {
+    final player = plPlayerController.videoPlayerController;
+
+    // index == 主字幕轨为防御性兜底(UI 已置灰该项),与 setSubtitle 的
+    // 守卫同规则:冲突时副字幕让位,即视为关闭副字幕。
+    if (index <= 0 || index == vttSubtitlesIndex.value) {
+      vttSecondarySubtitlesIndex.value = 0;
+      await player?.setSecondarySubtitleTrack(.no());
+      return;
     }
+
+    if (player == null) return;
+
+    final subUri = await _resolveVttUri(index - 1);
+    if (isClosed || subUri == null) return;
+    final sub = subtitles[index - 1];
+    await player.setSecondarySubtitleTrack(
+      SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
+    );
+    vttSecondarySubtitlesIndex.value = index;
+  }
+
+  /// 取 subtitles[subIdx] 的 VTT 播放地址(本地文件路径或 memory:// 数据),
+  /// 网络字幕转换结果缓存于 [vttSubtitles]。
+  Future<String?> _resolveVttUri(int subIdx) async {
+    ({bool isData, String id})? subtitle = vttSubtitles[subIdx];
+    if (subtitle == null) {
+      final result = await VideoHttp.vttSubtitles(subtitles[subIdx].subtitleUrl!);
+      if (result == null) return null;
+      subtitle = (isData: true, id: result);
+      vttSubtitles[subIdx] = subtitle;
+    }
+    return subtitle.isData ? 'memory://${subtitle.id}' : subtitle.id;
   }
 
   // interactive video
@@ -1477,6 +1504,9 @@ class VideoDetailController extends GetxController
   Future<void> _queryPlayInfo() async {
     vttSubtitles.clear();
     vttSubtitlesIndex.value = 0;
+    // 副字幕不跨 P/视频保留;同时清掉 mpv 的 secondary-sid 选项,
+    // 避免残留选项与下个视频 sub-add 产生的轨道 id 冲突
+    await setSecondarySubtitle(0);
     if (plPlayerController.showViewPoints) {
       viewPointList.clear();
     }
