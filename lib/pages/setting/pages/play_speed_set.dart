@@ -158,6 +158,7 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
                   SmartDialog.showToast('请输入搜索关键词');
                   return;
                 }
+                if (searching) return;
                 setLocal(() {
                   searching = true;
                   results = <SearchUserItemModel>[];
@@ -169,6 +170,7 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
                     page: 1,
                     onSuccess: (_) {},
                   );
+                  if (!context.mounted) return;
                   if (res case Success(:final response)) {
                     setLocal(() {
                       results = response.list ?? <SearchUserItemModel>[];
@@ -182,6 +184,7 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
                     SmartDialog.showToast('搜索失败，可改用 UID 添加');
                   }
                 } catch (_) {
+                  if (!context.mounted) return;
                   setLocal(() => searching = false);
                   SmartDialog.showToast('搜索失败，可改用 UID 添加');
                 }
