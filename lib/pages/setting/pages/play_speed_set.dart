@@ -4,7 +4,10 @@ import 'package:PiliPlus/common/widgets/flutter/list_tile.dart';
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/member.dart';
+import 'package:PiliPlus/http/search.dart';
+import 'package:PiliPlus/models/common/search/search_type.dart';
 import 'package:PiliPlus/models/common/video/author_play_speed.dart';
+import 'package:PiliPlus/models/search/result.dart';
 import 'package:PiliPlus/pages/setting/widgets/switch_item.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/filtering_text.dart';
@@ -109,77 +112,184 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
     if (res != null) onPicked(res);
   }
 
+  Future<void> _saveAuthorSpeed({
+    required int mid,
+    required String name,
+  }) async {
+    var resolvedName = name;
+    final existing = authorPlaySpeeds[mid];
+    if (existing != null) {
+      SmartDialog.showToast('该作者已存在，将更新倍速');
+      if (existing.name.isNotEmpty) {
+        resolvedName = existing.name;
+      }
+    }
+
+    await _pickSpeed(
+      title: '选择 $resolvedName 的倍速',
+      initial: existing?.speed ?? playSpeedDefault,
+      onPicked: (speed) {
+        final next = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds);
+        next[mid] = AuthorPlaySpeed(
+          mid: mid,
+          name: resolvedName,
+          speed: speed,
+        );
+        _persistAuthorSpeeds(next);
+        SmartDialog.showToast('已保存');
+      },
+    );
+  }
+
   Future<void> onAddAuthorSpeed() async {
+    final keywordCtrl = TextEditingController();
     final uidCtrl = TextEditingController();
-    String name = '';
     try {
-      final confirmed = await showDialog<bool>(
+      final result = await showDialog<({int mid, String name})>(
         context: context,
         builder: (context) {
-          return AlertDialog(
-            title: const Text('添加作者专属倍速'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: uidCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: '用户 UID',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(6)),
-                    ),
+          var searching = false;
+          var results = <SearchUserItemModel>[];
+          return StatefulBuilder(
+            builder: (context, setLocal) {
+              Future<void> doSearch() async {
+                final keyword = keywordCtrl.text.trim();
+                if (keyword.isEmpty) {
+                  SmartDialog.showToast('请输入搜索关键词');
+                  return;
+                }
+                setLocal(() {
+                  searching = true;
+                  results = <SearchUserItemModel>[];
+                });
+                try {
+                  final res = await SearchHttp.searchByType<SearchUserData>(
+                    searchType: SearchType.bili_user,
+                    keyword: keyword,
+                    page: 1,
+                    onSuccess: (_) {},
+                  );
+                  if (res case Success(:final response)) {
+                    setLocal(() {
+                      results = response.list ?? <SearchUserItemModel>[];
+                      searching = false;
+                    });
+                    if (results.isEmpty) {
+                      SmartDialog.showToast('未找到相关用户，可改用 UID 添加');
+                    }
+                  } else {
+                    setLocal(() => searching = false);
+                    SmartDialog.showToast('搜索失败，可改用 UID 添加');
+                  }
+                } catch (_) {
+                  setLocal(() => searching = false);
+                  SmartDialog.showToast('搜索失败，可改用 UID 添加');
+                }
+              }
+
+              Future<void> onNextByUid() async {
+                final mid = int.tryParse(uidCtrl.text.trim());
+                if (mid == null || mid <= 0) {
+                  SmartDialog.showToast('请输入有效 UID');
+                  return;
+                }
+                var name = 'UID:$mid';
+                try {
+                  final res = await MemberHttp.memberCardInfo(mid: mid);
+                  if (res case Success(:final response)) {
+                    final n = response.card?.name?.trim();
+                    if (n != null && n.isNotEmpty) name = n;
+                  }
+                } catch (_) {}
+                if (!context.mounted) return;
+                Get.back(result: (mid: mid, name: name));
+              }
+
+              return AlertDialog(
+                title: const Text('添加作者专属倍速'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: keywordCtrl,
+                        textInputAction: TextInputAction.search,
+                        decoration: const InputDecoration(
+                          labelText: '搜索昵称',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(6)),
+                          ),
+                        ),
+                        onSubmitted: (_) => doSearch(),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: searching ? null : doSearch,
+                          child: const Text('搜索'),
+                        ),
+                      ),
+                      if (searching) const LinearProgressIndicator(),
+                      if (results.isNotEmpty)
+                        SizedBox(
+                          height: 180,
+                          child: ListView.builder(
+                            itemCount: results.length,
+                            itemBuilder: (_, i) {
+                              final u = results[i];
+                              final mid = u.mid;
+                              final uname = u.uname?.trim();
+                              final title = (uname != null && uname.isNotEmpty)
+                                  ? uname
+                                  : 'UID:${mid ?? ''}';
+                              return ListTile(
+                                title: Text(title),
+                                subtitle: Text('UID: ${mid ?? '-'}'),
+                                onTap: mid == null || mid <= 0
+                                    ? null
+                                    : () {
+                                        Get.back(
+                                          result: (mid: mid, name: title),
+                                        );
+                                      },
+                              );
+                            },
+                          ),
+                        ),
+                      const Divider(),
+                      TextField(
+                        controller: uidCtrl,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: '用户 UID',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(6)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                // Task 4 会在此处插入搜索框与结果列表
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: Get.back, child: const Text('取消')),
-              TextButton(
-                onPressed: () => Get.back(result: true),
-                child: const Text('下一步'),
-              ),
-            ],
+                actions: [
+                  TextButton(onPressed: Get.back, child: const Text('取消')),
+                  TextButton(
+                    onPressed: onNextByUid,
+                    child: const Text('下一步'),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
-      if (confirmed != true) return;
-
-      final mid = int.tryParse(uidCtrl.text.trim());
-      if (mid == null || mid <= 0) {
-        SmartDialog.showToast('请输入有效 UID');
-        return;
-      }
-
-      // 尽量解析昵称；失败则 UID:mid
-      name = 'UID:$mid';
-      try {
-        final res = await MemberHttp.memberCardInfo(mid: mid);
-        if (res case Success(:final response)) {
-          final n = response.card?.name?.trim();
-          if (n != null && n.isNotEmpty) name = n;
-        }
-      } catch (_) {}
-
-      final existing = authorPlaySpeeds[mid];
-      if (existing != null) {
-        SmartDialog.showToast('该作者已存在，将更新倍速');
-        name = existing.name.isNotEmpty ? existing.name : name;
-      }
-
-      await _pickSpeed(
-        title: '选择 $name 的倍速',
-        initial: existing?.speed ?? playSpeedDefault,
-        onPicked: (speed) {
-          final next = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds);
-          next[mid] = AuthorPlaySpeed(mid: mid, name: name, speed: speed);
-          _persistAuthorSpeeds(next);
-          SmartDialog.showToast('已保存');
-        },
-      );
+      if (result == null) return;
+      await _saveAuthorSpeed(mid: result.mid, name: result.name);
     } finally {
+      keywordCtrl.dispose();
       uidCtrl.dispose();
     }
   }
