@@ -774,6 +774,11 @@ class PlPlayerController with BlockConfigMixin {
       _activeVideoContextKey = nextVideoContextKey;
       this.isLive = isLive;
       _videoType = videoType ?? VideoType.ugc;
+      if (isLive || (_videoType != VideoType.ugc)) {
+        // 非 UGC：回到全局默认基准；真正 setRate 仍由 _initializePlayer 处理
+        // UGC 的 mid 注入由 intro 到达后 applyAuthorDefaultSpeed 负责
+        resetAuthorDefaultSpeedToGlobal(force: false);
+      }
       this.width = width;
       this.height = height;
       this.dataSource = dataSource;
@@ -1289,8 +1294,32 @@ class PlPlayerController with BlockConfigMixin {
     }
   }
 
-  // 还原默认速度
+  // 当前视频 effective 默认倍速（UGC 可为作者专属，非 UGC/live 回退全局）
   double playSpeedDefault = Pref.playSpeedDefault;
+  int? _authorMidForSpeed;
+
+  /// 按作者更新当前视频的默认倍速。
+  /// [force] 为 true 时立即 setPlaybackSpeed；为 false 时只更新 playSpeedDefault 基准。
+  Future<void> applyAuthorDefaultSpeed(int? mid, {bool force = true}) async {
+    final next = Pref.playSpeedForAuthor(mid);
+    final midChanged = _authorMidForSpeed != mid;
+    _authorMidForSpeed = mid;
+    playSpeedDefault = next;
+    if (force && (midChanged || _playbackSpeed.value != next)) {
+      await setPlaybackSpeed(next);
+    }
+  }
+
+  /// 非 UGC / live 时回退到全局默认倍速基准。
+  void resetAuthorDefaultSpeedToGlobal({bool force = false}) {
+    final hadAuthor = _authorMidForSpeed != null;
+    _authorMidForSpeed = null;
+    playSpeedDefault = Pref.playSpeedDefault;
+    if (force && (hadAuthor || _playbackSpeed.value != playSpeedDefault)) {
+      unawaited(setPlaybackSpeed(playSpeedDefault));
+    }
+  }
+
   Future<void> setDefaultSpeed() async {
     await _videoPlayerController?.setRate(playSpeedDefault);
     _playbackSpeed.value = playSpeedDefault;
