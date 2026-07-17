@@ -333,5 +333,6 @@ abstract final class VideoBoxKey {
       playSpeedDefault = 'playSpeedDefault',
       longPressSpeedDefault = 'longPressSpeedDefault',
       speedsList = 'speedsList',
+      authorPlaySpeeds = 'authorPlaySpeeds',
       cacheVideoFit = 'cacheVideoFit';
 }

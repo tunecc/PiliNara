@@ -24,6 +24,7 @@ import 'package:PiliPlus/models/common/super_chat_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/theme/theme_type.dart';
 import 'package:PiliPlus/models/common/video/audio_quality.dart';
+import 'package:PiliPlus/models/common/video/author_play_speed.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
 import 'package:PiliPlus/models/common/video/live_quality.dart';
 import 'package:PiliPlus/models/common/video/subtitle_pref_type.dart';
@@ -1385,6 +1386,34 @@ abstract final class Pref {
 
   static double get longPressSpeedDefault =>
       _video.get(VideoBoxKey.longPressSpeedDefault, defaultValue: 3.0);
+
+  static Map<int, AuthorPlaySpeed> get authorPlaySpeeds =>
+      decodeAuthorPlaySpeeds(_video.get(VideoBoxKey.authorPlaySpeeds));
+
+  static set authorPlaySpeeds(Map<int, AuthorPlaySpeed> value) {
+    _video.put(VideoBoxKey.authorPlaySpeeds, encodeAuthorPlaySpeeds(value));
+  }
+
+  static double playSpeedForAuthor(int? mid) {
+    return resolvePlaySpeedForAuthor(
+      mid: mid,
+      authorSpeeds: authorPlaySpeeds,
+      defaultSpeed: playSpeedDefault,
+    );
+  }
+
+  static void upsertAuthorPlaySpeed(AuthorPlaySpeed entry) {
+    final map = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds);
+    map[entry.mid] = entry;
+    authorPlaySpeeds = map;
+  }
+
+  static void removeAuthorPlaySpeed(int mid) {
+    final map = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds);
+    if (map.remove(mid) != null) {
+      authorPlaySpeeds = map;
+    }
+  }
 
   static bool get defaultShowComment =>
       _setting.get(SettingBoxKey.defaultShowComment, defaultValue: false);
