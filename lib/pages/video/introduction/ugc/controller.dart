@@ -116,6 +116,12 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
           ..listOrder = videoDetail.value.listOrder;
       }
       videoDetail.value = response;
+      // UGC 开播 / 切稿件：按作者注入 effective 默认倍速（幂等，可与 playerInit 重复调用）
+      unawaited(
+        videoDetailCtr.plPlayerController.applyAuthorDefaultSpeed(
+          response.owner?.mid,
+        ),
+      );
       try {
         if (videoDetailCtr.cover.value.isEmpty ||
             (videoDetailCtr.videoUrl.isNullOrEmpty &&

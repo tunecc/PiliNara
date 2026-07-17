@@ -768,17 +768,18 @@ class PlPlayerController with BlockConfigMixin {
           _activeVideoContextKey != null &&
           nextVideoContextKey != null &&
           nextVideoContextKey != _activeVideoContextKey;
+      final nextVideoType = videoType ?? VideoType.ugc;
+      // 非 UGC/live 先回全局基准，再 resetTempSettings，避免 temp 重置时仍用作者 playSpeedDefault
+      // UGC 的 mid 注入由 intro / playerInit 的 applyAuthorDefaultSpeed 负责
+      if (isLive || nextVideoType != VideoType.ugc) {
+        resetAuthorDefaultSpeedToGlobal(force: false);
+      }
       if (shouldResetTempSettings) {
         resetTempSettings(nextPgcType: pgcType);
       }
       _activeVideoContextKey = nextVideoContextKey;
       this.isLive = isLive;
-      _videoType = videoType ?? VideoType.ugc;
-      if (isLive || (_videoType != VideoType.ugc)) {
-        // 非 UGC：回到全局默认基准；真正 setRate 仍由 _initializePlayer 处理
-        // UGC 的 mid 注入由 intro 到达后 applyAuthorDefaultSpeed 负责
-        resetAuthorDefaultSpeedToGlobal(force: false);
-      }
+      _videoType = nextVideoType;
       this.width = width;
       this.height = height;
       this.dataSource = dataSource;

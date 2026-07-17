@@ -973,6 +973,22 @@ class VideoDetailController extends GetxController
       }
     }
 
+    // 切集 / 开播：UGC 重套作者倍速；非 UGC 确保基准回到全局（不抢 setDataSource 的 setRate）
+    if (isUgc) {
+      try {
+        final mid = Get.find<UgcIntroController>(tag: heroTag)
+            .videoDetail
+            .value
+            .owner
+            ?.mid;
+        await plPlayerController.applyAuthorDefaultSpeed(mid);
+      } catch (_) {
+        // intro 尚未就绪时忽略；queryVideoIntro 成功后会再套一次
+      }
+    } else {
+      plPlayerController.resetAuthorDefaultSpeedToGlobal(force: false);
+    }
+
     defaultST = null;
   }
 
