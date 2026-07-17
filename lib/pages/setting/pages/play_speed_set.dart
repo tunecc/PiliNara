@@ -149,6 +149,7 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
         context: context,
         builder: (context) {
           var searching = false;
+          var uidSubmitting = false;
           var results = <SearchUserItemModel>[];
           return StatefulBuilder(
             builder: (context, setLocal) {
@@ -191,11 +192,13 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
               }
 
               Future<void> onNextByUid() async {
+                if (uidSubmitting) return;
                 final mid = int.tryParse(uidCtrl.text.trim());
                 if (mid == null || mid <= 0) {
                   SmartDialog.showToast('请输入有效 UID');
                   return;
                 }
+                setLocal(() => uidSubmitting = true);
                 var name = 'UID:$mid';
                 try {
                   final res = await MemberHttp.memberCardInfo(mid: mid);
@@ -280,7 +283,7 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
                 actions: [
                   TextButton(onPressed: Get.back, child: const Text('取消')),
                   TextButton(
-                    onPressed: onNextByUid,
+                    onPressed: uidSubmitting ? null : onNextByUid,
                     child: const Text('下一步'),
                   ),
                 ],
