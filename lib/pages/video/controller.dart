@@ -147,6 +147,9 @@ class VideoDetailController extends GetxController
   bool get removeSafeArea => plPlayerController.removeSafeArea;
   double get uiScale => plPlayerController.uiScale;
 
+  /// 上次 force 应用作者倍速的内容键（bvid-cid）；同集 reinits 不强制 setRate。
+  String? _authorSpeedContentKey;
+
   late VideoItem firstVideo;
   String? videoUrl;
   String? audioUrl;
@@ -973,7 +976,7 @@ class VideoDetailController extends GetxController
       }
     }
 
-    // 切集 / 开播：UGC 重套作者倍速；非 UGC 确保基准回到全局（不抢 setDataSource 的 setRate）
+    // 切集 / 开播：UGC 仅在 bvid/cid 变化时 force 重套；同集 reinits（画质/音轨/didPopNext）只更基准
     if (isUgc) {
       try {
         final mid = Get.find<UgcIntroController>(tag: heroTag)
@@ -981,7 +984,13 @@ class VideoDetailController extends GetxController
             .value
             .owner
             ?.mid;
-        await plPlayerController.applyAuthorDefaultSpeed(mid);
+        final contentKey = '$bvid-${cid.value}';
+        final contentChanged = _authorSpeedContentKey != contentKey;
+        _authorSpeedContentKey = contentKey;
+        await plPlayerController.applyAuthorDefaultSpeed(
+          mid,
+          force: contentChanged,
+        );
       } catch (_) {
         // intro 尚未就绪时忽略；queryVideoIntro 成功后会再套一次
       }
