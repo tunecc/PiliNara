@@ -2,6 +2,9 @@ import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart';
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/member.dart';
+import 'package:PiliPlus/models/common/video/author_play_speed.dart';
 import 'package:PiliPlus/pages/setting/widgets/switch_item.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/filtering_text.dart';
@@ -9,6 +12,7 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart' hide ListTile;
+import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
@@ -25,6 +29,7 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
   late double longPressSpeedDefault = Pref.longPressSpeedDefault;
   late List<double> speedList = Pref.speedList;
   late bool enableAutoLongPressSpeed = Pref.enableAutoLongPressSpeed;
+  late Map<int, AuthorPlaySpeed> authorPlaySpeeds = Pref.authorPlaySpeeds;
   List<({int id, String title, Icon icon})> sheetMenu = [
     (
       id: 1,
@@ -53,6 +58,131 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
   ];
 
   Box video = GStorage.video;
+
+  void _persistAuthorSpeeds(Map<int, AuthorPlaySpeed> next) {
+    Pref.authorPlaySpeeds = next;
+    setState(() => authorPlaySpeeds = next);
+  }
+
+  Future<void> _pickSpeed({
+    required String title,
+    required double initial,
+    required ValueChanged<double> onPicked,
+  }) async {
+    if (speedList.isEmpty) {
+      SmartDialog.showToast('请先在倍速列表中添加倍速');
+      return;
+    }
+    double selected = speedList.contains(initial) ? initial : speedList.first;
+    final res = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: StatefulBuilder(
+            builder: (context, setLocal) {
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: speedList
+                    .map(
+                      (s) => ChoiceChip(
+                        label: Text(s.toString()),
+                        selected: selected == s,
+                        onSelected: (_) => setLocal(() => selected = s),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
+          actions: [
+            TextButton(onPressed: Get.back, child: const Text('取消')),
+            TextButton(
+              onPressed: () => Get.back(result: selected),
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+    if (res != null) onPicked(res);
+  }
+
+  Future<void> onAddAuthorSpeed() async {
+    final uidCtrl = TextEditingController();
+    String name = '';
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('添加作者专属倍速'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: uidCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: '用户 UID',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(6)),
+                    ),
+                  ),
+                ),
+                // Task 4 会在此处插入搜索框与结果列表
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: Get.back, child: const Text('取消')),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: const Text('下一步'),
+              ),
+            ],
+          );
+        },
+      );
+      if (confirmed != true) return;
+
+      final mid = int.tryParse(uidCtrl.text.trim());
+      if (mid == null || mid <= 0) {
+        SmartDialog.showToast('请输入有效 UID');
+        return;
+      }
+
+      // 尽量解析昵称；失败则 UID:mid
+      name = 'UID:$mid';
+      try {
+        final res = await MemberHttp.memberCardInfo(mid: mid);
+        if (res case Success(:final response)) {
+          final n = response.card?.name?.trim();
+          if (n != null && n.isNotEmpty) name = n;
+        }
+      } catch (_) {}
+
+      final existing = authorPlaySpeeds[mid];
+      if (existing != null) {
+        SmartDialog.showToast('该作者已存在，将更新倍速');
+        name = existing.name.isNotEmpty ? existing.name : name;
+      }
+
+      await _pickSpeed(
+        title: '选择 $name 的倍速',
+        initial: existing?.speed ?? playSpeedDefault,
+        onPicked: (speed) {
+          final next = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds);
+          next[mid] = AuthorPlaySpeed(mid: mid, name: name, speed: speed);
+          _persistAuthorSpeeds(next);
+          SmartDialog.showToast('已保存');
+        },
+      );
+    } finally {
+      uidCtrl.dispose();
+    }
+  }
 
   // 添加自定义倍速
   void onAddSpeed() {
@@ -270,6 +400,55 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.only(left: 14, right: 14, top: 12, bottom: 6),
+              child: Row(
+                children: [
+                  Text('作者专属倍速', style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 12),
+                  TextButton(onPressed: onAddAuthorSpeed, child: const Text('添加')),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 14, right: 14, bottom: 8),
+              child: Text(
+                '指定 UP 主的视频以专属倍速开播；未列出的作者使用上方默认倍速。播放中手动改速仅本次有效。',
+                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+              ),
+            ),
+            if (authorPlaySpeeds.isEmpty)
+              const ListTile(title: Text('尚未添加作者，点击添加'))
+            else
+              ...authorPlaySpeeds.values.map((item) {
+                return ListTile(
+                  title: Text(item.name),
+                  subtitle: Text('UID: ${item.mid}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${item.speed}x'),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () {
+                          final next = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds)
+                            ..remove(item.mid);
+                          _persistAuthorSpeeds(next);
+                        },
+                      ),
+                    ],
+                  ),
+                  onTap: () => _pickSpeed(
+                    title: '修改 ${item.name} 的倍速',
+                    initial: item.speed,
+                    onPicked: (speed) {
+                      final next = Map<int, AuthorPlaySpeed>.from(authorPlaySpeeds);
+                      next[item.mid] = item.copyWith(speed: speed);
+                      _persistAuthorSpeeds(next);
+                    },
+                  ),
+                );
+              }),
           ],
         ),
       ),
