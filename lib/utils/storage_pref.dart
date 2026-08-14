@@ -508,6 +508,11 @@ abstract final class Pref {
     return CDNService.backupUrl;
   }
 
+  static String? get customCDNUrl {
+    final value = _setting.get(SettingBoxKey.customCDNUrl);
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
   static String get banWordForRecommend =>
       _setting.get(SettingBoxKey.banWordForRecommend, defaultValue: '');
 
@@ -552,9 +557,6 @@ abstract final class Pref {
 
   static double get blockLimit =>
       _setting.get(SettingBoxKey.blockLimit, defaultValue: 0.0);
-
-  static double get refreshDragPercentage =>
-      _setting.get(SettingBoxKey.refreshDragPercentage, defaultValue: 0.25);
 
   static double get refreshDisplacement => _setting.get(
     SettingBoxKey.refreshDisplacement,
@@ -781,6 +783,9 @@ abstract final class Pref {
   static int get mergeDanmakuMarkThreshold =>
       _setting.get(SettingBoxKey.mergeDanmakuMarkThreshold, defaultValue: 1);
 
+  static bool get danmakuEnlarge =>
+      _setting.get(SettingBoxKey.danmakuEnlarge, defaultValue: true);
+
   static int get danmakuEnlargeThreshold =>
       _setting.get(SettingBoxKey.danmakuEnlargeThreshold, defaultValue: 7);
 
@@ -904,6 +909,9 @@ abstract final class Pref {
 
   static bool get enableShrinkVideoSize =>
       _setting.get(SettingBoxKey.enableShrinkVideoSize, defaultValue: true);
+
+  static bool get enablePinchRotate =>
+      _setting.get(SettingBoxKey.enablePinchRotate, defaultValue: true);
 
   static bool get showDynActionBar =>
       _setting.get(SettingBoxKey.showDynActionBar, defaultValue: true);
@@ -1469,6 +1477,9 @@ abstract final class Pref {
 
   static bool get showFsLockBtn =>
       _setting.get(SettingBoxKey.showFsLockBtn, defaultValue: true);
+
+  static bool get showFsLockBtnRight =>
+      _setting.get(SettingBoxKey.showFsLockBtnRight, defaultValue: false);
 
   static bool get silentDownImg =>
       _setting.get(SettingBoxKey.silentDownImg, defaultValue: false);

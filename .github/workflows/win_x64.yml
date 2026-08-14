@@ -72,6 +72,7 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             PiliNara_windows_*.zip
             PiliNara-Win-Setup/PiliNara_windows_*.exe

@@ -18,7 +18,7 @@ class MsgFeedTopSkeleton extends StatelessWidget {
           ),
         ),
         title: UnconstrainedBox(
-          alignment: Alignment.centerLeft,
+          alignment: .centerLeft,
           child: Container(
             width: 100,
             height: 11,

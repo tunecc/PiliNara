@@ -8,7 +8,9 @@ import 'package:PiliPlus/common/widgets/dynamic_sliver_app_bar/dynamic_sliver_ap
 import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/gesture/tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/scroll_behavior.dart'
+    show NoOverscrollIndicator;
+import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
@@ -93,8 +95,9 @@ class _MemberPageState extends State<MemberPage> {
         () => switch (_userController.loadingState.value) {
           Loading() => m3eLoading,
           Success(:final response) => ExtendedNestedScrollView(
-            key: _userController.scrollKey,
             onlyOneScrollInBody: true,
+            key: _userController.scrollKey,
+            scrollBehavior: const NoOverscrollIndicator(),
             pinnedHeaderSliverHeightBuilder: () =>
                 kToolbarHeight + MediaQuery.viewPaddingOf(context).top,
             headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -585,6 +588,7 @@ class _MemberPageState extends State<MemberPage> {
   ];
 
   Widget get _buildBody => tabBarView(
+    hitTestBehavior: .translucent,
     controller: _userController.tabController,
     children: _userController.tab2!.map((item) {
       return switch (item.param!) {

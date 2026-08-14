@@ -58,6 +58,7 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             PiliNara_macos_*.dmg
             release-manifest.json

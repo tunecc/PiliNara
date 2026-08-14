@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:PiliPlus/common/assets.dart';
+import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
+import 'package:PiliPlus/common/widgets/emote_span.dart';
 import 'package:PiliPlus/common/widgets/gesture/tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/image/cached_network_svg_image.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -34,34 +36,63 @@ class OpusContent extends StatelessWidget {
   final List<ArticleContentModel> opus;
   final ValueGetter<List<SourceModel>> images;
   final double maxWidth;
+  final String opusId;
 
   const OpusContent({
     super.key,
     required this.opus,
     required this.images,
     required this.maxWidth,
+    required this.opusId,
   });
 
   static InlineSpan _node2Widget({
     required Node item,
-    required ColorScheme colorScheme,
     bool isQuote = false,
+    required String opusId,
+    required ColorScheme colorScheme,
     required ValueGetter<double> surfaceLuminance,
   }) {
     switch (item.type) {
       case 'TEXT_NODE_TYPE_RICH' when (item.rich != null):
-        Rich rich = item.rich!;
+        final rich = item.rich!;
         switch (rich.type) {
           case 'RICH_TEXT_NODE_TYPE_EMOJI':
             Emoji emoji = rich.emoji!;
             final size = 20.0 * emoji.size;
-            return WidgetSpan(
+            return EmoteSpan(
+              rawText: rich.origText,
               child: NetworkImgLayer(
                 width: size,
                 height: size,
                 src: emoji.url,
                 type: ImageType.emote,
               ),
+            );
+          case 'RICH_TEXT_NODE_TYPE_LOTTERY':
+            return TextSpan(
+              children: [
+                WidgetSpan(
+                  alignment: .middle,
+                  child: Icon(
+                    Icons.redeem_rounded,
+                    size: 16,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                TextSpan(
+                  text: '${rich.origText} ',
+                  style: TextStyle(color: colorScheme.primary),
+                  recognizer: NoDeadlineTapGestureRecognizer()
+                    ..onTap = () => Get.toNamed(
+                      '/webview',
+                      parameters: {
+                        'url':
+                            'https://www.bilibili.com/h5/lottery/result?business_id=$opusId',
+                      },
+                    ),
+                ),
+              ],
             );
           default:
             return TextSpan(
@@ -185,6 +216,7 @@ class OpusContent extends StatelessWidget {
                       ?.map(
                         (item) => _node2Widget(
                           item: item,
+                          opusId: opusId,
                           colorScheme: colorScheme,
                           surfaceLuminance: getSurfaceLuminance,
                         ),
@@ -231,7 +263,7 @@ class OpusContent extends StatelessWidget {
                 );
                 if (!(pic.isLongPic ?? false)) {
                   child = fromHero(
-                    tag: pic.url!,
+                    tag: '${pic.url!}$hashCode',
                     child: child,
                   );
                 }
@@ -241,6 +273,7 @@ class OpusContent extends StatelessWidget {
                     imgList: images,
                     initialPage: images.indexWhere((e) => e.url == pic.url),
                     quality: 60,
+                    tag: hashCode.toString(),
                   ),
                   child: child,
                 );
@@ -598,15 +631,34 @@ class OpusContent extends StatelessWidget {
                               return;
                             }
                             if (type == 'LINK_CARD_TYPE_ITEM_NULL') {
-                              switch (card.itemNull?.text) {
-                                case '视频':
-                                  PiliScheme.videoPush(
-                                    int.parse(card.oid!),
-                                    null,
-                                  );
-                                default:
-                                  PageUtils.pushDynFromId(id: card.oid!);
-                              }
+                              showDialog(
+                                context: context,
+                                builder: (context) => SimpleDialog(
+                                  clipBehavior: .hardEdge,
+                                  contentPadding: const .symmetric(
+                                    vertical: 12,
+                                  ),
+                                  children: [
+                                    DialogOption(
+                                      onPressed: () {
+                                        Get.back();
+                                        PiliScheme.videoPush(
+                                          int.parse(card.oid!),
+                                          null,
+                                        );
+                                      },
+                                      child: const Text('视频'),
+                                    ),
+                                    DialogOption(
+                                      onPressed: () {
+                                        Get.back();
+                                        PageUtils.pushDynFromId(id: card.oid!);
+                                      },
+                                      child: const Text('动态/专栏'),
+                                    ),
+                                  ],
+                                ),
+                              );
                               return;
                             }
                             final url = switch (type) {
@@ -662,6 +714,7 @@ class OpusContent extends StatelessWidget {
                       .map(
                         (e) => _node2Widget(
                           item: e,
+                          opusId: opusId,
                           colorScheme: colorScheme,
                           surfaceLuminance: getSurfaceLuminance,
                         ),

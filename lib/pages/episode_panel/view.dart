@@ -5,11 +5,11 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/models/common/list_order.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
-import 'package:PiliPlus/common/widgets/flutter/page/tabs.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart'
+    show tabBarScrollPhysics;
 import 'package:PiliPlus/common/widgets/stat/stat.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -33,8 +33,8 @@ import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' hide TabBarView;
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -84,10 +84,10 @@ class EpisodePanel extends CommonSlidePage {
   final VoidCallback? onClose;
 
   @override
-  State<EpisodePanel> createState() => _EpisodePanelState();
+  State<EpisodePanel> createState() => EpisodePanelState();
 }
 
-class _EpisodePanelState extends State<EpisodePanel>
+class EpisodePanelState extends State<EpisodePanel>
     with TickerProviderStateMixin, CommonSlideMixin {
   // tab
   late final TabController _tabController;
@@ -109,6 +109,10 @@ class _EpisodePanelState extends State<EpisodePanel>
 
   late final List<bool> _isReversed;
   late final List<ScrollController> _itemScrollController;
+
+  /// 当前激活子列表的滚动控制器（供视频页键盘滚动播放列表使用）
+  ScrollController get activeScrollController =>
+      _itemScrollController[_currentTabIndex.value];
 
   // fav
   Rx<LoadingState<bool>>? _favState;
@@ -237,9 +241,9 @@ class _EpisodePanelState extends State<EpisodePanel>
   @override
   Widget buildList(ThemeData theme) {
     if (_isMulti) {
-      return TabBarView<TabBarDragGestureRecognizer>(
+      return TabBarView(
         controller: _tabController,
-        physics: clampingScrollPhysics,
+        physics: tabBarScrollPhysics,
         horizontalDragGestureRecognizer: () =>
             TabBarDragGestureRecognizer(isDxAllowed: isDxAllowed),
         children: List.generate(
@@ -270,7 +274,7 @@ class _EpisodePanelState extends State<EpisodePanel>
 
   double _calcItemHeight(ugc.BaseEpisodeItem episode) {
     if (episode is ugc.EpisodeItem && episode.pages!.length > 1) {
-      return 157; // 110 + 2 + 10 + 35
+      return 167; // 110 + 2 + 10 + 45
     }
     return 112;
   }
@@ -320,7 +324,7 @@ class _EpisodePanelState extends State<EpisodePanel>
                                 vertical: 5,
                               ), // 10
                               child: PagesPanel(
-                                // 35
+                                // 45
                                 list: isCurrTab && isCurrItem
                                     ? null
                                     : episode.pages,
@@ -435,6 +439,7 @@ class _EpisodePanelState extends State<EpisodePanel>
           type: .transparency,
           child: InkWell(
             onTap: () {
+              if (isCurrentIndex) return;
               if (episode.badge == "会员" &&
                   Accounts.mainEqVideo &&
                   vipStatus != 1) {

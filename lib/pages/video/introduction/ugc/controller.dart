@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart' show ReloadMixin;
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/init.dart';
@@ -37,7 +37,6 @@ import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -333,22 +332,21 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
               PageUtils.launchURL(videoUrl);
             },
           ),
-          if (PlatformUtils.isMobile)
-            ListTile(
-              dense: true,
-              title: const Text(
-                '分享视频',
-                style: TextStyle(fontSize: 14),
-              ),
-              onTap: () {
-                Get.back();
-                ShareUtils.shareText(
-                  '${videoDetail.title} '
-                  'UP主: ${videoDetail.owner!.name!}'
-                  ' - $videoUrl',
-                );
-              },
+          ListTile(
+            dense: true,
+            title: const Text(
+              '分享视频',
+              style: TextStyle(fontSize: 14),
             ),
+            onTap: () {
+              Get.back();
+              ShareUtils.shareText(
+                '${videoDetail.title} '
+                'UP主: ${videoDetail.owner!.name!}'
+                ' - $videoUrl',
+              );
+            },
+          ),
           if (isLogin)
             ListTile(
               dense: true,
@@ -500,6 +498,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
             cid: cid,
             cover: cover,
             dimension: dimension,
+            title: episode.title,
           );
           return false;
         }

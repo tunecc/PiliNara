@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/assets.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart'
+    show tabBarScrollPhysics;
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/user.dart';
 import 'package:PiliPlus/pages/common/publish/publish_route.dart';
@@ -25,11 +26,13 @@ class PayCoinsPage extends StatefulWidget {
     required this.onPayCoin,
     required this.hasCoin,
     required this.hasCopyright,
+    this.showCoinWithLike = true,
   });
 
   final OnPayCoin onPayCoin;
   final bool hasCoin;
   final bool hasCopyright;
+  final bool showCoinWithLike;
 
   @override
   State<PayCoinsPage> createState() => _PayCoinsPageState();
@@ -38,6 +41,7 @@ class PayCoinsPage extends StatefulWidget {
     required OnPayCoin onPayCoin,
     required bool hasCoin,
     required bool hasCopyright,
+    bool showCoinWithLike = true,
   }) {
     Get.key.currentState!.push(
       PublishRoute(
@@ -46,6 +50,7 @@ class PayCoinsPage extends StatefulWidget {
             onPayCoin: onPayCoin,
             hasCoin: hasCoin,
             hasCopyright: hasCopyright,
+            showCoinWithLike: showCoinWithLike,
           );
         },
         transitionDuration: const Duration(milliseconds: 225),
@@ -66,7 +71,8 @@ class _PayCoinsPageState extends State<PayCoinsPage>
   late final _hasCopyright = widget.hasCopyright;
   late bool _isPaying = false;
   PageController? _controller;
-  late final RxBool _coinWithLike = Pref.coinWithLike.obs;
+  late final RxBool _coinWithLike =
+      (widget.showCoinWithLike && Pref.coinWithLike).obs;
   late final RxInt _pageIndex = 0.obs;
 
   late final AnimationController _slide22Controller;
@@ -314,7 +320,7 @@ class _PayCoinsPageState extends State<PayCoinsPage>
                       child: SizedBox(
                         height: 100,
                         child: PageView(
-                          physics: clampingScrollPhysics,
+                          physics: tabBarScrollPhysics,
                           controller: _controller,
                           onPageChanged: (index) {
                             _scale();
@@ -450,33 +456,37 @@ class _PayCoinsPageState extends State<PayCoinsPage>
                 clipBehavior: Clip.none,
                 alignment: Alignment.centerLeft,
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      final newVal = !_coinWithLike.value;
-                      _coinWithLike.value = newVal;
-                      GStorage.setting.put(SettingBoxKey.coinWithLike, newVal);
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(width: 12),
-                        Obx(
-                          () => Icon(
-                            _coinWithLike.value
-                                ? Icons.check_box_outlined
-                                : Icons.check_box_outline_blank,
-                            size: 20,
-                            color: Colors.white,
+                  if (widget.showCoinWithLike)
+                    GestureDetector(
+                      onTap: () {
+                        final newVal = !_coinWithLike.value;
+                        _coinWithLike.value = newVal;
+                        GStorage.setting.put(
+                          SettingBoxKey.coinWithLike,
+                          newVal,
+                        );
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(width: 12),
+                          Obx(
+                            () => Icon(
+                              _coinWithLike.value
+                                  ? Icons.check_box_outlined
+                                  : Icons.check_box_outline_blank,
+                              size: 20,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        const Text(
-                          ' 同时点赞',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ],
+                          const Text(
+                            ' 同时点赞',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   Center(
                     child: GestureDetector(
                       onTap: Get.back,

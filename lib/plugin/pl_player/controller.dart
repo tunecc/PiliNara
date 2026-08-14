@@ -1,5 +1,5 @@
 import 'dart:async' show StreamSubscription, Timer, unawaited;
-import 'dart:convert' show ascii;
+import 'dart:convert' show ascii, utf8;
 import 'dart:io' show Platform;
 import 'dart:math' show max, min;
 import 'dart:ui' as ui;
@@ -30,6 +30,7 @@ import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/plugin/pl_player/models/speed_lock_hint.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:PiliPlus/services/live_pip_overlay_service.dart';
@@ -52,10 +53,11 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:archive/archive.dart' show getCrc32;
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:easy_debounce/easy_throttle.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show clampDouble, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback, DeviceOrientation;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -126,6 +128,16 @@ class PlPlayerController with BlockConfigMixin {
   final RxBool showBrightnessStatus = false.obs;
 
   final RxBool longPressStatus = false.obs;
+
+  /// 长按倍速锁定（仅当次播放生效，不持久化）
+  bool speedLocked = false;
+
+  /// 长按倍速锁定提示（六态，驱动播放器顶部 toast）
+  final Rx<SpeedLockHint> speedLockHint = SpeedLockHint.none.obs;
+
+  /// 长按中滑动越线后的预备态：松手才提交锁定/解锁
+  bool _speedLockArmed = false;
+  Timer? _speedLockHintTimer;
 
   final RxBool controlsLock = false.obs;
 
@@ -371,6 +383,7 @@ class PlPlayerController with BlockConfigMixin {
   // settings
   late final showFSActionItem = Pref.showFSActionItem;
   late final enableShrinkVideoSize = Pref.enableShrinkVideoSize;
+  late final enablePinchRotate = Pref.enablePinchRotate;
   late final darkVideoPage = Pref.darkVideoPage;
   late final enableSlideVolumeBrightness = Pref.enableSlideVolumeBrightness;
   late final enableSlideFS = Pref.enableSlideFS;
@@ -401,6 +414,7 @@ class PlPlayerController with BlockConfigMixin {
   late final showViewPoints = Pref.showViewPoints;
   late final showFsScreenshotBtn = Pref.showFsScreenshotBtn;
   late final showFsLockBtn = Pref.showFsLockBtn;
+  late final showFsLockBtnRight = Pref.showFsLockBtnRight;
   late final keyboardControl = Pref.keyboardControl;
   late final uiScale = Pref.uiScale;
 
@@ -756,6 +770,9 @@ class PlPlayerController with BlockConfigMixin {
   }) async {
     try {
       _processing = true;
+      // 换视频/换P：解除倍速锁定并恢复锁定前速度。
+      // 必须先于临时配置重置执行，否则 lastPlaybackSpeed 会被先行覆盖
+      await releaseSpeedLock();
       final nextVideoContextKey = PipOverlayService.buildVideoContextKey(
         videoType: videoType ?? VideoType.ugc,
         bvid: bvid,
@@ -809,12 +826,22 @@ class PlPlayerController with BlockConfigMixin {
       }
 
       if (_playerCount == 0) {
+        if (kDebugMode) {
+          debugPrint(
+            '[PlPlayer] setDataSource aborted: _playerCount == 0 before init',
+          );
+        }
         return;
       }
       // 配置Player 音轨、字幕等等
       await _createVideoController(dataSource, seekTo, volume);
 
       if (_playerCount == 0) {
+        if (kDebugMode) {
+          debugPrint(
+            '[PlPlayer] setDataSource aborted: _playerCount == 0 after createVideoController',
+          );
+        }
         _removeListeners();
         _videoPlayerController?.dispose();
         _videoPlayerController = null;
@@ -1000,8 +1027,15 @@ class PlPlayerController with BlockConfigMixin {
       if (onlyPlayAudio.value) {
         video = audio;
       } else {
-        extras['audio-files'] =
-            '"${Platform.isWindows ? audio.replaceAll(';', r'\;') : audio.replaceAll(':', r'\:')}"';
+        // dely_open need provide length
+        video =
+            ('edl://'
+            '!no_clip;!no_chapters;'
+            // '!delay_open,media_type=video;'
+            '%${isFileSource ? utf8.encode(video).length : video.length}%$video;'
+            '!new_stream;!no_clip;!no_chapters;'
+            // '!delay_open,media_type=audio;'
+            '%${isFileSource ? utf8.encode(audio).length : audio.length}%$audio');
       }
       if (enableAudioNormalization) {
         final String audioNormalization;
@@ -1196,9 +1230,14 @@ class PlPlayerController with BlockConfigMixin {
                 //   debugPrint("_buffered.value: ${_buffered.value}");
                 // }
                 if (isBuffering.value && buffered.value == 0) {
+                  final customHost = VideoUtils.customCDNUrl;
                   SmartDialog.showToast(
-                    '视频链接打开失败，重试中',
-                    displayTime: const Duration(milliseconds: 500),
+                    customHost == null
+                        ? '视频链接打开失败，重试中'
+                        : '视频链接打开失败，重试中\n当前自定义CDN节点：$customHost，持续失败可尝试更换或清除',
+                    displayTime: customHost == null
+                        ? const Duration(milliseconds: 500)
+                        : const Duration(milliseconds: 3000),
                   );
                   refreshPlayer();
                 }
@@ -1578,7 +1617,7 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   /// 设置长按倍速状态 live模式下禁用
-  Future<void> setLongPressStatus(bool val) async {
+  Future<void> setLongPressStatus(bool val, {bool isCancel = false}) async {
     if (isLive) {
       return;
     }
@@ -1590,17 +1629,130 @@ class PlPlayerController with BlockConfigMixin {
     }
     if (val) {
       if (playerStatus.isPlaying) {
+        _speedLockArmed = false;
+        _cancelSpeedLockHintTimer();
         longPressStatus.value = val;
         HapticFeedback.lightImpact();
-        await setPlaybackSpeed(
-          enableAutoLongPressSpeed ? playbackSpeed * 2 : longPressSpeed,
-        );
+        if (speedLocked) {
+          // 锁定态：速度已固化为锁定值，不得再调速——setPlaybackSpeed 会
+          // 覆盖 lastPlaybackSpeed（锁定前速度），动态倍速下还会二次翻倍
+          speedLockHint.value = SpeedLockHint.swipeDownToUnlock;
+        } else {
+          await setPlaybackSpeed(
+            enableAutoLongPressSpeed ? playbackSpeed * 2 : longPressSpeed,
+          );
+          if (longPressStatus.value) {
+            speedLockHint.value = SpeedLockHint.swipeUpToLock;
+          }
+        }
       }
     } else {
-      // if (kDebugMode) debugPrint('$playbackSpeed');
+      // 预备态在松手时提交；系统打断（cancel）一律不提交
+      final bool commit = _speedLockArmed && !isCancel;
+      _speedLockArmed = false;
       longPressStatus.value = val;
+      if (speedLocked) {
+        if (commit) {
+          speedLocked = false;
+          HapticFeedback.mediumImpact();
+          await setPlaybackSpeed(lastPlaybackSpeed);
+          _showTransientSpeedLockHint(SpeedLockHint.unlockedConfirm);
+        } else {
+          speedLockHint.value = SpeedLockHint.none;
+        }
+      } else {
+        if (commit) {
+          speedLocked = true;
+          HapticFeedback.mediumImpact();
+          _showTransientSpeedLockHint(SpeedLockHint.lockedConfirm);
+        } else {
+          speedLockHint.value = SpeedLockHint.none;
+          await setPlaybackSpeed(lastPlaybackSpeed);
+        }
+      }
+    }
+  }
+
+  // 长按倍速锁定：预备阈值 = 播放器实高 × 比例，clamp 到人体工学区间。
+  // 比例由实测锚点反推（横屏半屏 48/231≈0.21、横屏全屏 96/411≈0.23），
+  // 下限保小窗/小播放器手感，上限≈2.7cm 为拇指第一指节舒适推程封顶
+  static const double _speedLockThresholdRatio = 0.22;
+  static const double _speedLockThresholdMin = 48;
+  static const double _speedLockThresholdMax = 112;
+  static const double _speedLockHysteresis = 10;
+
+  /// 长按中手指移动，dy 为相对长按起点的纵向偏移（上滑为负），
+  /// [playerHeight] 为播放器组件实高（决定阈值）。
+  /// 越线进入预备态、滑回取消预备，均可反复，提交只发生在松手
+  void onLongPressMove(double dy, double playerHeight) {
+    if (!longPressStatus.value) {
+      return;
+    }
+    final double threshold = clampDouble(
+      playerHeight * _speedLockThresholdRatio,
+      _speedLockThresholdMin,
+      _speedLockThresholdMax,
+    );
+    if (speedLocked) {
+      // 下滑预备退出
+      if (!_speedLockArmed && dy >= threshold) {
+        _speedLockArmed = true;
+        HapticFeedback.lightImpact();
+        speedLockHint.value = SpeedLockHint.releaseToUnlock;
+      } else if (_speedLockArmed && dy <= threshold - _speedLockHysteresis) {
+        _speedLockArmed = false;
+        HapticFeedback.lightImpact();
+        speedLockHint.value = SpeedLockHint.swipeDownToUnlock;
+      }
+    } else {
+      // 上滑预备锁定
+      if (!_speedLockArmed && dy <= -threshold) {
+        _speedLockArmed = true;
+        HapticFeedback.lightImpact();
+        speedLockHint.value = SpeedLockHint.releaseToLock;
+      } else if (_speedLockArmed && dy >= -(threshold - _speedLockHysteresis)) {
+        _speedLockArmed = false;
+        HapticFeedback.lightImpact();
+        speedLockHint.value = SpeedLockHint.swipeUpToLock;
+      }
+    }
+  }
+
+  /// 手动调速（倍速菜单/快捷键）：锁定态下先解除锁定再应用所选速度
+  Future<void> setManualPlaybackSpeed(double speed) async {
+    if (speedLocked) {
+      await releaseSpeedLock(restoreSpeed: false);
+    }
+    await setPlaybackSpeed(speed);
+  }
+
+  /// 解除倍速锁定；[restoreSpeed] 为 true 时恢复锁定前速度
+  Future<void> releaseSpeedLock({bool restoreSpeed = true}) async {
+    if (!speedLocked) {
+      return;
+    }
+    speedLocked = false;
+    _speedLockArmed = false;
+    _cancelSpeedLockHintTimer();
+    speedLockHint.value = SpeedLockHint.none;
+    if (restoreSpeed) {
       await setPlaybackSpeed(lastPlaybackSpeed);
     }
+  }
+
+  void _showTransientSpeedLockHint(SpeedLockHint hint) {
+    speedLockHint.value = hint;
+    _speedLockHintTimer?.cancel();
+    _speedLockHintTimer = Timer(const Duration(seconds: 2), () {
+      if (speedLockHint.value == hint) {
+        speedLockHint.value = SpeedLockHint.none;
+      }
+    });
+  }
+
+  void _cancelSpeedLockHintTimer() {
+    _speedLockHintTimer?.cancel();
+    _speedLockHintTimer = null;
   }
 
   bool get isCompleted =>
@@ -1880,6 +2032,10 @@ class PlPlayerController with BlockConfigMixin {
     // 每次减1，最后销毁
     resetScreenRotation();
     cancelLongPressTimer();
+    _cancelSpeedLockHintTimer();
+    speedLocked = false;
+    _speedLockArmed = false;
+    speedLockHint.value = SpeedLockHint.none;
     _cancelSubForSeek();
     if (!_isCloseAll && _playerCount > 1) {
       _playerCount -= 1;
@@ -1948,7 +2104,7 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void setContinuePlayInBackground() {
-    continuePlayInBackground.value = !continuePlayInBackground.value;
+    continuePlayInBackground.toggle();
     if (!tempPlayerConf) {
       setting.put(
         SettingBoxKey.continuePlayInBackground,
@@ -1958,10 +2114,8 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void setOnlyPlayAudio() {
-    onlyPlayAudio.value = !onlyPlayAudio.value;
-    videoPlayerController?.setVideoTrack(
-      onlyPlayAudio.value ? VideoTrack.no() : VideoTrack.auto(),
-    );
+    onlyPlayAudio.toggle();
+    videoPlayerController?.setVideoTrack(onlyPlayAudio.value ? .no() : .auto());
   }
 
   late final Map<String, ui.Image?> previewCache = {};

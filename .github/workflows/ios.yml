@@ -71,6 +71,7 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             PiliNara_ios_*.ipa
             release-manifest.json

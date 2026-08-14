@@ -225,6 +225,7 @@ jobs:
         with:
           tag_name: ${{ env.release_tag }}
           name: ${{ env.release_tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             PiliNara_linux_*.tar.gz
             PiliNara_linux_*.deb

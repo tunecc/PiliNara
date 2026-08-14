@@ -7,7 +7,6 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/extra_hittest_stack.dart';
-import 'package:PiliPlus/common/widgets/flutter/page/page_view.dart';
 import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
@@ -15,8 +14,9 @@ import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recogniz
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
-import 'package:PiliPlus/models/common/image_type.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart'
+    show tabBarScrollPhysics;
 import 'package:PiliPlus/models/common/live/live_contribution_rank_type.dart';
 import 'package:PiliPlus/models_new/live/live_room_info_h5/data.dart';
 import 'package:PiliPlus/models_new/live/live_superchat/item.dart';
@@ -38,6 +38,7 @@ import 'package:PiliPlus/plugin/pl_player/view/view.dart';
 import 'package:PiliPlus/services/live_pip_overlay_service.dart';
 import 'package:PiliPlus/services/logger.dart';
 import 'package:PiliPlus/services/pip_overlay_service.dart';
+import 'package:PiliPlus/services/pip_transition_coordinator.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
@@ -56,7 +57,7 @@ import 'package:PiliPlus/utils/utils.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:canvas_danmaku/danmaku_screen.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart' hide PageView;
+import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
@@ -86,6 +87,67 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   late final GlobalKey scKey = GlobalKey();
   late final GlobalKey playerKey = GlobalKey();
 
+  // 归位动画进行中：页面播放器以透明占位先行布局（供量取目标矩形），
+  // 恢复握手完成后亮出，期间小窗是唯一可见端
+  bool _pipRestoreInFlight = false;
+  int _pipRestoreRectAttempts = 0;
+
+  // 页面根参照系：归位目标矩形以此量取，规避路由转场期间的整页偏移
+  final _pageRootKey = GlobalKey();
+
+  /// 量取页面播放器矩形（收起源矩形用全局坐标；归位目标以页面根为参照系）
+  Rect? _livePlayerRect({bool relativeToPage = false}) {
+    final renderObject = playerKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox ||
+        !renderObject.attached ||
+        !renderObject.hasSize ||
+        // 未加载完成时播放器区是零尺寸 SizedBox.shrink,视为未量到
+        renderObject.size.isEmpty) {
+      return null;
+    }
+    if (relativeToPage) {
+      final pageRenderObject = _pageRootKey.currentContext?.findRenderObject();
+      if (pageRenderObject is RenderBox && pageRenderObject.attached) {
+        return renderObject.localToGlobal(
+              Offset.zero,
+              ancestor: pageRenderObject,
+            ) &
+            renderObject.size;
+      }
+      return null;
+    }
+    return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+  }
+
+  /// C1/C2 共用：页面就绪后量取归位目标矩形并上报协调器（最多重试 10 帧）
+  void _scheduleLivePipRestoreAttach() {
+    _pipRestoreRectAttempts = 0;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _attachLivePipRestore(),
+    );
+  }
+
+  void _attachLivePipRestore() {
+    if (!mounted || !_pipRestoreInFlight) return;
+    final targetRect = _livePlayerRect(relativeToPage: true);
+    if (targetRect == null && _pipRestoreRectAttempts++ < 10) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _attachLivePipRestore(),
+      );
+      return;
+    }
+    LivePipOverlayService.transition.attachRestorePage(
+      targetRect: targetRect,
+      onCompleted: () {
+        if (!mounted) {
+          _pipRestoreInFlight = false;
+          return;
+        }
+        setState(() => _pipRestoreInFlight = false);
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -107,10 +169,20 @@ class _LiveRoomPageState extends State<LiveRoomPage>
 
     // 无论是否是同一个房间，既然进入了直播详情页，就关闭现有的小窗（不销毁播放器）
     if (LivePipOverlayService.isInPipMode) {
-      // 使用非销毁式关闭，让新页面接管播放器
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        LivePipOverlayService.stopLivePip(callOnClose: false);
-      });
+      // 本页随后会新建 controller 并自开弹幕流/通知条目，旧 controller 就此退休
+      LivePipOverlayService.cleanupSavedController();
+      if (isReturningFromPip &&
+          LivePipOverlayService.transition.phase == PipPhase.restoring) {
+        // 点击展开（归位动画中）：小窗仍在飞向本页，非销毁式关闭推迟到
+        // 握手完成由协调器触发 _finalizeRestore 执行；本页播放器先透明占位
+        _pipRestoreInFlight = true;
+        _scheduleLivePipRestoreAttach();
+      } else {
+        // 其他房间/无动画路径：维持旧的非销毁式关闭，让新页面接管播放器
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          LivePipOverlayService.stopLivePip(callOnClose: false);
+        });
+      }
     }
 
     // 如果有视频小窗也关闭
@@ -174,7 +246,17 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     // 如果返回当前页面时应用内小窗正在运行，且房间号匹配，说明是从正在小窗播放的页面返回
     if (LivePipOverlayService.isInPipMode) {
       if (LivePipOverlayService.currentRoomId == _liveRoomController.roomId) {
-        LivePipOverlayService.stopLivePip(callOnClose: false, immediate: true);
+        // 返回展开：小窗飞回页内播放器位置，非销毁式关闭推迟到握手完成；
+        // 无法归位（无小窗会话）则维持旧的瞬时关闭
+        if (LivePipOverlayService.transition.beginRestore()) {
+          _pipRestoreInFlight = true;
+          _scheduleLivePipRestoreAttach();
+        } else {
+          LivePipOverlayService.stopLivePip(
+            callOnClose: false,
+            immediate: true,
+          );
+        }
       } else {
         // 小窗里是其他房间，返回直播间时必须关闭，否则会同时播放两个视频
         LivePipOverlayService.stopLivePip(callOnClose: true, immediate: true);
@@ -364,9 +446,13 @@ class _LiveRoomPageState extends State<LiveRoomPage>
         child: child,
       );
     }
-    return Theme(
-      data: ThemeUtils.darkTheme,
-      child: child,
+    // 页面根参照系：归位目标矩形以此量取
+    return KeyedSubtree(
+      key: _pageRootKey,
+      child: Theme(
+        data: ThemeUtils.darkTheme,
+        child: child,
+      ),
     );
   }
 
@@ -498,11 +584,16 @@ class _LiveRoomPageState extends State<LiveRoomPage>
         ],
       );
     }
-    return popScope(
+    final Widget result = popScope(
       canPop: !isFullScreen && !plPlayerController.isDesktopPip,
       onPopInvokedWithResult: _onPopInvokedWithResult,
       child: player,
     );
+    // 归位动画中：透明占位参与布局（供量取目标矩形）但不可见不可点，
+    // 小窗是唯一可见端，恢复握手完成后亮出
+    return _pipRestoreInFlight
+        ? IgnorePointer(child: Opacity(opacity: 0, child: result))
+        : result;
   }
 
   void _onPopInvokedWithResult(bool didPop, Object? result) {
@@ -553,6 +644,8 @@ class _LiveRoomPageState extends State<LiveRoomPage>
         roomId: _liveRoomController.roomId,
         plPlayerController: plPlayerController,
         controller: _liveRoomController,
+        // 收起动画源矩形：页面播放器当前屏幕位置；量取失败则无动画直接出现
+        sourceRect: _livePlayerRect(),
         onClose: () {
           _isEnteringPipMode = false;
           _liveRoomController.isInPipMode.value = false;
@@ -582,6 +675,12 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       return;
     }
     _liveRoomController.isInPipMode.value = false;
+    // 路由 pop 时 onClose 已因 isInPipMode 跳过清理，下方 Get.delete 对已
+    // 注销实例是空操作，弹幕流与计时器需在此显式关闭
+    _liveRoomController
+      ..closeLiveMsg()
+      ..cancelLiveTimer()
+      ..cancelLikeTimer();
     videoPlayerServiceHandler?.onVideoDetailDispose(heroTag);
     if (Platform.isAndroid && !plPlayerController.setSystemBrightness) {
       ScreenBrightnessPlatform.instance.resetApplicationScreenBrightness();
@@ -634,10 +733,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 );
               },
             ),
-          Scaffold(
-            primary: !plPlayerController.removeSafeArea,
-            resizeToAvoidBottomInset: false,
-            backgroundColor: Colors.transparent,
+          ScaffoldLayout(
             appBar: isWindowMode && isFullScreen && !isPortrait
                 ? null
                 : _buildAppBar(isFullScreen),
@@ -792,7 +888,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                       NetworkImgLayer(
                         width: 34,
                         height: 34,
-                        type: ImageType.avatar,
+                        type: .avatar,
                         src: roomInfoH5.anchorInfo!.baseInfo!.face,
                       ),
                       Flexible(
@@ -986,10 +1082,10 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     return Padding(
       padding: .only(bottom: 12, top: isPortrait ? 12 : 0),
       child: _liveRoomController.showSuperChat
-          ? PageView<CustomHorizontalDragGestureRecognizer>(
+          ? PageView(
               key: pageKey,
               controller: _liveRoomController.pageController,
-              physics: clampingScrollPhysics,
+              physics: tabBarScrollPhysics,
               onPageChanged: _liveRoomController.pageIndex.call,
               horizontalDragGestureRecognizer:
                   CustomHorizontalDragGestureRecognizer.new,

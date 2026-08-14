@@ -19,13 +19,13 @@ import 'dart:io' show File, Platform;
 
 import 'package:PiliPlus/common/widgets/colored_box_transition.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
-import 'package:PiliPlus/common/widgets/flutter/page/page_view.dart';
 import 'package:PiliPlus/common/widgets/flutter/popup_menu.dart';
 import 'package:PiliPlus/common/widgets/gesture/image_horizontal_drag_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/image.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/loading_indicator.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/viewer.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart'
+    show tabBarScrollPhysics;
 import 'package:PiliPlus/main.dart' show tmpPadding;
 import 'package:PiliPlus/models/common/image_preview_type.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
@@ -41,7 +41,7 @@ import 'package:PiliPlus/utils/utils.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart' hide Image, PageView;
+import 'package:flutter/material.dart' hide Image;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:get/get.dart';
 import 'package:media_kit/media_kit.dart';
@@ -332,11 +332,11 @@ class _GalleryViewerState extends State<GalleryViewer>
                 alignment: .topLeft,
                 animation: _animateController,
                 onTransform: _onTransform,
-                child: PageView<ImageHorizontalDragGestureRecognizer>.builder(
+                child: PageView.builder(
                   controller: _pageController,
                   onPageChanged: _onPageChanged,
-                  physics: const CustomTabBarViewScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: tabBarScrollPhysics,
                   ),
                   itemCount: widget.sources.length,
                   itemBuilder: _itemBuilder,
@@ -619,8 +619,8 @@ class _GalleryViewerState extends State<GalleryViewer>
       items: [
         CustomPopupMenuItem<void>(
           height: 42,
-          onTap: () => Utils.copyText(item.url),
-          child: const Text('复制链接', style: TextStyle(fontSize: 14)),
+          onTap: () => ImageUtils.downloadImg([item.url]),
+          child: const Text('保存图片', style: TextStyle(fontSize: 14)),
         ),
         CustomPopupMenuItem<void>(
           height: 42,
@@ -629,8 +629,8 @@ class _GalleryViewerState extends State<GalleryViewer>
         ),
         CustomPopupMenuItem<void>(
           height: 42,
-          onTap: () => ImageUtils.downloadImg([item.url]),
-          child: const Text('保存图片', style: TextStyle(fontSize: 14)),
+          onTap: () => Utils.copyText(item.url),
+          child: const Text('复制链接', style: TextStyle(fontSize: 14)),
         ),
         CustomPopupMenuItem<void>(
           height: 42,
