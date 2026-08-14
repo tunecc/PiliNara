@@ -1178,11 +1178,11 @@ packages:
     dependency: "direct overridden"
     description:
       path: "libs/android/media_kit_libs_android_video"
-      ref: "version_1.2.5"
-      resolved-ref: dfb488e7d59ed77cfd29eda479719ac3c8b7d5ba
-      url: "https://github.com/Starfallan/media-kit.git"
+      ref: "24a45c85"
+      resolved-ref: "24a45c85e862b66720e850c1f395637c377822ae"
+      url: "https://github.com/media-kit/media-kit.git"
     source: git
-    version: "1.3.7"
+    version: "1.3.8"
   media_kit_libs_ios_video:
     dependency: "direct overridden"
     description:
