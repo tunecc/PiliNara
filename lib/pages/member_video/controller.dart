@@ -53,9 +53,12 @@ class MemberVideoCtr
   final MemberVideoFilter filter = MemberVideoFilter();
   final RxList<SpaceArchiveItem> filteredList = <SpaceArchiveItem>[].obs;
   final RxBool isAutoLoading = false.obs;
+  // 过滤是否激活的响应式标记，供 FAB 等 Obx 依赖；与 filter.hasActiveFilter 保持同步
+  final RxBool filterActive = false.obs;
   bool get hasActiveFilter => filter.hasActiveFilter;
 
   List<SpaceArchiveItem> applyFilter() {
+    filterActive.value = filter.hasActiveFilter;
     final list = loadingState.value.dataOrNull;
     if (list == null) {
       return filteredList.value = const [];
@@ -66,6 +69,17 @@ class MemberVideoCtr
     return filteredList.value = list
         .where((item) => !filter.shouldHide(item))
         .toList();
+  }
+
+  // 过滤开启时尾项触发的手动加载：节流防请求风暴，复用 onLoadMore 的 isEnd/isLoading 守卫
+  int _lastManualLoadTime = 0;
+  void manualLoadMore() {
+    if (isAutoLoading.value || isLocating.value) return;
+    if (isLoading || isEnd) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastManualLoadTime < 1200) return;
+    _lastManualLoadTime = now;
+    onLoadMore();
   }
 
   // 开启过滤后当前已加载内容全部被滤空时，自动补载下一页直到出现符合项或到底；
@@ -102,6 +116,17 @@ class MemberVideoCtr
     if (hasActiveFilter && filteredList.isEmpty && !isEnd) {
       _autoLoadMoreLoop();
     }
+  }
+
+  // 过滤开启时，定位「上次观看」需要基于 filteredList 而非原始列表
+  int indexOfFromViewAid() {
+    if (!hasActiveFilter) {
+      return loadingState.value.dataOrNull?.indexWhere(
+            (i) => i.param == fromViewAid,
+          ) ??
+          -1;
+    }
+    return filteredList.indexWhere((i) => i.param == fromViewAid);
   }
 
   @override

@@ -134,12 +134,7 @@ class _MemberVideoState extends State<MemberVideo>
                       onPressed: () {
                         final fromViewAid = _controller.fromViewAid;
                         _controller.isLocating.value = true;
-                        final locatedIndex =
-                            _controller.loadingState.value.dataOrNull
-                                ?.indexWhere(
-                                  (i) => i.param == fromViewAid,
-                                ) ??
-                            -1;
+                        final locatedIndex = _controller.indexOfFromViewAid();
                         if (locatedIndex == -1) {
                           _controller
                             ..lastAid = fromViewAid
@@ -191,10 +186,15 @@ class _MemberVideoState extends State<MemberVideo>
             SliverGrid.builder(
               gridDelegate: gridDelegate,
               itemBuilder: (context, index) {
-                if (widget.type != .season &&
-                    index == list.length - 1 &&
-                    !_controller.hasActiveFilter) {
-                  _controller.onLoadMore();
+                if (index == list.length - 1) {
+                  if (widget.type == .season) {
+                    // 合集类型无分页，到底即结束
+                  } else if (!_controller.hasActiveFilter) {
+                    _controller.onLoadMore();
+                  } else {
+                    // 过滤开启时尾项触发手动加载（节流），加载后自动重新过滤
+                    _controller.manualLoadMore();
+                  }
                 }
                 return VideoCardHMemberVideo(
                   videoItem: list[index],
@@ -212,8 +212,6 @@ class _MemberVideoState extends State<MemberVideo>
       ),
     };
   }
-
-  // 过滤开启且当前页全部被滤空，正在自动补载（区分 isAutoLoading 与 isEnd）
   Widget _buildFilteredOutAutoLoading(ThemeData theme) {
     return SliverFillRemaining(
       hasScrollBody: false,
@@ -228,12 +226,24 @@ class _MemberVideoState extends State<MemberVideo>
             ),
             const SizedBox(height: 12),
             Text(
-              '当前内容已被过滤，正在加载更多…',
+              _controller.isAutoLoading.value
+                  ? '当前内容已被过滤，正在加载更多…'
+                  : '当前过滤条件下暂无内容，可调整过滤或上拉加载更多',
               style: TextStyle(
                 fontSize: 13,
                 color: theme.colorScheme.outline,
               ),
             ),
+            if (!_controller.isAutoLoading.value) ...[
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => MemberVideoFilterDialog.show(
+                  context,
+                  _controller.filter,
+                ).whenComplete(_controller.onFilterChanged),
+                child: const Text('调整过滤条件'),
+              ),
+            ],
           ],
         ),
       ),
@@ -242,6 +252,10 @@ class _MemberVideoState extends State<MemberVideo>
 
   // 已到列表末尾且无符合项
   Widget _buildFilteredOutEnd(ThemeData theme) {
+    // 无过滤时 isEnd 且空 = 真空数据态，恢复原版「没有数据 + 重试」
+    if (!_controller.hasActiveFilter) {
+      return HttpError(onReload: _controller.onReload);
+    }
     return SliverFillRemaining(
       hasScrollBody: false,
       child: Center(
@@ -254,23 +268,20 @@ class _MemberVideoState extends State<MemberVideo>
               color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 12),
-            Text(
-              _controller.hasActiveFilter ? '没有更多了' : '还没有投稿',
+            const Text(
+              '没有更多了',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: theme.colorScheme.onSurface,
               ),
             ),
-            if (_controller.hasActiveFilter) ...[
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: () =>
-                    MemberVideoFilterDialog.show(context, _controller.filter)
-                        .whenComplete(_controller.onFilterChanged),
-                child: const Text('调整过滤条件'),
-              ),
-            ],
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () =>
+                  MemberVideoFilterDialog.show(context, _controller.filter)
+                      .whenComplete(_controller.onFilterChanged),
+              child: const Text('调整过滤条件'),
+            ),
           ],
         ),
       ),
@@ -297,8 +308,7 @@ class _MemberVideoState extends State<MemberVideo>
   }
 
   Widget _buildFilterBtn(ThemeData theme) {
-    // 依赖父级 Obx（filteredList）重建，弹窗关闭后 onFilterChanged 会刷新列表
-    final hasFilter = _controller.filter.hasActiveFilter;
+    // 依赖父级 Obx（filterActive/filteredList）重建，弹窗关闭后 onFilterChanged 会刷新列表
     return IconButton(
       tooltip: '筛选',
       style: const ButtonStyle(
@@ -308,13 +318,16 @@ class _MemberVideoState extends State<MemberVideo>
         context,
         _controller.filter,
       ).whenComplete(_controller.onFilterChanged),
-      icon: Icon(
-        hasFilter ? Icons.filter_list : Icons.filter_list_off,
-        size: 18,
-        color: hasFilter
-            ? theme.colorScheme.primary
-            : theme.colorScheme.secondary,
-      ),
+      icon: Obx(() {
+        final hasFilter = _controller.filterActive.value;
+        return Icon(
+          hasFilter ? Icons.filter_list : Icons.filter_list_off,
+          size: 18,
+          color: hasFilter
+              ? theme.colorScheme.primary
+              : theme.colorScheme.secondary,
+        );
+      }),
     );
   }
 
