@@ -174,3 +174,8 @@ test*
 /.comet/*
 !/.comet/config.yaml
 # <<< Comet managed project state <<<
+
+# >>> Comet managed artifacts >>>
+!docs/comet/
+!docs/comet/**
+# <<< Comet managed artifacts <<<
