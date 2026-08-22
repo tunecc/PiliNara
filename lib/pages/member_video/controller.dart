@@ -10,6 +10,7 @@ import 'package:PiliPlus/models_new/space/space_archive/data.dart';
 import 'package:PiliPlus/models_new/space/space_archive/episodic_button.dart';
 import 'package:PiliPlus/models_new/space/space_archive/item.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/pages/member_video/video_filter.dart';
 import 'package:PiliPlus/utils/extension/dimension_ext.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
@@ -47,6 +48,86 @@ class MemberVideoCtr
   RxBool isLocating = false.obs;
   bool isLoadPrevious = false;
   bool? hasPrev;
+
+  // 客户端本地过滤：播放量区间 + 已观看状态，页面生命周期内有效
+  final MemberVideoFilter filter = MemberVideoFilter();
+  final RxList<SpaceArchiveItem> filteredList = <SpaceArchiveItem>[].obs;
+  final RxBool isAutoLoading = false.obs;
+  // 过滤是否激活的响应式标记，供 FAB 等 Obx 依赖；与 filter.hasActiveFilter 保持同步
+  final RxBool filterActive = false.obs;
+  bool get hasActiveFilter => filter.hasActiveFilter;
+
+  List<SpaceArchiveItem> applyFilter() {
+    filterActive.value = filter.hasActiveFilter;
+    final list = loadingState.value.dataOrNull;
+    if (list == null) {
+      return filteredList.value = const [];
+    }
+    if (!hasActiveFilter) {
+      return filteredList.value = list;
+    }
+    return filteredList.value = list
+        .where((item) => !filter.shouldHide(item))
+        .toList();
+  }
+
+  // 过滤开启时尾项触发的手动加载：节流防请求风暴，复用 onLoadMore 的 isEnd/isLoading 守卫
+  int _lastManualLoadTime = 0;
+  void manualLoadMore() {
+    if (isAutoLoading.value || isLocating.value) return;
+    if (isLoading || isEnd) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastManualLoadTime < 1200) return;
+    _lastManualLoadTime = now;
+    onLoadMore();
+  }
+
+  // 开启过滤后当前已加载内容全部被滤空时，自动补载下一页直到出现符合项或到底；
+  // 请求失败或无进展时停止，避免请求风暴
+  Future<void> _autoLoadMoreLoop() async {
+    if (isAutoLoading.value) return;
+    isAutoLoading.value = true;
+    try {
+      while (hasActiveFilter &&
+          filteredList.isEmpty &&
+          !isEnd &&
+          !isLocating.value) {
+        if (isLoading) {
+          await Future<void>.delayed(const Duration(milliseconds: 600));
+          continue;
+        }
+        final prevLength = loadingState.value.dataOrNull?.length ?? 0;
+        await onLoadMore();
+        final newLength = loadingState.value.dataOrNull?.length ?? 0;
+        if (newLength <= prevLength) {
+          // 请求失败或并发加载未推进，停止循环
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+      }
+    } finally {
+      isAutoLoading.value = false;
+    }
+  }
+
+  // 弹窗修改过滤设置后由 view 调用：重新过滤并按需触发自动补载
+  void onFilterChanged() {
+    applyFilter();
+    if (hasActiveFilter && filteredList.isEmpty && !isEnd) {
+      _autoLoadMoreLoop();
+    }
+  }
+
+  // 过滤开启时，定位「上次观看」需要基于 filteredList 而非原始列表
+  int indexOfFromViewAid() {
+    if (!hasActiveFilter) {
+      return loadingState.value.dataOrNull?.indexWhere(
+            (i) => i.param == fromViewAid,
+          ) ??
+          -1;
+    }
+    return filteredList.indexWhere((i) => i.param == fromViewAid);
+  }
 
   @override
   Future<void> onRefresh() async {
@@ -108,6 +189,7 @@ class MemberVideoCtr
     lastAid = data.item?.lastOrNull?.param;
     isLoadPrevious = false;
     loadingState.value = Success(data.item);
+    applyFilter();
     return true;
   }
 
