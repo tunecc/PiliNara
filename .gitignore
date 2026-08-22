@@ -169,3 +169,8 @@ outputs/runtime/vibe-sessions
 test*
 /pubspec_overrides.yaml
 .mindfs
+
+# >>> Comet managed artifacts >>>
+!docs/comet/
+!docs/comet/**
+# <<< Comet managed artifacts <<<
