@@ -169,3 +169,8 @@ outputs/runtime/vibe-sessions
 test*
 /pubspec_overrides.yaml
 .mindfs
+# >>> Comet managed project state >>>
+!/.comet/
+/.comet/*
+!/.comet/config.yaml
+# <<< Comet managed project state <<<
