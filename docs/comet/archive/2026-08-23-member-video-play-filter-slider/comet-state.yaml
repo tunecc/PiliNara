@@ -2,8 +2,8 @@ schema: comet.native.v4
 name: member-video-play-filter-slider
 language: zh-CN
 phase: archive
-status: active
-state_version: 13
+status: done
+state_version: 14
 brief: brief.md
 spec_changes:
   - capability: member-video-filter
@@ -15,7 +15,7 @@ workspace:
   target_branch: main
   finish: keep
 loop:
-  stage: archive-ready
+  stage: done
   goal_cycle: 1
   iteration: 2
   attempt: 2
@@ -24,7 +24,7 @@ loop:
   no_progress_count: 0
   execution_failure_count: 0
   previous_unresolved_ids: []
-  next_action: archive
+  next_action: null
 acceptance:
   - id: A1
     source: brief.md
@@ -846,5 +846,5 @@ history_overflow:
     recovery: 0
 verification_result: pass
 verification_report: verification.md
-archived: false
+archived: true
 created_at: 2026-08-23T04:31:17.847Z

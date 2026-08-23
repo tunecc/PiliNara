@@ -1,57 +1,105 @@
-# 用户空间视频列表过滤
+# 作者主页视频列表 · 播放量筛选（完整目标规格）
 
-## 概述
+本规格描述归档后 `member-video-filter` 能力的完整行为（修改后）。
 
-`MemberVideo` 组件（覆盖投稿视频、充电专属、合集、系列四种列表）提供客户端本地过滤能力：按播放量区间与已观看状态隐藏视频，帮助用户快速定位未看的高播放量内容。
+## 能力概述
 
-## 过滤条件
+在作者主页视频列表（`MemberVideo`，复用于 contribute 的 `video` / `charging_video` / `season_video` / `series` 等 tab）的 header 筛选图标点击后，弹出一个 BottomSheet。用户通过触控滑块设置播放量区间（最小 / 最大），并通过显式确认按钮应用过滤；列表按条件在客户端本地过滤已加载的视频，过滤后为空时自动补载下一页。
 
-### 播放量过滤
+## 数据模型
 
-- 最小播放量阈值与最大播放量阈值各自独立开关，默认均关闭。
-- 阈值支持预设（1万 / 10万 / 50万 / 100万）与自定义输入。
-- 播放量取 `SpaceArchiveItem.stat.view`（int）。
-- 隐藏规则：播放量 < 最小阈值 或 播放量 > 最大阈值 的视频被隐藏。
+`MemberVideoFilter`（`lib/pages/member_video/video_filter.dart`）保持字段不变：
 
-### 已观看过滤
+- `bool enableMinPlay`：是否启用最小播放量阈值（隐藏低于阈值）。
+- `int minPlay`：最小播放量阈值（原始整数，1万=10000）。
+- `bool enableMaxPlay`：是否启用最大播放量阈值（隐藏高于阈值）。
+- `int maxPlay`：最大播放量阈值（原始整数）。
+- `bool hideCompleted`：隐藏已看完。
+- `bool hideInProgress`：隐藏看过未看完。
+- `static const int playSliderMax = 5000000`（新增）：滑块上界，=500万，同时是「不限制上限」的端点语义值。
 
-- 两个独立开关，默认均关闭：
-  - 「隐藏已看完」：`history != null && history.progress == history.duration` 的视频被隐藏。
-  - 「隐藏看过未看完」：`history != null && progress != duration` 的视频被隐藏。
-- 两开关同时开启时，所有存在 `history` 的视频（即所有看过部分或全部的视频）均被隐藏。
+筛选判定 `shouldHide(SpaceArchiveItem)` 语义不变：
 
-### 过滤边界
+- `enableMinPlay` 且 `item.stat.view != null` 且 `view < minPlay` → 隐藏。
+- `enableMaxPlay` 且 `item.stat.view != null` 且 `view > maxPlay` → 隐藏。
+- `hideCompleted` 且 `isCompleted(item)` → 隐藏。
+- `hideInProgress` 且 `isInProgress(item)` → 隐藏。
+- `view == null` 时播放量阈值不隐藏该条（保留，交由「已观看」开关决定）。
 
-- 所有开关均关闭时不做任何过滤，列表与现状完全一致。
-- 缺失字段（如 `history == null`、进度数据异常）不视为已观看，不过滤。
+## UI 结构
 
-## 入口与交互
+`MemberVideoFilterDialog.show(BuildContext, MemberVideoFilter)` 仍为 `showModalBottomSheet` + `StatefulBuilder`，宽度约束沿用 `min(640, shortestSide)`。
 
-- 列表头部现有工具栏（共X视频 / 播放全部 / 排序）新增筛选入口按钮；有任一过滤激活时图标高亮（对齐搜索页 filter_list / filter_list_off 模式）。
-- 点击打开底部弹窗展示过滤设置，宽度约束与风格对齐项目现有筛选弹窗（Material 3、useSafeArea、isScrollControlled、maxWidth 约束）。
-- 弹窗内修改设置即时生效，关闭弹窗后列表按当前条件过滤展示。
+弹窗内容自上而下：
 
-## 过滤与分页
+1. 标题「播放量筛选（万）」。
+2. `RangeSlider` 区间控件：
+   - 范围 `[0, playSliderMax]`（0 – 500万），连续滑块（不设 `divisions`，保证任意万级精度可拖动与输入一致���。
+   - 左端 thumb = 最小阈值，右端 thumb = 最大阈值。
+3. 滑块两端数字标签（横向 Row，左标签靠左、右标签靠右，可点击）：
+   - 左标签文本：`start == 0` → 「不限」（不限制下限）；否则 `NumUtils.numFormat(start)`。
+   - 右标签文本：`end == playSliderMax` → 「不限」（不限制上限）；否则 `NumUtils.numFormat(end)`。
+   - 点击任一标签 → 弹出数字输入对话框（见下）。
+4. 「已观看」区段：两个 `SwitchListTile`（`hideCompleted` / `hideInProgress`），行为不变。
+5. 底部操作行：
+   - 左：「清除所有过滤条件」`TextButton`（仅 `hasActiveFilter` 时显示）。
+   - 右：「确认」`IconButton`（check 图标，`Icons.check`）。
 
-- 过滤仅作用于客户端已加载数据，不修改网络请求参数。
-- 开启过滤后，若当前已加载内容全部被滤空，自动加载下一页，直到出现符合项或到达列表末尾。
-- 自动补载带频率限制与并发防抖，避免请求风暴（对齐搜索页关键词过滤的补载节流策略）。
-- 到达列表末尾且无符合项时，展示明确的「没有更多了」提示，不展示空白。
-- 手动上拉加载在过滤开启时同样继续追加数据并重新过滤：滚到过滤结果尾项时触发带节流的手动加载（与自动补载共用 600ms/1200ms 节流与 isEnd/isLoading/isAutoLoading 守卫），加载完成后随 filteredList 重建自动重新过滤。
+### 滑块端点 ↔ filter 字段映射
 
-## 定位上次观看与过滤
+弹窗内维护草稿 `RangeValues draft(start, end)`（double，单位原始整数，范围 `0..playSliderMax`）。
 
-- 定位「上次观看」（fromViewAid）在过滤开启时基于过滤后列表（filteredList）计算索引，跳转到过滤结果中的目标视频。
-- 目标视频在当前过滤条件下被隐藏时（不在 filteredList 中）视为「定位点不存在」，复用原定位流程：先向更早分页回溯加载（设置 lastAid/fromViewAid 后 reload），加载到的原始数据经 applyFilter 重新过滤后再判定；用户可通过「调整过滤条件」放宽后再次定位。
+打开弹窗时由当前 `filter` 初始化草稿：
 
-## 空数据态
+- `draft.start = filter.enableMinPlay ? filter.minPlay.toDouble() : 0.0`
+- `draft.end = filter.enableMaxPlay ? filter.maxPlay.toDouble() : playSliderMax.toDouble()`
 
-- 无过滤且 isEnd 且空时，维持原版「没有数据 + 点击重试」HttpError 行为。
-- 有过滤且 isEnd 且空时，展示「没有更多了 + 调整过滤条件」。
-- 有过滤、未到底且当前页被滤空时：正在自动补载展示 loading；自动补载停止后展示「调整过滤条件」入口。
+点「确认」时由草稿写回 `filter`：
 
-## 不变量
+- `start == 0` → `enableMinPlay = false`（`minPlay` 保持原值或置默认，不影响判定）。
+- `start > 0` → `enableMinPlay = true`，`minPlay = start.toInt()`。
+- `end == playSliderMax` → `enableMaxPlay = false`。
+- `end < playSliderMax` → `enableMaxPlay = true`，`maxPlay = end.toInt()`。
+- 两个「已观看」开关直接写回对应字段。
 
-- 不改变现有网络接口调用逻辑与参数。
-- 排序切换（最新发布/最多播放）、播放全部、定位上次观看（fromViewAid）、下拉刷新、上拉加载在无过滤时行为与现状一致，在有过滤时不产生功能冲突。
-- 过滤状态仅在当前页面生命周期内有效，退出页面后不保留。
+### 区间钳制
+
+拖动 `RangeSlider` 时 `onChanged` 保证 `start <= end`（Flutter `RangeSlider` 自身保证 thumb 不交叉）；通过数字输入设置单端时：
+
+- 左端输入值 `v`：若 `v >= draft.end`，钳制为 `draft.end`（或当右端=不限即 `playSliderMax` 时允许任意 `>0` 值，此时 `end` 仍为 `playSliderMax`）。
+- 右端输入值 `v`：若 `v <= draft.start`，钳制为 `draft.start`。
+- 输入越界（>500万）按 `playSliderMax` 处理（=不限上限）；输入 0 / 空 / 「不限」按对应端点「不限制」处理。
+
+### 数字输入对话框
+
+点击数字标签弹出 `AlertDialog`：
+
+- `TextField`，`keyboardType: TextInputType.number`，`autofocus: true`。
+- hint：「输入万为单位数字，如 10.5万 / 2亿；0 或不限 表示不限制」。
+- 预填当前端的显示值（万格式字符串，如「10万」；端点为「不限」时预填空）。
+- 解析：`NumUtils.parseNum(text)` 得原始整数 `v`。
+- 「取消」：关闭，不修改草稿。
+- 「确定」：按区间钳制规则更新草稿对应端，关闭。
+
+## 触发与生效
+
+- 「确认」按钮 `onPressed`：把草稿写回 `filter`（按映射），`Navigator.pop()` 关闭弹窗。外层 `.whenComplete(_controller.onFilterChanged)` 随后触发 `applyFilter()`，列表按新条件过滤；过滤后为空且未到底时 `_autoLoadMoreLoop()` 自动补载。
+- 非确认关闭（下滑 / 遮罩 / 返回 / 「取消」类操作）：不写回 `filter`，`whenComplete` 触发的 `applyFilter()` 用旧 `filter` 值重新过滤（幂等，列表不变）。
+- 「清除所有过滤条件」：草稿与开关归位（`start=0` / `end=playSliderMax` / `hideCompleted=false` / `hideInProgress=false`），随后由用户点「确认」应用，或直接调用 `filter.reset()` 并关闭弹窗（实现择一，需保证列表恢复全量）。
+
+## header 与空态
+
+- header 筛选图标：`filterActive` 为 true 时显示 `Icons.filter_list` 并高亮（primary），否则 `Icons.filter_list_off`。
+- 过滤后空态：`_buildFilteredOutAutoLoading`（loading / 可调整提示）、`_buildFilteredOutEnd`（到底无匹配），均保留「调整过滤条件」入口，行为不变。
+
+## 验收映射
+
+- A1 端点语义与映射
+- A2 数字标签显示与点击输入
+- A3 确认按钮应用并关闭、列表重新过滤
+- A4 非确认关闭不应用
+- A5 区间钳制
+- A6 已观看两开关不变
+- A7 清除并归位
+- A8 图标高亮与空态不变
+- A9 `shouldHide` 语义与单测不破坏
