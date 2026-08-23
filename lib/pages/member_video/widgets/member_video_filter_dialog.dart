@@ -1,15 +1,23 @@
 import 'dart:math';
 
 import 'package:PiliPlus/pages/member_video/video_filter.dart';
-import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:flutter/material.dart';
 
-// 用户空间视频列表过滤设置弹窗，风格对齐搜索页筛选弹窗
+// 用户空间视频列表过滤设置弹窗：触控滑块设置播放量区间 + 显式确认按钮应用。
+// 非确认关闭（下滑 / 遮罩 / 返回）撤销草稿，不写回 filter。
 abstract final class MemberVideoFilterDialog {
   static Future<void> show(BuildContext context, MemberVideoFilter filter) {
-    return showModalBottomSheet(
+    // 草稿：滑块端点为原始整数刻度（0..playSliderMax），端点值=不限制对应端。
+    var draft = filter.toSliderValues();
+    var hideCompleted = filter.hideCompleted;
+    var hideInProgress = filter.hideInProgress;
+    final max = MemberVideoFilter.playSliderMax.toDouble();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
@@ -18,110 +26,132 @@ abstract final class MemberVideoFilterDialog {
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
-          final theme = Theme.of(context);
-          Widget playFilterSection({
-            required bool enable,
-            required ValueChanged<bool> onEnableChanged,
-            required int value,
-            required ValueChanged<int> onValueChanged,
-            required bool isMin,
-          }) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('启用', style: TextStyle(fontSize: 14)),
-                  subtitle: Text(
-                    '当前阈值：${NumUtils.numFormat(value)}',
-                    style: const TextStyle(fontSize: 12),
+          String startLabel(double v) =>
+              v <= 0 ? '不限' : NumUtils.numFormat(v.round());
+          String endLabel(double v) =>
+              v >= max ? '不限' : NumUtils.numFormat(v.round());
+
+          // 数字输入：解析万为单位（兼容 10.5万 / 2亿），越界/不限按端点语义处理。
+          Future<void> editValue({required bool isMin}) async {
+            final current =
+                isMin ? draft.start : draft.end;
+            final initial = isMin
+                ? (current <= 0 ? '' : NumUtils.numFormat(current.round()))
+                : (current >= max ? '' : NumUtils.numFormat(current.round()));
+            final controller = TextEditingController(text: initial);
+            final result = await showDialog<int>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: Text(isMin ? '最小播放量' : '最大播放量'),
+                content: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                  value: enable,
-                  onChanged: onEnableChanged,
+                  decoration: const InputDecoration(
+                    hintText: '万为单位，如 10.5万 / 2亿；0 或「不限」表示不限制',
+                  ),
                 ),
-                if (enable)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final e in MemberVideoFilter.playPresets)
-                        SearchText(
-                          text: NumUtils.numFormat(e),
-                          onTap: (_) => onValueChanged(e),
-                          bgColor: value == e
-                              ? theme.colorScheme.secondaryContainer
-                              : null,
-                          textColor: value == e
-                              ? theme.colorScheme.onSecondaryContainer
-                              : null,
-                        ),
-                      SearchText(
-                        text: '自定义',
-                        onTap: (_) => _showCustomPlayInput(
-                          context,
-                          value,
-                          onValueChanged,
-                        ),
-                        bgColor: !MemberVideoFilter.playPresets.contains(value)
-                            ? theme.colorScheme.secondaryContainer
-                            : null,
-                        textColor: !MemberVideoFilter.playPresets.contains(
-                              value,
-                            )
-                            ? theme.colorScheme.onSecondaryContainer
-                            : null,
-                      ),
-                    ],
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('取消'),
                   ),
-                if (isMin) ...[
-                  const SizedBox(height: 20),
-                  const Text('最大播放量（高于此值隐藏）', style: TextStyle(fontSize: 16)),
-                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: () {
+                      final text = controller.text.trim();
+                      int value;
+                      if (text.isEmpty || text == '不限') {
+                        value = isMin ? 0 : MemberVideoFilter.playSliderMax;
+                      } else {
+                        value = NumUtils.parseNum(text);
+                        if (value <= 0) {
+                          value = isMin ? 0 : MemberVideoFilter.playSliderMax;
+                        } else if (value >
+                            MemberVideoFilter.playSliderMax) {
+                          value = MemberVideoFilter.playSliderMax;
+                        }
+                      }
+                      Navigator.of(dialogContext).pop(value);
+                    },
+                    child: const Text('确定'),
+                  ),
                 ],
-              ],
+              ),
             );
+            controller.dispose();
+            if (result == null) return;
+            setState(() {
+              final clamped = _clampInput(
+                value: result.toDouble(),
+                isMin: isMin,
+                other: isMin ? draft.end : draft.start,
+                max: max,
+              );
+              if (isMin) {
+                draft = RangeValues(clamped, draft.end);
+              } else {
+                draft = RangeValues(draft.start, clamped);
+              }
+            });
           }
+
+          final hasActiveDraft = draft.start > 0 ||
+              draft.end < max ||
+              hideCompleted ||
+              hideInProgress;
 
           return SafeArea(
             child: SingleChildScrollView(
-              padding: const .fromLTRB(16, 20, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('最小播放量（低于此值隐藏）', style: TextStyle(fontSize: 16)),
-                  const SizedBox(height: 6),
-                  playFilterSection(
-                    enable: filter.enableMinPlay,
-                    onEnableChanged: (v) => setState(() {
-                      filter.enableMinPlay = v;
-                    }),
-                    value: filter.minPlay,
-                    onValueChanged: (v) => setState(() {
-                      filter.minPlay = v;
-                    }),
-                    isMin: true,
+                  const Text('播放量筛选（万）', style: TextStyle(fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '左拖设最小（低于隐藏），右拖设最大（高于隐藏）；端点 = 不限制',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  playFilterSection(
-                    enable: filter.enableMaxPlay,
-                    onEnableChanged: (v) => setState(() {
-                      filter.enableMaxPlay = v;
-                    }),
-                    value: filter.maxPlay,
-                    onValueChanged: (v) => setState(() {
-                      filter.maxPlay = v;
-                    }),
-                    isMin: false,
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _PlayLabel(
+                        text: startLabel(draft.start),
+                        onTap: () => editValue(isMin: true),
+                        colorScheme: colorScheme,
+                      ),
+                      _PlayLabel(
+                        text: endLabel(draft.end),
+                        onTap: () => editValue(isMin: false),
+                        colorScheme: colorScheme,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
+                  RangeSlider(
+                    values: draft,
+                    min: 0,
+                    max: max,
+                    labels: RangeLabels(
+                      startLabel(draft.start),
+                      endLabel(draft.end),
+                    ),
+                    onChanged: (v) => setState(() => draft = v),
+                  ),
+                  const SizedBox(height: 8),
                   const Text('已观看', style: TextStyle(fontSize: 16)),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('隐藏已看完', style: TextStyle(fontSize: 14)),
-                    value: filter.hideCompleted,
-                    onChanged: (v) => setState(() {
-                      filter.hideCompleted = v;
-                    }),
+                    value: hideCompleted,
+                    onChanged: (v) =>
+                        setState(() => hideCompleted = v),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -129,16 +159,38 @@ abstract final class MemberVideoFilterDialog {
                       '隐藏看过未看完',
                       style: TextStyle(fontSize: 14),
                     ),
-                    value: filter.hideInProgress,
-                    onChanged: (v) => setState(() {
-                      filter.hideInProgress = v;
-                    }),
+                    value: hideInProgress,
+                    onChanged: (v) =>
+                        setState(() => hideInProgress = v),
                   ),
-                  if (filter.hasActiveFilter)
-                    TextButton(
-                      onPressed: () => setState(() => filter.reset()),
-                      child: const Text('清除所有过滤条件'),
-                    ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (hasActiveDraft)
+                        TextButton(
+                          onPressed: () => setState(() {
+                            draft = RangeValues(0, max);
+                            hideCompleted = false;
+                            hideInProgress = false;
+                          }),
+                          child: const Text('清除所有过滤条件'),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      FilledButton.icon(
+                        onPressed: () {
+                          filter
+                            ..applySliderValues(draft)
+                            ..hideCompleted = hideCompleted
+                            ..hideInProgress = hideInProgress;
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('确认'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -148,44 +200,53 @@ abstract final class MemberVideoFilterDialog {
     );
   }
 
-  static Future<void> _showCustomPlayInput(
-    BuildContext context,
-    int current,
-    ValueChanged<int> onChanged,
-  ) async {
-    final controller = TextEditingController(text: current.toString());
-    final result = await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('自定义播放量'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: '输入数字，支持 10.5万 / 2亿 格式',
+  // 数字输入钳制：左端不能超过右端，右端不能低于左端；
+  // 右端=不限(max)时左端可取任意 >0 值，左端=不限(0)时右端可取任意 <max 值。
+  static double _clampInput({
+    required double value,
+    required bool isMin,
+    required double other,
+    required double max,
+  }) {
+    if (isMin) {
+      // 左端：超过上界按不限上限；不超过右端则保留，否则钳到右端
+      if (value > max) return max;
+      return value.clamp(0.0, other);
+    } else {
+      if (value > max) return max;
+      return value.clamp(other, max);
+    }
+  }
+}
+
+// 滑块端点的可点击数字标签。
+class _PlayLabel extends StatelessWidget {
+  const _PlayLabel({
+    required this.text,
+    required this.onTap,
+    required this.colorScheme,
+  });
+
+  final String text;
+  final VoidCallback onTap;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.primary,
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final value = NumUtils.parseNum(controller.text.trim());
-              if (value > 0) {
-                Navigator.of(context).pop(value);
-              }
-            },
-            child: const Text('确定'),
-          ),
-        ],
       ),
     );
-    controller.dispose();
-    if (result != null && result > 0) {
-      onChanged(result);
-    }
   }
 }
