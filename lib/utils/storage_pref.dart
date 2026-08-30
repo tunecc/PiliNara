@@ -52,9 +52,9 @@ import 'package:PiliPlus/utils/utils.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flex_seed_scheme/flex_seed_scheme.dart' show FlexSchemeVariant;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:material_ui/material_ui.dart';
 
 abstract final class Pref {
   static final Box _setting = GStorage.setting;
@@ -486,6 +486,14 @@ abstract final class Pref {
     return const <VideoDecodeFormatType>[.AVC, .AV1];
   }
 
+  static List<VideoDecodeFormatType> get preferCodecsCellular {
+    final codecs = _setting.get(SettingBoxKey.preferCodecsCellular);
+    if (codecs is List) {
+      return codecs.map((i) => VideoDecodeFormatType.values.byName(i)).toList();
+    }
+    return preferCodecs;
+  }
+
   static String get hardwareDecoding => _setting.get(
     SettingBoxKey.hardwareDecoding,
     defaultValue: Platform.isAndroid
@@ -515,6 +523,9 @@ abstract final class Pref {
 
   static String get banWordForRecommend =>
       _setting.get(SettingBoxKey.banWordForRecommend, defaultValue: '');
+
+  static String get banWordForRecommendUpName =>
+      _setting.get(SettingBoxKey.banWordForRecommendUpName, defaultValue: '');
 
   static String get banWordForReply =>
       _setting.get(SettingBoxKey.banWordForReply, defaultValue: '');
@@ -1265,6 +1276,12 @@ abstract final class Pref {
         defaultValue: ReplySortType.hot.index,
       )];
 
+  static ReplySortType get reply2SortType =>
+      ReplySortType.values[_setting.get(
+        SettingBoxKey.reply2SortType,
+        defaultValue: ReplySortType.time.index,
+      )];
+
   static DynamicBadgeMode get dynamicBadgeMode =>
       DynamicBadgeMode.values[_setting.get(
         SettingBoxKey.dynamicBadgeMode,
@@ -1428,6 +1445,9 @@ abstract final class Pref {
 
   static bool get swapReplyLikeDislike =>
       _setting.get(SettingBoxKey.swapReplyLikeDislike, defaultValue: false);
+
+  static bool get remarkReplaceName =>
+      _setting.get(SettingBoxKey.remarkReplaceName, defaultValue: false);
 
   static bool get enableTrending =>
       _setting.get(SettingBoxKey.enableHotKey, defaultValue: true);
@@ -1671,4 +1691,25 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.maxVolume, defaultValue: 2.0);
 
   static List? get liveStream => _setting.get(SettingBoxKey.liveStream);
+
+  static String? get appFont => _setting.get(SettingBoxKey.appFont);
+
+  static bool get enableDocProvider =>
+      _setting.get(SettingBoxKey.enableDocProvider, defaultValue: false);
+
+  static Map<String, String> get customAppFont => Map<String, String>.from(
+    _setting.get(
+      SettingBoxKey.customAppFont,
+      defaultValue: const <String, String>{},
+    ),
+  );
+
+  /// 已导入字体的显示名：字体族名 → 从字体文件解析出的名字
+  static Map<String, String> get customAppFontNames =>
+      Map<String, String>.from(
+        _setting.get(
+          SettingBoxKey.customAppFontNames,
+          defaultValue: const <String, String>{},
+        ),
+      );
 }

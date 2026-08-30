@@ -62,13 +62,13 @@ import 'package:dio/dio.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show compute;
-import 'package:flutter/material.dart' hide showBottomSheet;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:material_ui/material_ui.dart' hide showBottomSheet;
 import 'package:media_kit/media_kit.dart' show NativePlayer;
 
 class _BatteryInfo {
@@ -334,6 +334,8 @@ class HeaderControl extends StatefulWidget {
       return autoWrapReportDialog(
         context,
         ReportOptions.danmakuReport,
+        withContent: ReportOptions.danmakuReportCheck,
+        contentRequired: ReportOptions.danmakuReportCheck,
         (reasonType, reasonDesc, banUid) {
           if (banUid) {
             final filter = ctr.filters;
@@ -350,10 +352,10 @@ class HeaderControl extends StatefulWidget {
             );
           }
           return DanmakuHttp.danmakuReport(
-            reason: reasonType == 0 ? 11 : reasonType,
+            reason: reasonType,
             cid: ctr.cid!,
             id: extra.id,
-            content: reasonType == 0 ? reasonDesc : null,
+            content: reasonDesc,
           );
         },
       );
@@ -373,6 +375,8 @@ class HeaderControl extends StatefulWidget {
         context,
         ban: false,
         ReportOptions.liveDanmakuReport,
+        withContent: ReportOptions.liveDanmakuReportCheck,
+        contentRequired: ReportOptions.liveDanmakuReportCheck,
         (reasonType, reasonDesc, banUid) {
           // if (banUid) {
           //   final filter = ctr.filters;
@@ -544,7 +548,8 @@ class HeaderControlState extends State<HeaderControl>
                     Icons.stay_current_landscape_outlined,
                     size: 20,
                   ),
-                  title: const Text('超分辨率'),
+                  title: const Text('超分辨率', style: titleStyle),
+                  titleStyle: theme.textTheme.bodyLarge,
                   value: () {
                     final value = plPlayerController.superResolutionType.value;
                     return (value, value.label);
@@ -556,8 +561,8 @@ class HeaderControlState extends State<HeaderControl>
                     plPlayerController.setShader(value);
                     setState();
                   },
-                  descFontSize: 12,
                   descPosType: .subtitle,
+                  descStyle: subTitleStyle,
                 ),
                 if (PlatformUtils.isMobile)
                   if (plPlayerController.videoPlayerController
@@ -733,7 +738,8 @@ class HeaderControlState extends State<HeaderControl>
                 PopupListTile(
                   dense: true,
                   leading: const Icon(Icons.repeat, size: 20),
-                  title: const Text('播放顺序'),
+                  title: const Text('播放顺序', style: titleStyle),
+                  titleStyle: theme.textTheme.bodyLarge,
                   value: () {
                     final value = plPlayerController.playRepeat;
                     return (value, value.label);
@@ -744,7 +750,7 @@ class HeaderControlState extends State<HeaderControl>
                     setState();
                   },
                   descPosType: .subtitle,
-                  descFontSize: 12,
+                  descStyle: subTitleStyle,
                 ),
                 ListTile(
                   dense: true,
@@ -780,14 +786,20 @@ class HeaderControlState extends State<HeaderControl>
                     try {
                       final result = await FilePicker.pickFile(
                         type: .custom,
-                        allowedExtensions: const ['json', 'vtt', 'srt', 'ass'],
+                        allowedExtensions: const [
+                          'json',
+                          'vtt',
+                          'srt',
+                          'ass',
+                          'bcc',
+                        ],
                       );
                       if (result != null) {
                         final file = result.xFile;
                         final path = file.path;
                         final name = file.name;
                         final length = videoDetailCtr.subtitles.length;
-                        if (name.endsWith('.json')) {
+                        if (name.endsWith('.json') || name.endsWith('.bcc')) {
                           final file = File(path);
                           final stream = file.openRead().transform(
                             utf8.decoder,
@@ -930,7 +942,7 @@ class HeaderControlState extends State<HeaderControl>
                       title: const Text("VideoTrack"),
                       subtitle: Text(state.track.video.toString()),
                       onTap: () =>
-                          Utils.copyText('VideoTrack\n${state.track.audio}'),
+                          Utils.copyText('VideoTrack\n${state.track.video}'),
                     ),
                     ListTile(
                       dense: true,
@@ -941,7 +953,7 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("Volume"),
-                      subtitle: Text(volume.toString()),
+                      subtitle: Text(volume),
                       onTap: () => Utils.copyText('Volume\n$volume'),
                     ),
                     ListTile(
@@ -1252,7 +1264,7 @@ class HeaderControlState extends State<HeaderControl>
     if (subtitle == null) {
       final url = item.subtitleUrl;
       if (url == null || url.isEmpty) return null;
-      final res = await VideoHttp.vttSubtitles(url);
+      final res = await VideoHttp.getSubtitles(url);
       if (res == null) return null;
       subtitle = (isData: true, id: res);
       videoDetailCtr.vttSubtitles[index] = subtitle;
@@ -1331,7 +1343,7 @@ class HeaderControlState extends State<HeaderControl>
                     case .srt:
                       final url = item.subtitleUrl;
                       if (url == null || url.isEmpty) return;
-                      final subtitle = await VideoHttp.vttSubtitles(
+                      final subtitle = await VideoHttp.getSubtitles(
                         url,
                         format: .srt,
                       );
@@ -1802,56 +1814,61 @@ class HeaderControlState extends State<HeaderControl>
         (isFullScreen ||
             ((!horizontalScreen || plPlayerController.isDesktopPip) &&
                 !isPortrait))) {
-      title = Padding(
-        key: titleKey,
-        padding: isPortrait
-            ? EdgeInsets.zero
-            : const EdgeInsets.only(right: 10),
-        child: Obx(
-          () {
-            final videoDetail = introController.videoDetail.value;
-            final String title;
-            if (isFileSource || videoDetail.videos == 1) {
-              title = videoDetail.title!;
-            } else {
-              title =
-                  videoDetail.pages
-                      ?.firstWhereOrNull(
-                        (e) => e.cid == videoDetailCtr.cid.value,
-                      )
-                      ?.part ??
-                  videoDetail.title!;
-            }
-            return MarqueeText(
-              title,
-              spacing: 30,
-              velocity: 30,
-              strutStyle: const StrutStyle(fontSize: 16, leading: 0),
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-              provider: effectiveProvider,
-            );
-          },
-        ),
-      );
-      if (introController.isShowOnlineTotal) {
-        title = Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      title = Expanded(
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            title,
-            Obx(
-              () => Text(
-                '${introController.total.value}人正在看',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                ),
+            Padding(
+              key: titleKey,
+              padding: isPortrait
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.only(right: 10),
+              child: Obx(
+                () {
+                  final videoDetail = introController.videoDetail.value;
+                  final String title;
+                  if (isFileSource || videoDetail.videos == 1) {
+                    title = videoDetail.title!;
+                  } else {
+                    title =
+                        videoDetail.pages
+                            ?.firstWhereOrNull(
+                              (e) => e.cid == videoDetailCtr.cid.value,
+                            )
+                            ?.part ??
+                        videoDetail.title!;
+                  }
+                  return MarqueeText(
+                    title,
+                    spacing: 30,
+                    velocity: 30,
+                    strutStyle: const StrutStyle(fontSize: 16, leading: 0),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    provider: effectiveProvider,
+                  );
+                },
               ),
             ),
+            if (introController.isShowOnlineTotal)
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: FractionalTranslation(
+                  translation: const Offset(0, 1),
+                  child: Obx(
+                    () => Text(
+                      '${introController.total.value}人正在看',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
-        );
-      }
-      title = Expanded(child: title);
+        ),
+      );
     } else {
       title = const Spacer();
     }
@@ -2198,6 +2215,22 @@ class HeaderControlState extends State<HeaderControl>
                 ),
               ),
             ],
+          ),
+        // 计入人数行的高度，收起顶部控制栏时避免溢出内容残留。
+        if (introController.isShowOnlineTotal)
+          const Visibility(
+            visible: false,
+            maintainAnimation: true,
+            maintainState: true,
+            maintainSize: true,
+            child: Text(
+              '0人正在看',
+              maxLines: 1,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+              ),
+            ),
           ),
       ],
     );

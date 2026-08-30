@@ -10,6 +10,7 @@ abstract final class SettingBoxKey {
       autoPlayEnable = 'autoPlayEnable',
       fullScreenMode = 'fullScreenMode',
       preferCodecs = 'preferCodecs',
+      preferCodecsCellular = 'preferCodecsCellular',
       defaultToastOp = 'defaultToastOp',
       defaultPicQa = 'defaultPicQa',
       enableHA = 'enableHA',
@@ -61,6 +62,7 @@ abstract final class SettingBoxKey {
       minLikeRatioForRecommend = 'minLikeRatioForRecommend',
       exemptFilterForFollowed = 'exemptFilterForFollowed',
       banWordForRecommend = 'banWordForRecommend',
+      banWordForRecommendUpName = 'banWordForRecommendUpName',
       applyFilterToRelatedVideos = 'applyFilterToRelatedVideos',
       applyFilterToHotVideos = 'applyFilterToHotVideos',
       applyFilterToRankVideos = 'applyFilterToRankVideos',
@@ -71,6 +73,7 @@ abstract final class SettingBoxKey {
       maxCacheSize = 'maxCacheSize',
       defaultShowComment = 'defaultShowComment',
       replySortType = 'replySortType',
+      reply2SortType = 'reply2SortType',
       defaultDynamicType = 'defaultDynamicType',
       showDynInteraction = 'showDynInteraction',
       enableHotKey = 'enableHotKey',
@@ -151,7 +154,6 @@ abstract final class SettingBoxKey {
       retryDelay = 'retryDelay',
       liveQuality = 'liveQuality',
       liveQualityCellular = 'liveQualityCellular',
-      appFontWeight = 'appFontWeight',
       fastForBackwardDuration = 'fastForBackwardDuration',
       doubleTapBackwardDuration = 'doubleTapBackwardDuration',
       doubleTapForwardDuration = 'doubleTapForwardDuration',
@@ -190,7 +192,8 @@ abstract final class SettingBoxKey {
       mixWithOthers = 'mixWithOthers',
       removeSafeArea = 'removeSafeArea',
       angleDegrees = 'angleDegrees',
-      liveStream = 'liveStream';
+      liveStream = 'liveStream',
+      enableDocProvider = 'enableDocProvider';
 
   static const String enableAiChat = 'enableAiChat',
       aiApiUrl = 'aiApiUrl',
@@ -279,6 +282,7 @@ abstract final class SettingBoxKey {
 
   static const String themeMode = 'themeMode',
       defaultTextScale = 'textScale',
+      appFontWeight = 'appFontWeight',
       customFontPath = 'customFontPath',
       customFontFamily = 'customFontFamily',
       customFontName = 'customFontName',
@@ -312,7 +316,11 @@ abstract final class SettingBoxKey {
       reduceLuxColor = 'reduceLuxColor',
       liveCdnUrl = 'liveCdnUrl',
       saveReply = 'saveReply',
-      swapReplyLikeDislike = 'swapReplyLikeDislike';
+      swapReplyLikeDislike = 'swapReplyLikeDislike',
+      remarkReplaceName = 'remarkReplaceName',
+      appFont = 'appFont',
+      customAppFont = 'customAppFont',
+      customAppFontNames = 'customAppFontNames';
 }
 
 abstract final class LocalCacheKey {
