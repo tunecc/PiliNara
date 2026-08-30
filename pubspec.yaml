@@ -34,7 +34,6 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  gt3_flutter_plugin: ^0.1.0
 
   app_links: ^7.1.1
   archive: ^4.0.0
