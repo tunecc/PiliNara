@@ -180,6 +180,18 @@ class _MemberVideoState extends State<MemberVideo>
           }
           return HttpError(onReload: _controller.onReload);
         }
+        final mediaQuery = MediaQuery.of(context);
+        // 过滤开启且未到底时，可见内容填不满当前页面就自动补载。
+        // 尾项回调只在最后一项被构建时触发，填不满一屏时最后一项不会被构建，
+        // 所以这里在列表构建后按视口尺寸单独调度。
+        if (_controller.hasActiveFilter &&
+            !_controller.isEnd &&
+            widget.type != .season) {
+          _controller.scheduleAutoLoadMore(
+            viewportHeight: mediaQuery.size.height,
+            crossAxisExtent: mediaQuery.size.width,
+          );
+        }
         return SliverMainAxisGroup(
           slivers: [
             _buildHeader(theme),
@@ -203,6 +215,8 @@ class _MemberVideoState extends State<MemberVideo>
               },
               itemCount: list.length,
             ),
+            if (_controller.autoLoadPaused.value)
+              SliverToBoxAdapter(child: _buildAutoLoadPaused(theme)),
           ],
         );
       }),
@@ -212,6 +226,31 @@ class _MemberVideoState extends State<MemberVideo>
       ),
     };
   }
+
+  // 弹窗关闭后按当前视口尺寸重新过滤，不足一屏时自动补载
+  void _applyFilterFromDialog() {
+    final size = MediaQuery.sizeOf(context);
+    _controller.onFilterChanged(
+      viewportHeight: size.height,
+      crossAxisExtent: size.width,
+    );
+  }
+
+  // 连续自动翻页达到上限后的暂停提示，手动上拉可继续
+  Widget _buildAutoLoadPaused(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      child: Text(
+        '已连续加载较多内容，上拉可继续加载',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 13,
+          color: theme.colorScheme.outline,
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilteredOutAutoLoading(ThemeData theme) {
     return SliverFillRemaining(
       hasScrollBody: false,
@@ -240,7 +279,7 @@ class _MemberVideoState extends State<MemberVideo>
                 onPressed: () => MemberVideoFilterDialog.show(
                   context,
                   _controller.filter,
-                ).whenComplete(_controller.onFilterChanged),
+                ).whenComplete(_applyFilterFromDialog),
                 child: const Text('调整过滤条件'),
               ),
             ],
@@ -279,7 +318,7 @@ class _MemberVideoState extends State<MemberVideo>
             TextButton(
               onPressed: () =>
                   MemberVideoFilterDialog.show(context, _controller.filter)
-                      .whenComplete(_controller.onFilterChanged),
+                      .whenComplete(_applyFilterFromDialog),
               child: const Text('调整过滤条件'),
             ),
           ],
@@ -317,7 +356,7 @@ class _MemberVideoState extends State<MemberVideo>
       onPressed: () => MemberVideoFilterDialog.show(
         context,
         _controller.filter,
-      ).whenComplete(_controller.onFilterChanged),
+      ).whenComplete(_applyFilterFromDialog),
       icon: Obx(() {
         final hasFilter = _controller.filterActive.value;
         return Icon(
