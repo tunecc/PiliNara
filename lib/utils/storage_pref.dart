@@ -811,6 +811,37 @@ abstract final class Pref {
     return superResolutionType ?? SuperResolutionType.disable;
   }
 
+  // --- Media3 Engine Settings ---
+  static String get playerEngine =>
+      _setting.get(SettingBoxKey.playerEngine, defaultValue: 'mediaKit');
+
+  static double get media3AudioGainDb =>
+      (_setting.get(SettingBoxKey.media3AudioGainDb) as num?)?.toDouble() ?? 0.0;
+
+  static bool get media3AudioDynamic =>
+      _setting.get(SettingBoxKey.media3AudioDynamic, defaultValue: false);
+
+  static double get media3AudioTargetRmsDb =>
+      (_setting.get(SettingBoxKey.media3AudioTargetRmsDb) as num?)?.toDouble() ?? -16.0;
+
+  static bool get media3AudioEqEnabled =>
+      _setting.get(SettingBoxKey.media3AudioEqEnabled, defaultValue: false);
+
+  static double get media3AudioEqFreqHz =>
+      (_setting.get(SettingBoxKey.media3AudioEqFreqHz) as num?)?.toDouble() ?? 1000.0;
+
+  static double get media3AudioEqGainDb =>
+      (_setting.get(SettingBoxKey.media3AudioEqGainDb) as num?)?.toDouble() ?? 0.0;
+
+  static double get media3AudioEqQ =>
+      (_setting.get(SettingBoxKey.media3AudioEqQ) as num?)?.toDouble() ?? 1.0;
+
+  static String get media3SuperResolution =>
+      _setting.get(SettingBoxKey.media3SuperResolution, defaultValue: 'disable');
+
+  static bool get mediaSourceEnabled =>
+      _setting.get(SettingBoxKey.mediaSourceEnabled, defaultValue: true);
+
   static bool get preInitPlayer =>
       _setting.get(SettingBoxKey.preInitPlayer, defaultValue: false);
 

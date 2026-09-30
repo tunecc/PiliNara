@@ -73,6 +73,7 @@ import 'package:screen_brightness_platform_interface/screen_brightness_platform_
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:PiliPlus/plugin/pl_player/models/auto_audio_only_state.dart';
+import 'package:PiliPlus/utils/android/media3_bridge.dart';
 
 typedef PlayCallback = Future<void>? Function();
 typedef PlayerInitCallback = Future<void> Function();
@@ -999,7 +1000,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         }
         _removeListeners();
         _videoPlayerController?.dispose();
-        _videoPlayerController = null;
+        _media3Bridge?.release();
+    _media3Bridge?.dispose();
+    _media3Bridge = null;
+    _videoPlayerController = null;
         _videoController = null;
         return;
       }
@@ -1081,8 +1085,42 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
+  // Media3 bridge instance (Android only, when engine is set to media3)
+  Media3Bridge? _media3Bridge;
+  bool get isMedia3Engine => Platform.isAndroid && Pref.playerEngine == 'media3';
+
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);
+
+    // --- Media3 Engine Path (Android only) ---
+    if (isMedia3Engine) {
+      _media3Bridge = Media3Bridge();
+      await _media3Bridge!.init();
+      final created = await _media3Bridge!.createPlayer();
+      if (created) {
+        // Apply saved audio/super-res settings
+        await _media3Bridge!.setAudioGain(Pref.media3AudioGainDb);
+        await _media3Bridge!.setAudioDynamic(
+          Pref.media3AudioDynamic,
+          targetRmsDb: Pref.media3AudioTargetRmsDb,
+        );
+        if (Pref.media3AudioEqEnabled) {
+          await _media3Bridge!.setAudioEq(
+            true,
+            freqHz: Pref.media3AudioEqFreqHz,
+            gainDb: Pref.media3AudioEqGainDb,
+            q: Pref.media3AudioEqQ,
+          );
+        }
+        await _media3Bridge!.setSuperResolution(Pref.media3SuperResolution);
+        debugPrint('[PlPlayer] Media3 engine initialized with audio/super-res settings');
+      } else {
+        debugPrint('[PlPlayer] Media3 init failed, falling back to media_kit');
+        _media3Bridge?.dispose();
+        _media3Bridge = null;
+      }
+    }
+
     if (PlatformUtils.isMobile && Pref.enableAppVolume) {
       // 移动平台应用内音量模式：初始化系统音量
       systemVolume.value = (await FlutterVolumeController.getVolume()) ?? 1.0;

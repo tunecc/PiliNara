@@ -405,6 +405,14 @@ List<SettingsModel> get playSettings => [
         .put(VideoBoxKey.playRepeat, value.index)
         .whenComplete(setState),
   ),
+  // --- Media3 Engine Settings (Android only) ---
+  if (Platform.isAndroid)
+    NormalModel(
+      onTap: _showMedia3EngineDialog,
+      leading: const Icon(Icons.settings_suggest_outlined),
+      title: 'Media3 播放引擎',
+      getSubtitle: () => Pref.playerEngine == 'media3' ? '已启用（音频处理/超分/截帧）' : '使用默认 media_kit',
+    ),
   const SwitchModel(
     title: '播放器设置仅对当前生效',
     subtitle: '弹幕、字幕及部分设置中没有的设置除外',
