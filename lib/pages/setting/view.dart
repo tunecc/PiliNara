@@ -83,6 +83,11 @@ class _SettingPageState extends State<SettingPage> {
       icon: Icon(MdiIcons.databaseCogOutline),
     ),
     _SettingsModel(
+      type: SettingType.experimentalSetting,
+      subtitle: '液态玻璃、模糊蒙层、AMOLED、卡片动画、动态取色、紧凑模式、DoH',
+      icon: Icon(Icons.science_outlined),
+    ),
+    _SettingsModel(
       type: SettingType.about,
       icon: Icon(Icons.info_outline),
     ),
