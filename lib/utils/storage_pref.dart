@@ -1811,3 +1811,9 @@ abstract final class Pref {
   static bool get enableEmoteTooltip =>
       _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
 }
+
+  static int get playbackAccountMid => _setting.get(SettingBoxKey.playbackAccountMid, defaultValue: 0);
+  static int get commentAccountMid => _setting.get(SettingBoxKey.commentAccountMid, defaultValue: 0);
+  static bool get enableHighQualityTrial => _setting.get(SettingBoxKey.enableHighQualityTrial, defaultValue: true);
+  static bool get cdnAutoSelect => _setting.get(SettingBoxKey.cdnAutoSelect, defaultValue: true);
+  static String get cdnPreferredNode => _setting.get(SettingBoxKey.cdnPreferredNode, defaultValue: '');
