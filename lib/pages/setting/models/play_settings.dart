@@ -419,6 +419,18 @@ List<SettingsModel> get playSettings => [
     title: '订阅源管理',
     subtitle: '动漫花园/蜜柑计划/Nyaa 等外部数据源',
   ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/cdnDiagnostics'),
+    leading: const Icon(Icons.speed_outlined),
+    title: 'CDN 测速诊断',
+    subtitle: '真实视频段测速、DNS/TTFB/吞吐/抖动分析',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/trafficStats'),
+    leading: const Icon(Icons.data_usage_outlined),
+    title: '流量统计',
+    subtitle: '按小时/Wi-Fi/蜂窝分类的上下行统计',
+  ),
   const SwitchModel(
     title: '播放器设置仅对当前生效',
     subtitle: '弹幕、字幕及部分设置中没有的设置除外',
