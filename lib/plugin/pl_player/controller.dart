@@ -74,6 +74,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:PiliPlus/plugin/pl_player/models/auto_audio_only_state.dart';
 import 'package:PiliPlus/utils/android/media3_bridge.dart';
+import 'package:PiliPlus/services/playback_stats_service.dart';
 
 typedef PlayCallback = Future<void>? Function();
 typedef PlayerInitCallback = Future<void> Function();
@@ -1121,6 +1122,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       }
     }
 
+
+    // Initialize playback stats tracking
+    try {
+      PlaybackStatsService.init();
+    } catch (e) {
+      debugPrint('[PlPlayer] PlaybackStatsService init failed: $e');
+    }
+
     if (PlatformUtils.isMobile && Pref.enableAppVolume) {
       // 移动平台应用内音量模式：初始化系统音量
       systemVolume.value = (await FlutterVolumeController.getVolume()) ?? 1.0;
@@ -1162,6 +1171,16 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
 
     _startListeners(player);
+
+    // Track playback state changes for stats
+    try {
+      if (_videoPlayerController?.state.playing == true) {
+        PlaybackStatsService.onPlay();
+      } else {
+        PlaybackStatsService.onPause();
+      }
+    } catch (_) {}
+
 
     return player;
   }

@@ -72,6 +72,9 @@ import 'package:PiliPlus/pages/webdav/view.dart';
 import 'package:PiliPlus/pages/webview/view.dart';
 import 'package:PiliPlus/pages/whisper/view.dart';
 import 'package:PiliPlus/pages/media_source/view.dart';
+import 'package:PiliPlus/pages/cdn_diagnostics/view.dart';
+import 'package:PiliPlus/pages/traffic_stats/view.dart';
+import 'package:PiliPlus/pages/offline_decode_lab/view.dart';
 import 'package:PiliPlus/services/playback_stats_service.dart';
 import 'package:PiliPlus/services/cdn_diagnostics_service.dart';
 import 'package:PiliPlus/services/traffic_stats_service.dart';
@@ -138,6 +141,9 @@ class Routes {
     GetPage(name: '/historySearch', page: () => const HistorySearchPage()),
     GetPage(name: '/todayRecommend', page: () => const TodayRecommendPage()),
     GetPage(name: '/mediaSource', page: () => const MediaSourcePage()),
+    GetPage(name: '/cdnDiagnostics', page: () => const CdnDiagnosticsPage()),
+    GetPage(name: '/trafficStats', page: () => const TrafficStatsPage()),
+    GetPage(name: '/offlineDecodeLab', page: () => const OfflineDecodeLabPage()),
     GetPage(name: '/laterSearch', page: () => const LaterSearchPage()),
     GetPage(name: '/followSearch', page: () => const FollowSearchPage()),
     // 消息页面
