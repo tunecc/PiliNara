@@ -1,5 +1,6 @@
-import 'package:PiliPlus/models/video_bookmark.dart';
 import 'package:hive_ce/hive.dart';
+
+part of 'video_bookmark.dart';
 
 class VideoBookmarkAdapter extends TypeAdapter<VideoBookmark> {
   @override
@@ -19,7 +20,8 @@ class VideoBookmarkAdapter extends TypeAdapter<VideoBookmark> {
       timestampSeconds: (fields[4] as int?) ?? 0,
       name: (fields[5] as String?) ?? '',
       note: fields[6] as String?,
-      createdAt: (fields[7] as DateTime?) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      createdAt:
+          (fields[7] as DateTime?) ?? DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 

@@ -365,7 +365,7 @@ abstract final class SettingBoxKey {
       playbackArchiveId = 'playbackArchiveId',
       playbackStatsReady = 'playbackStatsReady',
       trafficStats = 'trafficStats',
-      videoQualityMode = 'videoQualityMode',
+      videoQualityMode = 'videoQualityMode';
 }
 
 abstract final class LocalCacheKey {

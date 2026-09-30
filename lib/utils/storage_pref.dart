@@ -1823,4 +1823,9 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.cdnAutoSelect, defaultValue: true);
   static String get cdnPreferredNode =>
       _setting.get(SettingBoxKey.cdnPreferredNode, defaultValue: '');
+
+  static String get dohProvider =>
+      _setting.get(SettingBoxKey.dohProvider, defaultValue: 'cloudflare');
+  static String get customDohUrl =>
+      _setting.get(SettingBoxKey.customDohUrl, defaultValue: '');
 }
