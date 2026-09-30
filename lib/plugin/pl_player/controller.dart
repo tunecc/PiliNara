@@ -622,7 +622,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   static double? getVolumeIfExists() {
-    return _instance?.volume?.value ?? 1.0;
+    return _instance?.volume.value;
   }
 
   static Future<void>? setVolumeIfExists(
@@ -1134,14 +1134,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       // 移动平台应用内音量模式：初始化系统音量
       systemVolume.value = (await FlutterVolumeController.getVolume()) ?? 1.0;
       // 从持久化存储读取应用内音量
-      volume?.value ?? 1.0 = Pref.appVolume;
+      volume.value = Pref.appVolume;
     }
     final opt = {
       'video-sync': Pref.videoSync,
       if (Platform.isAndroid) 'ao': Pref.audioOutput,
       'volume': (PlatformUtils.isMobile
-              ? (Pref.enableAppVolume ? volume?.value ?? 1.0 * 100 : Pref.playerVolume)
-              : volume?.value ?? 1.0 * 100)
+              ? (Pref.enableAppVolume ? volume.value * 100 : Pref.playerVolume)
+              : volume.value * 100)
           .toString(),
       'volume-max': kMaxVolume.toString(),
     };
@@ -1257,7 +1257,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         await _media3Bridge!.seekTo(seekTo.inMilliseconds);
       }
       await _media3Bridge!.setSpeed(playbackSpeed);
-      await _media3Bridge!.setVolume(volume?.value ?? 1.0);
+      await _media3Bridge!.setVolume(this.volume.value);
       debugPrint('[PlPlayer] Media3 setDataSource: $url');
     } else {
       await player.open(
@@ -1696,8 +1696,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   Future<void> setVolume(double volume, {bool showIndicator = true}) async {
-    if (this.volume?.value ?? 1.0 != volume) {
-      this.volume?.value ?? 1.0 = volume;
+    if (this.volume.value != volume) {
+      this.volume.value = volume;
       try {
         if (PlatformUtils.isDesktop) {
           await _videoPlayerController!.setVolume(volume * 100);
@@ -1753,7 +1753,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       final appVolume = (Pref.playerVolume / 100)
           .clamp(0.0, maxVolume)
           .toDouble();
-      volume?.value ?? 1.0 = appVolume;
+      volume.value = appVolume;
       Pref.appVolume = appVolume;
       volumeBoostUnlocked = false;
 
@@ -1768,7 +1768,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       final currentSystemVolume =
           (await FlutterVolumeController.getVolume()) ?? 1.0;
       final playerGain = max(Pref.playerVolume / 100, 0.01);
-      final newSystemVolume = (currentSystemVolume * volume?.value ?? 1.0 / playerGain)
+      final newSystemVolume = (currentSystemVolume * volume.value / playerGain)
           .clamp(0.0, 1.0)
           .toDouble();
 
@@ -1779,7 +1779,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
       // 更新状态
       systemVolume.value = newSystemVolume;
-      volume?.value ?? 1.0 = newSystemVolume;
+      volume.value = newSystemVolume;
 
       SmartDialog.showToast('已切换到同步系统音量模式');
     }
@@ -1793,13 +1793,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       // 应用内音量模式：使用临时音量，不影响持久化值
       if (begin) {
         _isDucked = true;
-        _preDuckVolume = volume?.value ?? 1.0;
-        volume?.value ?? 1.0 = volume?.value ?? 1.0 * 0.5;
-        _videoPlayerController?.setVolume(volume?.value ?? 1.0 * 100);
+        _preDuckVolume = volume.value;
+        volume.value = volume.value * 0.5;
+        _videoPlayerController?.setVolume(volume.value * 100);
       } else {
         _isDucked = false;
-        volume?.value ?? 1.0 = _preDuckVolume;
-        _videoPlayerController?.setVolume(volume?.value ?? 1.0 * 100);
+        volume.value = _preDuckVolume;
+        _videoPlayerController?.setVolume(volume.value * 100);
       }
     }
     // 同步模式：使用原有逻辑，直接调用 setVolume 即可

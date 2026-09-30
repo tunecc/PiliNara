@@ -1,9 +1,11 @@
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/services/logger.dart';
 
-class TodayRecommendController extends CommonListController {
+class TodayRecommendController
+    extends CommonListController<dynamic, RcmdVideoItemAppModel> {
   @override
   void onInit() {
     super.onInit();
@@ -11,7 +13,7 @@ class TodayRecommendController extends CommonListController {
   }
 
   @override
-  Future<LoadingState> customGetData() async {
+  Future<LoadingState<dynamic>> customGetData() async {
     try {
       return await VideoHttp.rcmdVideoListApp(freshIdx: page);
     } catch (e) {
@@ -21,9 +23,8 @@ class TodayRecommendController extends CommonListController {
   }
 
   @override
-  List? getDataList(dynamic response) {
-    if (response == null) return null;
-    if (response is List) return response;
+  List<RcmdVideoItemAppModel>? getDataList(dynamic response) {
+    if (response is List<RcmdVideoItemAppModel>) return response;
     return null;
   }
 }

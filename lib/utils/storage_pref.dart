@@ -1804,49 +1804,23 @@ abstract final class Pref {
   static Map<String, String> get customAppFontNames => Map<String, String>.from(
     _setting.get(
       SettingBoxKey.customAppFontNames,
-      defaultValue: const <String, String>{
-  // === Playback Stats (ported from Nishuo) ===
-  static Box get playbackStats => _playbackStatsBox;
-  static late final Box _playbackStatsBox = Hive.lazyBox('playbackStats');
-  static File get playbackStatsHiveFile => File('${Directory.systemTemp.path}/playbackStats.hiv');
-  static const playbackStatsPendingHiveFile = 'playbackStatsPending.hive';
-  static const playbackArchiveHiveFile = 'playbackArchive.hive';
-  static bool get playbackStatsReady => _setting.get(SettingBoxKey.playbackStatsReady, defaultValue: false);
-  static bool get playbackArchiveDue => _setting.get(SettingBoxKey.playbackArchiveDue, defaultValue: false);
-  static int get playbackArchiveId => _setting.get(SettingBoxKey.playbackArchiveId, defaultValue: 0);
-  static Future<void> restorePlaybackStatsHive() async {}
-  static Future<void> restorePlaybackArchiveHive() async {}
-  static Future<void> initializePlaybackStats() async {}
-  static Future<void> discardOrphanPlaybackArchiveId() async {}
-  static Future<int> preparePlaybackArchiveId() async => 0;
-  static Future<void> rotatePlaybackStats() async {}
-  static Future<void> completePlaybackArchive() async {}
-  static Future<void> finishPlaybackArchive() async {}
-  static Future<void> markPlaybackArchiveReset() async {}
-
-  // === CDN Diagnostics (ported from Chloe) ===
-  static Future<void> replaceCdnDiagnostics(Map<String, dynamic> data) async {}
-  static Future<void> appendCdnDiagnosticsHistory(Map<String, dynamic> data) async {}
-  static List<dynamic> readCdnDiagnosticsSync() => [];
-  static List<dynamic> readCdnDiagnosticsHistorySync() => [];
-  static Future<void> replaceCdnDiagnosticsHistory(List<dynamic> data) async {}
-
-  // === Traffic Stats (ported from BiliVideo-Lab) ===
-  static const trafficStats = 'trafficStats';
-  static File get trafficStatsFile => File('${Directory.systemTemp.path}/trafficStats.json');
-  static Map<String, dynamic>? readJsonMapSync(String path) => null;
-
-  // === Video Box (for traffic stats legacy) ===
-  static get video => _setting;
-},
+      defaultValue: const <String, String>{},
     ),
   );
 
   static bool get enableEmoteTooltip =>
       _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
-  static int get playbackAccountMid => _setting.get(SettingBoxKey.playbackAccountMid, defaultValue: 0);
-  static int get commentAccountMid => _setting.get(SettingBoxKey.commentAccountMid, defaultValue: 0);
-  static bool get enableHighQualityTrial => _setting.get(SettingBoxKey.enableHighQualityTrial, defaultValue: true);
-  static bool get cdnAutoSelect => _setting.get(SettingBoxKey.cdnAutoSelect, defaultValue: true);
-  static String get cdnPreferredNode => _setting.get(SettingBoxKey.cdnPreferredNode, defaultValue: '');
 
+  static int get playbackAccountMid =>
+      _setting.get(SettingBoxKey.playbackAccountMid, defaultValue: 0);
+  static int get commentAccountMid =>
+      _setting.get(SettingBoxKey.commentAccountMid, defaultValue: 0);
+  static bool get enableHighQualityTrial => _setting.get(
+    SettingBoxKey.enableHighQualityTrial,
+    defaultValue: true,
+  );
+  static bool get cdnAutoSelect =>
+      _setting.get(SettingBoxKey.cdnAutoSelect, defaultValue: true);
+  static String get cdnPreferredNode =>
+      _setting.get(SettingBoxKey.cdnPreferredNode, defaultValue: '');
+}

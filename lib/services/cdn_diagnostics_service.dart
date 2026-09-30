@@ -1,3 +1,5 @@
+import 'package:PiliPlus/http/cdn_manager.dart';
+import 'package:PiliPlus/pages/cdn_diagnostics/model.dart';
 import 'package:PiliPlus/utils/storage.dart';
 
 typedef CdnDiagnosticGroup = ({
@@ -7,6 +9,36 @@ typedef CdnDiagnosticGroup = ({
 });
 
 abstract final class CdnDiagnosticsService {
+  /// Probes every configured CDN node and records one diagnostic per node.
+  static Future<List<CdnTestResult>> runDiagnostics() async {
+    final managerResults = await CdnManager.testAllNodes();
+    final results = <CdnTestResult>[];
+    final runStartedAtUs = DateTime.now().microsecondsSinceEpoch;
+    for (final result in managerResults) {
+      final record = <String, dynamic>{
+        'testRunStartedAtUs': runStartedAtUs,
+        'recordedAtUs': DateTime.now().microsecondsSinceEpoch,
+        'cdn': {'index': result.nodeId, 'name': result.nodeName},
+        'success': result.success,
+        'throughputMbps': result.throughputMbps,
+        'latencyMs': result.latencyMs,
+        if (result.errorMessage != null) 'errorMessage': result.errorMessage,
+      };
+      append(historyRecord: record, latestRecord: record);
+      results.add(
+        CdnTestResult(
+          cdnName: result.nodeName,
+          success: result.success,
+          throughputMbps: result.throughputMbps,
+          ttfbMs: result.latencyMs,
+          errorMessage: result.errorMessage,
+        ),
+      );
+    }
+    await flushRun();
+    return results;
+  }
+
   static int? _activeRun;
   static final List<Map<String, dynamic>> _activeHistoryRecords = [];
   static final List<Map<String, dynamic>> _activeLatestRecords = [];
@@ -47,14 +79,16 @@ abstract final class CdnDiagnosticsService {
     final history = List<Map<String, dynamic>>.of(_activeHistoryRecords);
     final latest = List<Map<String, dynamic>>.of(_activeLatestRecords);
     return _enqueue(() async {
-      await GStorage.replaceCdnDiagnostics([
+      await GStorage.replaceCdnDiagnostics(<({String id, Map<String, dynamic> record})>[
         for (final item in latest)
           (id: item['recordedAtUs']?.toString() ?? '', record: item),
       ]);
-      await GStorage.appendCdnDiagnosticsHistory([
-        for (final item in history)
-          (id: item['recordedAtUs']?.toString() ?? '', record: item),
-      ]);
+      await GStorage.appendCdnDiagnosticsHistory(
+        <({String id, Map<String, dynamic> record})>[
+          for (final item in history)
+            (id: item['recordedAtUs']?.toString() ?? '', record: item),
+        ],
+      );
     });
   }
 

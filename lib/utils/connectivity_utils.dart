@@ -1,5 +1,7 @@
-import 'package:PiliPlus/utils/platform_utils.dart';
 import 'dart:async';
+
+import 'package:PiliPlus/models/common/network_profile.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 abstract final class ConnectivityUtils {
@@ -14,24 +16,28 @@ abstract final class ConnectivityUtils {
     }
   }
 
-  static final _controller = StreamController<bool>.broadcast();
-  static bool _isWiFi = true;
+  static final _controller = StreamController<NetworkProfile>.broadcast();
+  static NetworkProfile _current = NetworkProfile.wifi;
 
-  static Stream<bool> get changes => _controller.stream;
+  /// Emits whenever the coarse network profile changes.
+  static Stream<NetworkProfile> get changes => _controller.stream;
 
-  static bool get current => _isWiFi;
+  static NetworkProfile get current => _current;
 
-  static void _onConnectivityChanged(bool isWiFi) {
-    if (isWiFi != _isWiFi) {
-      _isWiFi = isWiFi;
-      _controller.add(isWiFi);
+  static Future<NetworkProfile> detect() async =>
+      await isWiFi ? NetworkProfile.wifi : NetworkProfile.cellular;
+
+  static void _emit(NetworkProfile profile) {
+    if (profile != _current) {
+      _current = profile;
+      _controller.add(profile);
     }
   }
 
   static Future<void> init() async {
-    _isWiFi = await isWiFi;
+    _current = await detect();
     Connectivity().onConnectivityChanged.listen((_) async {
-      _onConnectivityChanged(await isWiFi);
+      _emit(await detect());
     });
   }
 }

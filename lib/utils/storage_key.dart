@@ -346,7 +346,26 @@ abstract final class SettingBoxKey {
       remarkReplaceName = 'remarkReplaceName',
       appFont = 'appFont',
       customAppFont = 'customAppFont',
-      customAppFontNames = 'customAppFontNames';
+      customAppFontNames = 'customAppFontNames',
+      cdnAutoSelect = 'cdnAutoSelect',
+      cdnPreferredNode = 'cdnPreferredNode',
+      commentAccountMid = 'commentAccountMid',
+      customDohUrl = 'customDohUrl',
+      dohProvider = 'dohProvider',
+      enableDoh = 'enableDoh',
+      enableHighQualityTrial = 'enableHighQualityTrial',
+      experimentalAmoledBlack = 'experimentalAmoledBlack',
+      experimentalBlurBackdrop = 'experimentalBlurBackdrop',
+      experimentalCardAnimation = 'experimentalCardAnimation',
+      experimentalCompactMode = 'experimentalCompactMode',
+      experimentalDynamicColor = 'experimentalDynamicColor',
+      experimentalLiquidGlass = 'experimentalLiquidGlass',
+      playbackAccountMid = 'playbackAccountMid',
+      playbackArchiveDue = 'playbackArchiveDue',
+      playbackArchiveId = 'playbackArchiveId',
+      playbackStatsReady = 'playbackStatsReady',
+      trafficStats = 'trafficStats',
+      videoQualityMode = 'videoQualityMode',
 }
 
 abstract final class LocalCacheKey {

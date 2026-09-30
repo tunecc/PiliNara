@@ -3,9 +3,9 @@ import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:flutter/material.dart' hide Icons, showDialog, SimpleDialog, SimpleDialogOption, AlertDialog, InputDecoration, TextField, TextButton;
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Icons, showDialog, SimpleDialog, SimpleDialogOption, AlertDialog, InputDecoration, TextField, TextButton;
 
 /// Experimental features: UI effects (Kototoro/bilipai/PiliMax) + Network (DoH)
 List<SettingsModel> get experimentalSettings => [
@@ -161,12 +161,12 @@ Future<void> _showDohProviderDialog(BuildContext context, VoidCallback setState)
 }
 
 // --- Helper Widgets ---
-class _SectionHeader implements SettingsModel {
+class _SectionHeader extends WidgetModel {
   final String title;
-  const _SectionHeader(this.title);
+  const _SectionHeader(this.title) : super(child: const SizedBox.shrink(), searchTitle: '');
 }
 
-class _InfoText implements SettingsModel {
+class _InfoText extends WidgetModel {
   final String text;
-  const _InfoText(this.text);
+  const _InfoText(this.text) : super(child: const SizedBox.shrink(), searchTitle: '');
 }

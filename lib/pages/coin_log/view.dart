@@ -6,9 +6,9 @@ class CoinLogPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SimpleScaffold(
-      title: '硬币日志',
-      child: const Center(child: Text('暂无数据')),
+    return const SimpleScaffold(
+      appBar: null,
+      body: Center(child: Text('暂无数据')),
     );
   }
 }

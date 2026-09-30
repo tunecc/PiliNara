@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models/user/danmaku_rule_adapter.dart';
+import 'package:PiliPlus/models/video_bookmark_adapter.dart';
 import 'package:PiliPlus/models/user/info.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account_adapter.dart';
@@ -70,6 +72,15 @@ abstract final class GStorage {
       ).then((res) => historyWord = res),
       // 视频设置
       Hive.openBox('video').then((res) => video = res),
+      Hive.openBox('playbackStats').then((res) => playbackStats = res),
+      Hive.openBox('playbackArchive').then((res) => playbackArchive = res),
+      Hive.openBox('playbackStatsPending').then(
+        (res) => playbackStatsPending = res,
+      ),
+      Hive.openBox(cdnDiagnosticsBoxName).then((res) => cdnDiagnostics = res),
+      Hive.openBox(cdnDiagnosticsHistoryBoxName).then(
+        (res) => cdnDiagnosticsHistory = res,
+      ),
       Accounts.init(),
       Hive.openBox<int>(
         'watchProgress',
@@ -153,7 +164,8 @@ abstract final class GStorage {
       ..registerAdapter(LoginAccountAdapter())
       ..registerAdapter(AccountTypeAdapter())
       ..registerAdapter(SetIntAdapter())
-      ..registerAdapter(RuleFilterAdapter());
+      ..registerAdapter(RuleFilterAdapter())
+      ..registerAdapter(VideoBookmarkAdapter());
   }
 
   static dynamic _encodeLocalCacheValue(String key, dynamic value) {
@@ -195,6 +207,10 @@ abstract final class GStorage {
       setting.compact(),
       video.compact(),
       Accounts.account.compact(),
+      playbackStats.compact(),
+      playbackArchive.compact(),
+      cdnDiagnostics.compact(),
+      cdnDiagnosticsHistory.compact(),
       watchProgress.compact(),
       ?reply?.compact(),
     ]);
@@ -208,6 +224,10 @@ abstract final class GStorage {
       setting.close(),
       video.close(),
       Accounts.account.close(),
+      playbackStats.close(),
+      playbackArchive.close(),
+      cdnDiagnostics.close(),
+      cdnDiagnosticsHistory.close(),
       watchProgress.close(),
       ?reply?.close(),
     ]);
@@ -221,9 +241,147 @@ abstract final class GStorage {
       setting.clear(),
       video.clear(),
       Accounts.clear(),
+      playbackStats.clear(),
+      playbackArchive.clear(),
+      cdnDiagnostics.clear(),
+      cdnDiagnosticsHistory.clear(),
       watchProgress.clear(),
       ?reply?.clear(),
     ]);
+  }
+
+  // === Playback statistics + cold archive (self-contained Hive boxes) ===
+  static late final Box<dynamic> playbackStats;
+  static late final Box<dynamic> playbackArchive;
+  static late final Box<dynamic> playbackStatsPending;
+
+  static File get playbackStatsHiveFile => _hiveFile('playbackStats');
+  static File get playbackArchiveHiveFile => _hiveFile('playbackArchive');
+  static File get playbackStatsPendingHiveFile =>
+      _hiveFile('playbackStatsPending');
+
+  static File _hiveFile(String name) =>
+      File(path.join(appSupportDirPath, 'hive', '$name.hive'));
+
+  static bool get playbackStatsReady =>
+      setting.get(SettingBoxKey.playbackStatsReady, defaultValue: false);
+
+  static set playbackStatsReady(bool value) =>
+      setting.put(SettingBoxKey.playbackStatsReady, value);
+
+  static bool get playbackArchiveDue =>
+      setting.get(SettingBoxKey.playbackArchiveDue, defaultValue: false);
+
+  static set playbackArchiveDue(bool value) =>
+      setting.put(SettingBoxKey.playbackArchiveDue, value);
+
+  static int? get playbackArchiveId =>
+      setting.get(SettingBoxKey.playbackArchiveId);
+
+  static set playbackArchiveId(int? value) =>
+      setting.put(SettingBoxKey.playbackArchiveId, value);
+
+  static Future<void> initializePlaybackStats() async {
+    playbackStats = await Hive.openBox('playbackStats');
+    playbackArchive = await Hive.openBox('playbackArchive');
+    playbackStatsPending = await Hive.openBox('playbackStatsPending');
+    playbackStatsReady = true;
+  }
+
+  static Future<void> rotatePlaybackStats() async =>
+      playbackStats.clear();
+
+  static Future<int> preparePlaybackArchiveId() async {
+    final id = (playbackArchiveId ?? 0) + 1;
+    playbackArchiveId = id;
+    return id;
+  }
+
+  static Future<void> completePlaybackArchive() async =>
+      playbackArchiveId = null;
+
+  static Future<void> finishPlaybackArchive() async =>
+      playbackArchiveDue = false;
+
+  static Future<void> markPlaybackArchiveReset() async =>
+      playbackArchiveId = null;
+
+  static Future<void> discardOrphanPlaybackArchiveId() async =>
+      playbackArchiveId = null;
+
+  static Future<void> restorePlaybackStatsHive(File? source) async {
+    if (source == null) return;
+    await playbackStats.close();
+    if (await playbackStatsHiveFile.exists()) {
+      await playbackStatsHiveFile.delete();
+    }
+    await source.copy(playbackStatsHiveFile.path);
+    playbackStats = await Hive.openBox('playbackStats');
+  }
+
+  static Future<void> restorePlaybackArchiveHive(File? source) async {
+    if (source == null) return;
+    await playbackArchive.close();
+    if (await playbackArchiveHiveFile.exists()) {
+      await playbackArchiveHiveFile.delete();
+    }
+    await source.copy(playbackArchiveHiveFile.path);
+    playbackArchive = await Hive.openBox('playbackArchive');
+  }
+
+  // === CDN diagnostics (latest snapshot + append-only history) ===
+  static const cdnDiagnosticsBoxName = 'cdnDiagnostics';
+  static const cdnDiagnosticsHistoryBoxName = 'cdnDiagnosticsHistory';
+  static late final Box<dynamic> cdnDiagnostics;
+  static late final Box<dynamic> cdnDiagnosticsHistory;
+
+  static Future<void> initCdnDiagnostics() async {
+    cdnDiagnostics = await Hive.openBox(cdnDiagnosticsBoxName);
+    cdnDiagnosticsHistory = await Hive.openBox(cdnDiagnosticsHistoryBoxName);
+  }
+
+  static List<({String id, Map<String, dynamic> record})>
+      readCdnDiagnosticsSync() => [
+    for (final entry in cdnDiagnostics.toMap().entries)
+      (
+        id: entry.key.toString(),
+        record: Map<String, dynamic>.from(entry.value as Map),
+      ),
+  ];
+
+  static List<({String id, Map<String, dynamic> record})>
+      readCdnDiagnosticsHistorySync() => [
+    for (final entry in cdnDiagnosticsHistory.toMap().entries)
+      (
+        id: entry.key.toString(),
+        record: Map<String, dynamic>.from(entry.value as Map),
+      ),
+  ];
+
+  static Future<void> replaceCdnDiagnostics(
+    List<({String id, Map<String, dynamic> record})> entries,
+  ) async {
+    await cdnDiagnostics.clear();
+    await cdnDiagnostics.putAll({
+      for (final entry in entries) entry.id: entry.record,
+    });
+  }
+
+  static Future<void> replaceCdnDiagnosticsHistory(
+    List<({String id, Map<String, dynamic> record})> entries,
+  ) async {
+    await cdnDiagnosticsHistory.clear();
+    await cdnDiagnosticsHistory.putAll({
+      for (final entry in entries) entry.id: entry.record,
+    });
+  }
+
+  static Future<void> appendCdnDiagnosticsHistory(
+    List<({String id, Map<String, dynamic> record})> entries,
+  ) async {
+    await cdnDiagnosticsHistory.putAll({
+      for (final entry in entries) entry.id: entry.record,
+    });
   }
 
   static int _intStrDescKeyComparator(dynamic k1, dynamic k2) {

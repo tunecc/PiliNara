@@ -1,5 +1,5 @@
 import 'package:PiliPlus/controllers/video_bookmark_controller.dart';
-import 'package:PiliPlus/pages/video_detail_v/view.dart';
+import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -43,10 +43,12 @@ class _State extends State<VideoBookmarkSettingPage> {
                 final bm = _ctrl.bookmarks[index];
                 return ListTile(
                   leading: CircleAvatar(child: Text('${index + 1}')),
-                  title: Text(bm.title ?? '未知视频'),
-                  subtitle: Text('BV: ${bm.bvid ?? "?"} · ${bm.createdAt?.toString().substring(0, 16) ?? "?"}'),
+                  title: Text(bm.videoTitle),
+                  subtitle: Text(
+                    'BV: ${bm.bvid} · ${bm.name} · ${bm.formattedTimestamp}',
+                  ),
                   trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _ctrl.deleteBookmark(bm)),
-                  onTap: () => Get.to(() => const VideoDetailPageV(bvid: bm.bvid)),
+                  onTap: () => PageUtils.toVideoPage(bvid: bm.bvid, cid: 0),
                 );
               },
             ),

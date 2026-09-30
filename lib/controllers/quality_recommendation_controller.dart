@@ -55,7 +55,7 @@ class QualityRecommendationController {
 
   void _loadSavedMode() {
     try {
-      currentMode.value = QualityMode.decode(_modeReader());
+      currentMode.value = QualityModeCodec.decode(_modeReader());
     } catch (_) {
       currentMode.value = QualityMode.auto;
     }
@@ -115,6 +115,7 @@ class QualityRecommendationController {
 
     currentRecommendation.value = recommendation;
     _previousQualityCode = currentQualityCode ?? _currentQualityCode;
+    if (recommendation == null) return null;
     _pendingAutoChip = recommendation.isAuto;
 
     if (!applyToPlayer) return recommendation;

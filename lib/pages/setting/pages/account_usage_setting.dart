@@ -22,7 +22,7 @@ class _S extends State<AccountUsageSettingPage> {
     return showDialog<int>(context: context, builder: (c) => SimpleDialog(title: const Text('选择账号'), children: [
       SimpleDialogOption(onPressed: () => Navigator.pop(c, 0), child: const Text('主账号')),
       if (guest) SimpleDialogOption(onPressed: () => Navigator.pop(c, -1), child: const Text('游客')),
-      ...accs.values.toList().map((a) => SimpleDialogOption(onPressed: () => Navigator.pop(c, a.mid), child: Text('${a.name} (${a.mid})'))),
+      ...accs.values.toList().map((a) => SimpleDialogOption(onPressed: () => Navigator.pop(c, a.mid), child: Text('UID:${a.mid}'))),
     ]));
   }
 }

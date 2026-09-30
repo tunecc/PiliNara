@@ -3,8 +3,6 @@ import 'package:PiliPlus/pages/setting/pages/quality_recommend_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/account_usage_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/picture_enhance_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/cdn_setting.dart';
-import 'package:PiliPlus/pages/fav_folder_sort/view.dart';
-import 'package:PiliPlus/pages/fav_sort/view.dart';
 import 'package:PiliPlus/pages/coin_log/view.dart';
 import 'package:PiliPlus/pages/about/view.dart';
 import 'package:PiliPlus/pages/setting/ai_setting/view.dart';
@@ -97,8 +95,6 @@ GetPage(name: '/qualityRecommend', page: () => const QualityRecommendSettingPage
 GetPage(name: '/accountUsage', page: () => const AccountUsageSettingPage()),
 GetPage(name: '/pictureEnhance', page: () => const PictureEnhanceSettingPage()),
 GetPage(name: '/cdnSetting', page: () => const CdnSettingPage()),
-GetPage(name: '/favFolderSort', page: () => const FavFolderSortPage()),
-GetPage(name: '/favSort', page: () => const FavSortPage()),
 GetPage(name: '/coinLog', page: () => const CoinLogPage()),
 GetPage(name: '/', page: () => const MainApp()),
     // 首页(推荐)

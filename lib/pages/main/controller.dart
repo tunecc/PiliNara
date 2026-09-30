@@ -338,6 +338,8 @@ class MainController extends GetxController
             case NavigationBarType.dynamics:
               dynamicController.onRefresh();
               break;
+            case NavigationBarType.history:
+              break;
             case NavigationBarType.mine:
               Get.putOrFind(MineController.new).onRefresh();
               break;
@@ -351,6 +353,8 @@ class MainController extends GetxController
           break;
         case NavigationBarType.dynamics:
           dynamicController.toTopOrRefresh();
+          break;
+        case NavigationBarType.history:
           break;
         case NavigationBarType.mine:
           Get.putOrFind(MineController.new).toTopOrRefresh();
@@ -367,6 +371,8 @@ class MainController extends GetxController
         break;
       case NavigationBarType.dynamics:
         dynamicController.toTopAndRefresh();
+        break;
+      case NavigationBarType.history:
         break;
       case NavigationBarType.mine:
         Get.putOrFind(MineController.new).toTopAndRefresh();
