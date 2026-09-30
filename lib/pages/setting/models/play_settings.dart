@@ -413,6 +413,12 @@ List<SettingsModel> get playSettings => [
       title: 'Media3 播放引擎',
       getSubtitle: () => Pref.playerEngine == 'media3' ? '已启用（音频处理/超分/截帧）' : '使用默认 media_kit',
     ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/mediaSource'),
+    leading: const Icon(Icons.rss_feed_outlined),
+    title: '订阅源管理',
+    subtitle: '动漫花园/蜜柑计划/Nyaa 等外部数据源',
+  ),
   const SwitchModel(
     title: '播放器设置仅对当前生效',
     subtitle: '弹幕、字幕及部分设置中没有的设置除外',

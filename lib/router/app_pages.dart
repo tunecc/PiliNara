@@ -71,6 +71,7 @@ import 'package:PiliPlus/pages/video/view.dart';
 import 'package:PiliPlus/pages/webdav/view.dart';
 import 'package:PiliPlus/pages/webview/view.dart';
 import 'package:PiliPlus/pages/whisper/view.dart';
+import 'package:PiliPlus/pages/media_source/view.dart';
 import 'package:PiliPlus/pages/today_recommend/view.dart';
 import 'package:PiliPlus/pages/whisper_detail/view.dart';
 import 'package:get/get.dart';
@@ -133,6 +134,7 @@ class Routes {
     GetPage(name: '/favSearch', page: () => const FavSearchPage()),
     GetPage(name: '/historySearch', page: () => const HistorySearchPage()),
     GetPage(name: '/todayRecommend', page: () => const TodayRecommendPage()),
+    GetPage(name: '/mediaSource', page: () => const MediaSourcePage()),
     GetPage(name: '/laterSearch', page: () => const LaterSearchPage()),
     GetPage(name: '/followSearch', page: () => const FollowSearchPage()),
     // 消息页面

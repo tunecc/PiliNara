@@ -1226,11 +1226,27 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     assert(!isLive || seekTo == null);
-    await player.open(
-      Media(video, start: seekTo, extras: extras.isEmpty ? null : extras),
-      play: false,
-    );
-    applyVideoPictureParameters(player);
+    // --- Media3 Engine: delegate playback to native bridge ---
+    if (isMedia3Engine && _media3Bridge != null) {
+      final url = dataSource.videoSource;
+      final headers = <String, String>{
+        'User-Agent': BrowserUa.pc,
+        'Referer': HttpString.baseUrl,
+      };
+      await _media3Bridge!.setDataSource(url, headers: headers);
+      if (seekTo != null) {
+        await _media3Bridge!.seekTo(seekTo.inMilliseconds);
+      }
+      await _media3Bridge!.setSpeed(playbackSpeed);
+      await _media3Bridge!.setVolume(volume.value);
+      debugPrint('[PlPlayer] Media3 setDataSource: $url');
+    } else {
+      await player.open(
+        Media(video, start: seekTo, extras: extras.isEmpty ? null : extras),
+        play: false,
+      );
+      applyVideoPictureParameters(player);
+    }
   }
 
   Future<void>? refreshPlayer() {
