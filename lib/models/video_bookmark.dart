@@ -2,6 +2,14 @@ import 'package:hive_ce/hive.dart';
 
 part 'video_bookmark_adapter.dart';
 
+
+enum SortType {
+  mostRecent,
+  oldest,
+  mostViewed,
+  latestAdded,
+}
+
 @HiveType(typeId: 100)
 class VideoBookmark extends HiveObject {
   static const int maxIdLength = 128;

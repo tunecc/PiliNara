@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:pili_plus/models/quality_mode.dart';
-import 'package:pili_plus/services/quality_recommendation_service.dart';
-import 'package:pili_plus/utils/storage.dart';
-import 'package:pili_plus/utils/storage_key.dart';
+import 'package:PiliPlus/models/quality_mode.dart';
+import 'package:PiliPlus/services/quality_recommendation_service.dart';
+import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:get/get.dart';
 
 typedef QualityModeReader = Object? Function();
@@ -55,7 +55,7 @@ class QualityRecommendationController {
 
   void _loadSavedMode() {
     try {
-      currentMode.value = QualityModeCodec.decode(_modeReader());
+      currentMode.value = QualityMode.decode(_modeReader());
     } catch (_) {
       currentMode.value = QualityMode.auto;
     }

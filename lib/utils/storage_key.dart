@@ -375,4 +375,14 @@ abstract final class VideoBoxKey {
       speedsList = 'speedsList',
       authorPlaySpeeds = 'authorPlaySpeeds',
       cacheVideoFit = 'cacheVideoFit';
+
+  static const playbackAccountMid = 'playbackAccountMid';
+  static const commentAccountMid = 'commentAccountMid';
+  static const enableHighQualityTrial = 'enableHighQualityTrial';
+  static const cdnAutoSelect = 'cdnAutoSelect';
+  static const cdnPreferredNode = 'cdnPreferredNode';
+
+  static const playbackStatsReady = 'playbackStatsReady';
+  static const playbackArchiveDue = 'playbackArchiveDue';
+  static const playbackArchiveId = 'playbackArchiveId';
 }

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
-import 'package:pili_plus/utils/clash_compat.dart';
+import 'package:PiliPlus/utils/clash_compat.dart'; // no-op stub
 
 /// Monitors connection failures when Clash VPN is supposed to be routing.
 ///

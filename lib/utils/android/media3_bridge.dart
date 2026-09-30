@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -16,7 +17,7 @@ class Media3Bridge {
   Stream<Map<String, dynamic>> get playerEvents => _stateController.stream;
 
   Future<void> init() async {
-    if (!defaultTargetPlatform.isAndroid) return;
+    if (!defaultPlatform.isAndroid) return;
     _eventSub = _eventChannel.receiveBroadcastStream().listen(
       (data) {
         if (data is Map) {
@@ -28,7 +29,7 @@ class Media3Bridge {
   }
 
   Future<bool> createPlayer() async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('createPlayer') ?? false;
     } catch (e) {
@@ -38,7 +39,7 @@ class Media3Bridge {
   }
 
   Future<bool> setDataSource(String url, {Map<String, String>? headers}) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setDataSource', {
         'url': url,
@@ -54,7 +55,7 @@ class Media3Bridge {
   Future<bool> pause() => _invokeBool('pause');
 
   Future<bool> seekTo(int positionMs) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('seekTo', {
         'positionMs': positionMs,
@@ -69,7 +70,7 @@ class Media3Bridge {
   Future<int> getBufferedPosition() => _invokeInt('getBufferedPosition');
 
   Future<bool> setSpeed(double speed) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setSpeed', {
         'speed': speed,
@@ -80,7 +81,7 @@ class Media3Bridge {
   }
 
   Future<bool> setVolume(double volume) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setVolume', {
         'volume': volume,
@@ -95,7 +96,7 @@ class Media3Bridge {
   // --- Audio Processing ---
 
   Future<bool> setAudioGain(double db) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setAudioGain', {
         'db': db,
@@ -106,7 +107,7 @@ class Media3Bridge {
   }
 
   Future<bool> setAudioDynamic(bool enabled, {double targetRmsDb = -16.0}) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setAudioDynamic', {
         'enabled': enabled,
@@ -123,7 +124,7 @@ class Media3Bridge {
     double gainDb = 0.0,
     double q = 1.0,
   }) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setAudioEq', {
         'enabled': enabled,
@@ -137,7 +138,7 @@ class Media3Bridge {
   }
 
   Future<bool> setSuperResolution(String mode) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>('setSuperResolution', {
         'mode': mode,
@@ -148,7 +149,7 @@ class Media3Bridge {
   }
 
   Future<Uint8List?> captureFrame() async {
-    if (!defaultTargetPlatform.isAndroid) return null;
+    if (!defaultPlatform.isAndroid) return null;
     try {
       return await _methodChannel.invokeMethod<Uint8List>('captureFrame');
     } catch (e) {
@@ -165,7 +166,7 @@ class Media3Bridge {
   }
 
   Future<bool> _invokeBool(String method) async {
-    if (!defaultTargetPlatform.isAndroid) return false;
+    if (!defaultPlatform.isAndroid) return false;
     try {
       return await _methodChannel.invokeMethod<bool>(method) ?? false;
     } catch (e) {
@@ -174,7 +175,7 @@ class Media3Bridge {
   }
 
   Future<int> _invokeInt(String method) async {
-    if (!defaultTargetPlatform.isAndroid) return 0;
+    if (!defaultPlatform.isAndroid) return 0;
     try {
       return await _methodChannel.invokeMethod<int>(method) ?? 0;
     } catch (e) {

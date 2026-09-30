@@ -59,7 +59,7 @@ final class TrafficStatsService with WidgetsBindingObserver {
 
   Future<void> _initialize() async {
     _box = await _openBox();
-    final legacy = GStorage.video.get(VideoBoxKey.trafficStats);
+    final legacy = GStorage.setting.get(SettingBoxKey.trafficStats);
     final boxData = _box!.toMap();
     if (boxData.isNotEmpty) {
       _data.addAll(
@@ -81,8 +81,8 @@ final class TrafficStatsService with WidgetsBindingObserver {
     if (await GStorage.trafficStatsFile.exists()) {
       await GStorage.trafficStatsFile.delete();
     }
-    if (GStorage.video.containsKey(VideoBoxKey.trafficStats)) {
-      await GStorage.video.delete(VideoBoxKey.trafficStats);
+    if (GStorage.setting.containsKey(SettingBoxKey.trafficStats)) {
+      await GStorage.setting.delete(SettingBoxKey.trafficStats);
     }
     WidgetsBinding.instance.addObserver(this);
     if (Platform.isWindows) {
@@ -134,7 +134,7 @@ final class TrafficStatsService with WidgetsBindingObserver {
       await _sampleWindows();
       return;
     }
-    final current = PiliAndroidHelper.trafficStats();
+    final current = null();
     if (current == null) return;
     final now = DateTime.now();
     final previous = _last;

@@ -1,9 +1,9 @@
-import 'package:pili_plus/common/widgets/dialog/export_import.dart';
-import 'package:pili_plus/common/widgets/reorder_mixin.dart';
-import 'package:pili_plus/utils/storage/favorite_order_store.dart';
+import 'package:PiliPlus/common/widgets/dialog/export_import.dart';
+import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
+import 'package:PiliPlus/utils/storage/favorite_order_store.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:pili_plus/common/widgets/scaffold/simple_scaffold.dart';
+import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 
 /// Generic local drag-sort page that persists pin + order through
 /// [FavoriteOrderStore]. Rows reorder freely by long-press; the leading pin

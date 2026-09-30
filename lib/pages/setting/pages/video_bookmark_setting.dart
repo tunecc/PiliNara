@@ -1,4 +1,5 @@
 import 'package:PiliPlus/controllers/video_bookmark_controller.dart';
+import 'package:PiliPlus/pages/video_detail_v/view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -25,7 +26,7 @@ class _State extends State<VideoBookmarkSettingPage> {
           Text('已保存 ${_ctrl.bookmarks.length} 个书签', style: Theme.of(context).textTheme.titleMedium),
           const Spacer(),
           if (_ctrl.bookmarks.isNotEmpty)
-            TextButton(onPressed: _ctrl.clearAll, child: const Text('清空全部')),
+            TextButton(onPressed: _ctrl.clearAllBookmarks, child: const Text('清空全部')),
         ])),
         Expanded(child: _ctrl.bookmarks.isEmpty
           ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -44,8 +45,8 @@ class _State extends State<VideoBookmarkSettingPage> {
                   leading: CircleAvatar(child: Text('${index + 1}')),
                   title: Text(bm.title ?? '未知视频'),
                   subtitle: Text('BV: ${bm.bvid ?? "?"} · ${bm.createdAt?.toString().substring(0, 16) ?? "?"}'),
-                  trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _ctrl.removeBookmark(index)),
-                  onTap: () => _ctrl.navigateToBookmark(bm),
+                  trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _ctrl.deleteBookmark(bm)),
+                  onTap: () => Get.to(() => const VideoDetailPageV(bvid: bm.bvid)),
                 );
               },
             ),

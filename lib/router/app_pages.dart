@@ -99,7 +99,6 @@ GetPage(name: '/pictureEnhance', page: () => const PictureEnhanceSettingPage()),
 GetPage(name: '/cdnSetting', page: () => const CdnSettingPage()),
 GetPage(name: '/favFolderSort', page: () => const FavFolderSortPage()),
 GetPage(name: '/favSort', page: () => const FavSortPage()),
-GetPage(name: '/favCreate', page: () => const FavCreatePage()),
 GetPage(name: '/coinLog', page: () => const CoinLogPage()),
 GetPage(name: '/', page: () => const MainApp()),
     // 首页(推荐)

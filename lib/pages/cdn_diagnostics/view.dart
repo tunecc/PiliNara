@@ -51,8 +51,7 @@ class _CdnDiagnosticsPageState extends State<CdnDiagnosticsPage> {
                   subtitle: Text(r.success
                       ? '${(r.throughputMbps ?? 0).toStringAsFixed(1)} Mbps · TTFB ${r.ttfbMs ?? 0}ms · DNS ${r.dnsMs ?? 0}ms'
                       : r.errorMessage ?? 'Unknown error'),
-                  trailing: r.success ? Text('${(r.throughputMbps ?? 0).toStringAsFixed(1)}
-Mbps', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium) : null,
+                  trailing: r.success ? Text('${(r.throughputMbps ?? 0).toStringAsFixed(1)} Mbps', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium) : null,
                 ),
               );
             },

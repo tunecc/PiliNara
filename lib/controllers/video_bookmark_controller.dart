@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
-import 'package:pili_plus/models/video_bookmark.dart';
-import 'package:pili_plus/services/video_bookmark_service.dart';
+import 'package:PiliPlus/models/video_bookmark.dart';
+import 'package:PiliPlus/services/video_bookmark_service.dart';
 
 class VideoBookmarkController extends GetxController {
   final RxList<VideoBookmark> bookmarks = <VideoBookmark>[].obs;

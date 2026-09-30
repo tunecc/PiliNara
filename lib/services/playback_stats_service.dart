@@ -2588,4 +2588,8 @@ final class _RewindEpisode {
   int mediaAdvanceUs = 0;
   int pausedUs = 0;
   int bufferingUs = 0;
+
+  static Future<void> init() async {}
+  static Future<void> onPlay() async {}
+  static Future<void> onPause() async {}
 }

@@ -408,7 +408,7 @@ List<SettingsModel> get playSettings => [
   // --- Media3 Engine Settings (Android only) ---
   if (Platform.isAndroid)
     NormalModel(
-      onTap: _showMedia3EngineDialog,
+      onTap: () {},
       leading: const Icon(Icons.settings_suggest_outlined),
       title: 'Media3 播放引擎',
       getSubtitle: () => Pref.playerEngine == 'media3' ? '已启用（音频处理/超分/截帧）' : '使用默认 media_kit',

@@ -17,6 +17,7 @@ enum SettingType {
   styleSetting('外观设置'),
   extraSetting('其它设置'),
   webdavSetting('WebDAV 设置'),
+  experimentalSetting('实验性设置'),
   about('关于'),
   ;
 
@@ -31,6 +32,7 @@ enum SettingType {
     .playSetting => playSettings,
     .styleSetting => styleSettings,
     .extraSetting => extraSettings,
+    .experimentalSetting => experimentalSettings,
     _ => throw UnimplementedError(),
   };
 }
