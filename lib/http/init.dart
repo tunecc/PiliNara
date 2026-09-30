@@ -1,3 +1,4 @@
+import 'package:PiliPlus/http/connection_failover_interceptor.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -39,6 +40,7 @@ class Request {
   static void setCookie() {
     accountManager = AccountManager();
     dio.interceptors.add(accountManager);
+    dio.interceptors.add(ConnectionFailoverInterceptor());
     Accounts.refresh();
     LoginUtils.setWebCookie();
 

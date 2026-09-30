@@ -231,6 +231,18 @@ List<SettingsModel> get videoSettings => [
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: _showHwDecDialog,
   ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/qualityRecommend'),
+    leading: const Icon(Icons.auto_fix_high_outlined),
+    title: '智能画质推荐',
+    subtitle: '根据网络和设备自动推荐最佳画质',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/videoBookmark'),
+    leading: const Icon(Icons.bookmark_outline),
+    title: '视频书签管理',
+    subtitle: '查看和管理已收藏的视频时间点',
+  ),
 ];
 
 Future<void> _showCDNDialog(BuildContext context, VoidCallback setState) async {

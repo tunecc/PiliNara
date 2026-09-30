@@ -1,3 +1,5 @@
+import 'package:PiliPlus/pages/setting/pages/video_bookmark_setting.dart';
+import 'package:PiliPlus/pages/setting/pages/quality_recommend_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/account_usage_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/picture_enhance_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/cdn_setting.dart';
@@ -90,7 +92,9 @@ import 'package:get/get.dart';
 
 class Routes {
   static final List<GetPage<dynamic>> getPages = [
-                                GetPage(name: '/accountUsage', page: () => const AccountUsageSettingPage()),
+                                        GetPage(name: '/videoBookmark', page: () => const VideoBookmarkSettingPage()),
+GetPage(name: '/qualityRecommend', page: () => const QualityRecommendSettingPage()),
+GetPage(name: '/accountUsage', page: () => const AccountUsageSettingPage()),
 GetPage(name: '/pictureEnhance', page: () => const PictureEnhanceSettingPage()),
 GetPage(name: '/cdnSetting', page: () => const CdnSettingPage()),
 GetPage(name: '/favFolderSort', page: () => const FavFolderSortPage()),
