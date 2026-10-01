@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:PiliPlus/models/model_owner.dart';
+import 'package:PiliPlus/models/video_bookmark.dart';
 import 'package:PiliPlus/models/user/danmaku_rule_adapter.dart';
 import 'package:PiliPlus/models/user/info.dart';
 import 'package:PiliPlus/utils/accounts.dart';
