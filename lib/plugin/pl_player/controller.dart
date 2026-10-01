@@ -74,7 +74,6 @@ import 'package:screen_brightness_platform_interface/screen_brightness_platform_
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:PiliPlus/plugin/pl_player/models/auto_audio_only_state.dart';
-import 'package:PiliPlus/utils/android/media3_bridge.dart';
 import 'package:PiliPlus/services/playback_stats_service.dart';
 
 typedef PlayCallback = Future<void>? Function();
@@ -1085,44 +1084,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     ]);
   }
 
-  // Media3 bridge instance (Android only, when engine is set to media3)
-  Media3Bridge? _media3Bridge;
-  // The media3 path never binds a Surface, so it cannot render video. Keep the
-  // bridge around for a future implementation but always use media_kit.
-  bool get isMedia3Engine => false;
 
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);
-
-    // --- Media3 Engine Path (Android only) ---
-    if (isMedia3Engine) {
-      _media3Bridge = Media3Bridge();
-      await _media3Bridge!.init();
-      final created = await _media3Bridge!.createPlayer();
-      if (created) {
-        // Apply saved audio/super-res settings
-        await _media3Bridge!.setAudioGain(Pref.media3AudioGainDb);
-        await _media3Bridge!.setAudioDynamic(
-          Pref.media3AudioDynamic,
-          targetRmsDb: Pref.media3AudioTargetRmsDb,
-        );
-        if (Pref.media3AudioEqEnabled) {
-          await _media3Bridge!.setAudioEq(
-            true,
-            freqHz: Pref.media3AudioEqFreqHz,
-            gainDb: Pref.media3AudioEqGainDb,
-            q: Pref.media3AudioEqQ,
-          );
-        }
-        await _media3Bridge!.setSuperResolution(Pref.media3SuperResolution);
-        debugPrint('[PlPlayer] Media3 engine initialized with audio/super-res settings');
-      } else {
-        debugPrint('[PlPlayer] Media3 init failed, falling back to media_kit');
-        _media3Bridge?.dispose();
-        _media3Bridge = null;
-      }
-    }
-
 
     // Initialize playback stats tracking
     try {
@@ -1247,27 +1211,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
 
     assert(!isLive || seekTo == null);
-    // --- Media3 Engine: delegate playback to native bridge ---
-    if (isMedia3Engine && _media3Bridge != null) {
-      final url = dataSource.videoSource;
-      final headers = <String, String>{
-        'User-Agent': BrowserUa.pc,
-        'Referer': HttpString.baseUrl,
-      };
-      await _media3Bridge!.setDataSource(url, headers: headers);
-      if (seekTo != null) {
-        await _media3Bridge!.seekTo(seekTo.inMilliseconds);
-      }
-      await _media3Bridge!.setSpeed(playbackSpeed);
-      await _media3Bridge!.setVolume(this.volume.value);
-      debugPrint('[PlPlayer] Media3 setDataSource: $url');
-    } else {
-      await player.open(
-        Media(video, start: seekTo, extras: extras.isEmpty ? null : extras),
-        play: false,
-      );
-      applyVideoPictureParameters(player);
-    }
+    await player.open(
+      Media(video, start: seekTo, extras: extras.isEmpty ? null : extras),
+      play: false,
+    );
+    applyVideoPictureParameters(player);
   }
 
   Future<void>? refreshPlayer() {
