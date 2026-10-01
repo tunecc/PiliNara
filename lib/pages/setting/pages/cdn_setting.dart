@@ -1,5 +1,5 @@
 import 'package:PiliPlus/http/cdn_manager.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 class CdnSettingPage extends StatefulWidget {
   const CdnSettingPage({super.key});
   @override State<CdnSettingPage> createState() => _S();

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';

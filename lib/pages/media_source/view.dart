@@ -1,7 +1,7 @@
 import 'package:PiliPlus/pages/media_source/controller.dart';
 import 'package:PiliPlus/services/media_source/kazumi_plugin.dart';
 import 'package:PiliPlus/services/media_source/rss_media_source.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 

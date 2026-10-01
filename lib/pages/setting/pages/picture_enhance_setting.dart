@@ -3,7 +3,7 @@ import 'package:PiliPlus/plugin/pl_player/models/video_output_type.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
 class PictureEnhanceSettingPage extends StatefulWidget {

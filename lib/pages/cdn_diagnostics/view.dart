@@ -1,6 +1,6 @@
 import 'package:PiliPlus/pages/cdn_diagnostics/controller.dart';
 import 'package:PiliPlus/services/cdn_diagnostics_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
 class CdnDiagnosticsPage extends StatefulWidget {

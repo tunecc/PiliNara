@@ -5,7 +5,7 @@ import 'package:PiliPlus/pages/today_recommend/controller.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
 class TodayRecommendPage extends StatefulWidget {

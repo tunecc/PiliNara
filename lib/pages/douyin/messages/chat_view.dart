@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:PiliPlus/services/douyin/douyin_message_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class DouyinChatPage extends StatefulWidget {
   final String conversationId, peerName;

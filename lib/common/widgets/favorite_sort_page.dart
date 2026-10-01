@@ -1,7 +1,7 @@
 import 'package:PiliPlus/common/widgets/dialog/export_import.dart';
 import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
 import 'package:PiliPlus/utils/storage/favorite_order_store.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 

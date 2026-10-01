@@ -1,6 +1,6 @@
 import 'package:PiliPlus/controllers/video_bookmark_controller.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
 class VideoBookmarkSettingPage extends StatefulWidget {
