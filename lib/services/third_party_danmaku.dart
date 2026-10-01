@@ -86,12 +86,53 @@ abstract final class ThirdPartyDanmakuService {
     String keyword,
     int? episode,
   ) async {
-    final appId = Pref.dandanplayAppId;
-    final appSecret = Pref.dandanplayAppSecret;
-    if (appId.isEmpty || appSecret.isEmpty) {
-      // The public API requires an application id/signature pair.
-      logger.w('dandanplay skipped: no appId/appSecret configured');
+    // 使用公共API，无需凭据
+    try {
+      final search = await _dio.get<dynamic>(
+        'https://api.dandanplay.net/api/v2/search/episodes',
+        queryParameters: {'anime': keyword},
+      );
+      final data = search.data;
+      final animes = data is Map ? (data['animes'] as List?) : null;
+      if (animes == null || animes.isEmpty) return const [];
+
+      final target = _pickEpisode(animes, episode);
+      if (target == null) return const [];
+      final episodeId = (target['episodeId'] as num?)?.toInt();
+      if (episodeId == null) return const [];
+
+      final comment = await _dio.get<dynamic>(
+        'https://api.dandanplay.net/api/v2/comment/$episodeId',
+        queryParameters: {'withRelated': 'true'},
+      );
+      final body = comment.data;
+      final comments = body is Map ? (body['comments'] as List?) : null;
+      if (comments == null) return const [];
+      final result = <DanmakuElem>[];
+      for (final c in comments) {
+        if (c is! Map) continue;
+        final p = c['p']?.toString() ?? '';
+        final parts = p.split(',');
+        if (parts.length < 3) continue;
+        final seconds = double.tryParse(parts[0]) ?? 0;
+        final mode = int.tryParse(parts[1]) ?? 1;
+        final color = int.tryParse(parts[2]) ?? 0xFFFFFF;
+        result.add(
+          DanmakuElem(
+            content: c['m']?.toString() ?? '',
+            progress: (seconds * 1000).round(),
+            mode: mode,
+            fontsize: 25,
+            color: color,
+          ),
+        );
+      }
+      return result;
+    } catch (e) {
+      logger.w('dandanplay danmaku failed: $e');
       return const [];
+    }
+  };
     }
     try {
       final headers = _dandanplayHeaders(appId, appSecret);

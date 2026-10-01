@@ -1833,6 +1833,12 @@ abstract final class Pref {
   // === Experimental (visual effects + network) ===
   static bool get enableDoh =>
       _setting.get(SettingBoxKey.enableDoh, defaultValue: false);
+
+  static bool get enableDandanplay =>
+      _setting.get(SettingBoxKey.enableDandanplay, defaultValue: false);
+  static bool get enableGamerDanmaku =>
+      _setting.get(SettingBoxKey.enableGamerDanmaku, defaultValue: false);
+
   static bool get experimentalLiquidGlass => _setting.get(
     SettingBoxKey.experimentalLiquidGlass,
     defaultValue: false,

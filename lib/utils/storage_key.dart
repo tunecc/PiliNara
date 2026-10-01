@@ -355,6 +355,11 @@ abstract final class SettingBoxKey {
       enableDoh = 'enableDoh',
       enableHighQualityTrial = 'enableHighQualityTrial',
       experimentalAmoledBlack = 'experimentalAmoledBlack',
+
+  // 第三方弹幕源
+  enableDandanplay = 'enableDandanplay',
+  enableGamerDanmaku = 'enableGamerDanmaku',
+
       experimentalBlurBackdrop = 'experimentalBlurBackdrop',
       experimentalCardAnimation = 'experimentalCardAnimation',
       experimentalCompactMode = 'experimentalCompactMode',
