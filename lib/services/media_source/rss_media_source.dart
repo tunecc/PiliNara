@@ -25,5 +25,29 @@ class RssMediaSource extends MediaSource {
   String? _res(String t) { for (final p in [RegExp(r'(\d{3,4}[pP])'), RegExp(r'(4[Kk]|UHD|2160)')]) { final m = p.firstMatch(t); if (m != null) return m.group(0); } return null; }
   String? _sg(String t) { final m = RegExp(r'^\[([^\]]+)\]').firstMatch(t.trim()); return m?.group(1); }
   void dispose() { _dio.close(); }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': metadata.name,
+    'feedUrlTemplate': feedUrlTemplate,
+    'tier': tier,
+    'enabled': enabled,
+    if (metadata.iconUrl != null) 'iconUrl': metadata.iconUrl,
+  };
+
+  static RssMediaSource? fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String?;
+    final name = json['name'] as String?;
+    final url = json['feedUrlTemplate'] as String?;
+    if (id == null || name == null || url == null) return null;
+    return RssMediaSource(
+      id: id,
+      name: name,
+      feedUrlTemplate: url,
+      tier: (json['tier'] as num?)?.toInt() ?? 1,
+      enabled: json['enabled'] as bool? ?? true,
+      iconUrl: json['iconUrl'] as String?,
+    );
+  }
 }
 class BuiltInSources { static List<RssMediaSource> defaults() => [ RssMediaSource(id: 'dmhy', name: '动漫花园', feedUrlTemplate: 'https://share.dmhy.org/topics/rss/rss.xml?keyword={query}', tier: 1), RssMediaSource(id: 'mikan', name: '蜜柑计划', feedUrlTemplate: 'https://mikanani.me/RSS/Search?searchstr={query}', tier: 1), RssMediaSource(id: 'nyaa', name: 'Nyaa', feedUrlTemplate: 'https://nyaa.si/?page=rss&q={query}&c=1_2&f=0', tier: 2), ]; }

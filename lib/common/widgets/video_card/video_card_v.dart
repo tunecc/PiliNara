@@ -16,6 +16,7 @@ import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/global_data.dart';
+import 'package:get/get.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:intl/intl.dart';
@@ -215,10 +216,13 @@ class VideoCardV extends StatelessWidget {
                 Expanded(
                   flex: 1,
                   child: GestureDetector(
-                    onTap: () {
-                      final mid = videoItem.owner.mid;
-                      if (mid != null) Get.toNamed('/member?mid=$mid');
-                    },
+                    behavior: HitTestBehavior.opaque,
+                    onTap: videoItem.goto == 'av' &&
+                            (videoItem.owner.mid ?? 0) > 0
+                        ? () => Get.toNamed(
+                            '/member?mid=${videoItem.owner.mid}',
+                          )
+                        : null,
                     child: Text(
                       remarkedName(
                         videoItem.owner.mid,

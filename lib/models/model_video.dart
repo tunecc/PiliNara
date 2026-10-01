@@ -32,6 +32,7 @@ class Stat extends BaseStat {
     view = json["view"];
     like = json["like"];
     danmu = json['danmaku'];
+    reply = json['reply'];
   }
 }
 
