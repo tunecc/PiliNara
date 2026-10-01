@@ -1,4 +1,5 @@
 import 'package:PiliPlus/pages/media_source/controller.dart';
+import 'package:PiliPlus/pages/media_source/search_view.dart';
 import 'package:PiliPlus/services/media_source/kazumi_plugin.dart';
 import 'package:PiliPlus/services/media_source/rss_media_source.dart';
 import 'package:material_ui/material_ui.dart';
@@ -22,6 +23,11 @@ class _MediaSourcePageState extends State<MediaSourcePage> {
       appBar: AppBar(
         title: const Text('订阅源管理'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '搜索外部源',
+            onPressed: _searchExternal,
+          ),
           IconButton(
             icon: const Icon(Icons.cloud_sync_outlined),
             tooltip: '同步 Kazumi 规则',
@@ -128,6 +134,36 @@ class _MediaSourcePageState extends State<MediaSourcePage> {
       ),
       onLongPress: canDelete ? () => _ctrl.removeSource(src.id) : null,
     );
+  }
+
+  Future<void> _searchExternal() async {
+    final controller = TextEditingController();
+    final keyword = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('搜索外部源'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '番剧 / 视频标题',
+            hintText: '例如：孤独摇滚',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('搜索'),
+          ),
+        ],
+      ),
+    );
+    if (keyword == null || keyword.isEmpty) return;
+    Get.to(() => MediaSourceSearchPage(keyword: keyword));
   }
 
   Future<void> _syncPlugins() async {
