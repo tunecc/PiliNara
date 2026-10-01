@@ -4,36 +4,14 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager.LayoutParams
+import com.example.pilinara.media3.ExoPlayerPlugin
 import com.ryanheise.audioservice.AudioServiceActivity
-import com.example.pilinara.media3.Media3MethodHandler
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
-    private lateinit var methodChannel: MethodChannel
-    private var media3Handler: Media3MethodHandler? = null
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "PiliNara")
-        methodChannel.setMethodCallHandler { call, result ->
-            when (call.method) {
-                else -> result.notImplemented()
-            }
-        }
-
-        // Register Media3 bridge on separate channel
-        media3Handler = Media3MethodHandler(
-            applicationContext,
-            flutterEngine.dartExecutor.binaryMessenger
-        )
-    }
-
-    override fun onDestroy() {
-        media3Handler?.dispose()
-        media3Handler = null
-        super.onDestroy()
+        ExoPlayerPlugin.registerWith(flutterEngine)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -62,6 +40,6 @@ class MainActivity : AudioServiceActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         AndroidHelper.isPipMode = isInPictureInPictureMode
-        methodChannel.invokeMethod("onPipChanged", isInPictureInPictureMode)
+        AndroidHelper.ToDart.onPipChanged?.invoke(isInPictureInPictureMode)
     }
 }
