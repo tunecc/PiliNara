@@ -1,4 +1,6 @@
 import 'package:PiliPlus/models/common/enum_with_label.dart';
+import 'package:PiliPlus/pages/bangumi/controller.dart';
+import 'package:PiliPlus/pages/bangumi/view.dart';
 import 'package:PiliPlus/pages/common/common_controller.dart';
 import 'package:PiliPlus/pages/hot/controller.dart';
 import 'package:PiliPlus/pages/hot/view.dart';
@@ -23,6 +25,7 @@ enum HomeTabType implements EnumWithLabel {
   bangumi('番剧'),
   cinema('影视'),
   todayRecommend('今日推荐'),
+  bangumiSchedule('订阅'),
   ;
 
   @override
@@ -37,6 +40,7 @@ enum HomeTabType implements EnumWithLabel {
     HomeTabType.bangumi ||
     HomeTabType.cinema => () => Get.find<PgcController>(tag: name),
     HomeTabType.todayRecommend => Get.find<TodayRecommendController>,
+    HomeTabType.bangumiSchedule => Get.find<BangumiController>,
   };
 
   Widget get page => switch (this) {
@@ -47,5 +51,6 @@ enum HomeTabType implements EnumWithLabel {
     HomeTabType.bangumi => const PgcPage(tabType: HomeTabType.bangumi),
     HomeTabType.cinema => const PgcPage(tabType: HomeTabType.cinema),
     HomeTabType.todayRecommend => const TodayRecommendPage(),
+    HomeTabType.bangumiSchedule => const BangumiPage(),
   };
 }
