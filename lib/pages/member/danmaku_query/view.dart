@@ -1,7 +1,7 @@
 import 'package:PiliPlus/http/member_query.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:get/get.dart';
-import 'package:material_ui/material_ui.dart' hide Scaffold, AppBar, TabBar, TabController, TabBarView, Card, ListTile;
+import 'package:material_ui/material_ui.dart';
 
 class MemberDanmakuQueryPage extends StatefulWidget {
   const MemberDanmakuQueryPage({super.key, required this.mid});
@@ -13,7 +13,7 @@ class MemberDanmakuQueryPage extends StatefulWidget {
 
 class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 2, vsync: this);
+  late TabController _tab;
   final RxnString _error = RxnString();
   final RxBool _loading = false.obs;
   final RxList<Map<String, dynamic>> _comments = <Map<String, dynamic>>[].obs;
@@ -26,6 +26,7 @@ class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
   @override
   void initState() {
     super.initState();
+    _tab = TabController(length: 2, vsync: this);
     _tab.addListener(_onTabChanged);
     _loadComments();
   }

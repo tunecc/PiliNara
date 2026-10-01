@@ -1001,9 +1001,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         }
         _removeListeners();
         _videoPlayerController?.dispose();
-        _media3Bridge?.release();
-    _media3Bridge?.dispose();
-    _media3Bridge = null;
     _videoPlayerController = null;
         _videoController = null;
         return;
