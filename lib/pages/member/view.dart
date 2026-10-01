@@ -452,7 +452,7 @@ class _MemberPageState extends State<MemberPage> {
         PopupMenuItem(
           onTap: () => Get.to(
             MemberDanmakuQueryPage(mid: _mid),
-            transition: Transition.zoom,
+            
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
