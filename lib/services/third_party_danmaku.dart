@@ -1,11 +1,9 @@
-import 'dart:convert';
 import 'dart:math' show max;
 
 import 'package:PiliPlus/grpc/bilibili/community/service/dm/v1.pb.dart';
 import 'package:PiliPlus/models/common/danmaku_source.dart';
 import 'package:PiliPlus/services/logger.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 
 /// Fetches danmaku from third-party libraries and converts them to the
