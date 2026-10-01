@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 
 /// A Kazumi-style search/parse rule, mirroring Kazumi's `Plugin` schema.
 class KazumiPlugin {
-  const KazumiPlugin({
+  KazumiPlugin({
     required this.name,
     this.api = '4',
     this.type = 'anime',
