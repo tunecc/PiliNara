@@ -9,6 +9,7 @@ import 'package:PiliPlus/models_new/reply2reply/data.dart';
 import 'package:PiliPlus/models_new/reply_interaction/data.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
@@ -17,6 +18,24 @@ abstract final class ReplyHttp {
     headers: {...Constants.baseHeaders, 'cookie': ''},
     extra: {'account': const NoAccount()},
   );
+
+  /// Options that honour the "评论账号" preference.
+  ///
+  /// 0 = default routing (unchanged), -1 = guest, >0 = that account's mid.
+  static Options? commentOptions(bool isLogin) {
+    final mid = Pref.commentAccountMid;
+    if (mid == 0) return isLogin ? null : options;
+    final Account account = mid == -1
+        ? AnonymousAccount()
+        : (Accounts.account.values
+                  .where((a) => a.mid == mid)
+                  .firstOrNull ??
+              Accounts.main);
+    return Options(
+      headers: {...Constants.baseHeaders},
+      extra: {'account': account},
+    );
+  }
 
   static Future<LoadingState<ReplyData>> replyList({
     required bool isLogin,
@@ -36,7 +55,7 @@ abstract final class ReplyHttp {
                   '{"offset":"${nextOffset.replaceAll('"', '\\"')}"}',
               'mode': sort + 2, //2:按时间排序；3：按热度排序
             },
-            options: !isLogin ? options : null,
+            options: commentOptions(isLogin),
           )
         : await Request().get(
             Api.replyList,
@@ -47,7 +66,7 @@ abstract final class ReplyHttp {
               'pn': page,
               'ps': 20,
             },
-            options: !isLogin ? options : null,
+            options: commentOptions(isLogin),
           );
     if (res.data['code'] == 0) {
       return Success(ReplyData.fromJson(res.data['data']));
@@ -74,7 +93,7 @@ abstract final class ReplyHttp {
         'sort': 1,
         if (isLogin) 'csrf': Accounts.main.csrf,
       },
-      options: !isLogin ? options : null,
+      options: commentOptions(isLogin),
     );
     if (res.data['code'] == 0) {
       ReplyReplyData replyData = ReplyReplyData.fromJson(res.data['data']);
