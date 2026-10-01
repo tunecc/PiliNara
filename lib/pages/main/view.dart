@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/constants.dart';
@@ -379,6 +380,16 @@ class _MainAppState extends PopScopeState<MainApp>
                   ),
                 )
                 .toList(),
+          ),
+        );
+      }
+
+      if (Pref.experimentalLiquidGlass || Pref.experimentalBlurBackdrop) {
+        // Frosted-glass navigation bar: blur whatever scrolls behind it.
+        bottomNav = ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: bottomNav,
           ),
         );
       }

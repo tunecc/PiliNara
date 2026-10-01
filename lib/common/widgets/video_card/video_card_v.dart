@@ -89,7 +89,7 @@ class VideoCardV extends StatelessWidget {
       cover: videoItem.cover,
       bvid: videoItem.bvid,
     );
-    return Stack(
+    final card = Stack(
       clipBehavior: Clip.none,
       children: [
         Card(
@@ -162,13 +162,27 @@ class VideoCardV extends StatelessWidget {
           ),
       ],
     );
+    if (!Pref.experimentalCardAnimation) return card;
+    // Fade + slight scale entrance so cards settle in instead of popping.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.scale(scale: 0.97 + 0.03 * value, child: child),
+      ),
+      child: card,
+    );
   }
 
   Widget content(BuildContext context) {
     final theme = Theme.of(context);
     return Expanded(
       child: Padding(
-        padding: const .fromLTRB(6, 5, 6, 5),
+        padding: Pref.experimentalCompactMode
+            ? const .fromLTRB(4, 3, 4, 3)
+            : const .fromLTRB(6, 5, 6, 5),
         child: Column(
           crossAxisAlignment: .start,
           children: [

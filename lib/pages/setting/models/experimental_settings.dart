@@ -16,7 +16,7 @@ List<SettingsModel> get experimentalSettings => [
 
   const SwitchModel(
     title: '液态玻璃效果',
-    subtitle: '参考 Kototoro AndroidLiquidGlass，为卡片和导航栏添加毛玻璃背景模糊（尚未实现）',
+    subtitle: '参考 Kototoro AndroidLiquidGlass，为卡片和导航栏添加毛玻璃背景模糊（重启应用后生效）',
     leading: Icon(Icons.blur_on_outlined),
     setKey: SettingBoxKey.experimentalLiquidGlass,
     defaultVal: false,
@@ -24,7 +24,7 @@ List<SettingsModel> get experimentalSettings => [
 
   const SwitchModel(
     title: '背景模糊蒙层',
-    subtitle: '参考 bilipai 磨砂玻璃风格，弹窗/底栏/Tab栏启用高斯模糊背景（尚未实现）',
+    subtitle: '参考 bilipai 磨砂玻璃风格，弹窗/底栏/Tab栏启用高斯模糊背景（重启应用后生效）',
     leading: Icon(Icons.layers_outlined),
     setKey: SettingBoxKey.experimentalBlurBackdrop,
     defaultVal: false,
@@ -43,7 +43,7 @@ List<SettingsModel> get experimentalSettings => [
 
   const SwitchModel(
     title: '卡片展开动画',
-    subtitle: '参考 PiliMax，统一卡片展开与骨架入场过渡效果（尚未实现）',
+    subtitle: '参考 PiliMax，统一卡片展开与骨架入场过渡效果',
     leading: Icon(Icons.animation_outlined),
     setKey: SettingBoxKey.experimentalCardAnimation,
     defaultVal: false,
@@ -51,7 +51,7 @@ List<SettingsModel> get experimentalSettings => [
 
   const SwitchModel(
     title: 'Material You 动态取色',
-    subtitle: '从壁纸或系统主题自动提取主色调应用到整个应用（尚未实现）',
+    subtitle: '从壁纸或系统主题自动提取主色调应用到整个应用',
     leading: Icon(Icons.palette_outlined),
     setKey: SettingBoxKey.experimentalDynamicColor,
     defaultVal: false,
@@ -62,7 +62,7 @@ List<SettingsModel> get experimentalSettings => [
 
   const SwitchModel(
     title: '紧凑模式',
-    subtitle: '减小卡片间距、字体和内边距，单屏展示更多内容（尚未实现）',
+    subtitle: '减小卡片间距、字体和内边距，单屏展示更多内容',
     leading: Icon(Icons.view_compact_outlined),
     setKey: SettingBoxKey.experimentalCompactMode,
     defaultVal: false,

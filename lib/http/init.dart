@@ -42,7 +42,7 @@ class Request {
     accountManager = AccountManager();
     dio.interceptors.add(accountManager);
     dio.interceptors.add(ConnectionFailoverInterceptor());
-    Accounts.refresh();
+    Accounts.refresh().then((_) => Accounts.applyPreferredVideoAccount());
     LoginUtils.setWebCookie();
 
     if (Accounts.main.isLogin) {

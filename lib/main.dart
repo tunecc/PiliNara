@@ -264,7 +264,9 @@ class MyApp extends StatelessWidget {
   static ColorScheme? _light, _dark;
 
   static (ThemeData, ThemeData) getAllTheme() {
-    final dynamicColor = _light != null && _dark != null && Pref.dynamicColor;
+    final dynamicColor = _light != null &&
+        _dark != null &&
+        (Pref.dynamicColor || Pref.experimentalDynamicColor);
 
     final ColorScheme lightScheme, darkScheme;
     if (dynamicColor) {
