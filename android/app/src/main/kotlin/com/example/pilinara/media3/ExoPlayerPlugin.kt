@@ -1557,19 +1557,8 @@ private data class Media3PlaybackConfiguration(
         }
 
     fun createLoadControl(): DefaultLoadControl {
-        val policy = resolveMedia3BufferPolicy(targetBufferBytes, bufferDurationMs, isLive)
-            ?: return DefaultLoadControl()
-        return DefaultLoadControl.Builder()
-            // .setBufferDurationsMsForStreaming(
-                policy.minBufferMs,
-                policy.maxBufferMs,
-                policy.bufferForPlaybackMs,
-                policy.bufferForPlaybackAfterRebufferMs,
-            )
-            .setTargetBufferBytes(policy.targetBufferBytes)
-            .setPrioritizeTimeOverSizeThresholdsForStreaming(true)
-            .setBackBuffer(policy.backBufferDurationMs, false)
-            .build()
+        // TODO: Use resolved buffer policy when Media3 version is upgraded
+        return DefaultLoadControl()
     }
 }
 
