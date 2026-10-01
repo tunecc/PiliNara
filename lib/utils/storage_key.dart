@@ -367,7 +367,9 @@ abstract final class SettingBoxKey {
       trafficStats = 'trafficStats',
       videoQualityMode = 'videoQualityMode',
       mediaSourceCustom = 'mediaSourceCustom',
-      mediaSourceDisabled = 'mediaSourceDisabled';
+      mediaSourceDisabled = 'mediaSourceDisabled',
+      videoOutput = 'videoOutput',
+      enableSdr2Hdr = 'enableSdr2Hdr';
 }
 
 abstract final class LocalCacheKey {

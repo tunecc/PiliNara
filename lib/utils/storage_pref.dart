@@ -47,6 +47,7 @@ import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/login_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/plugin/pl_player/models/video_output_type.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:crypto/crypto.dart';
@@ -1856,4 +1857,17 @@ abstract final class Pref {
     SettingBoxKey.experimentalCompactMode,
     defaultValue: false,
   );
+
+  static VideoOutputType get videoOutput => VideoOutputType.fromValue(
+    _setting.get(SettingBoxKey.videoOutput),
+  );
+
+  static set videoOutput(VideoOutputType value) =>
+      _setting.put(SettingBoxKey.videoOutput, value.value);
+
+  static bool get enableSdr2Hdr =>
+      _setting.get(SettingBoxKey.enableSdr2Hdr, defaultValue: false);
+
+  static set enableSdr2Hdr(bool value) =>
+      _setting.put(SettingBoxKey.enableSdr2Hdr, value);
 }

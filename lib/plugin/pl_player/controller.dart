@@ -22,6 +22,7 @@ import 'package:PiliPlus/pages/setting/models/play_settings.dart'
     show kMaxVolume;
 import 'package:PiliPlus/pages/sponsor_block/block_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
+import 'package:PiliPlus/plugin/pl_player/models/video_output_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_seek_layout.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
@@ -1042,7 +1043,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     return shadersDirPath = await AssetUtils.getOrCopy(
       'assets/shaders',
-      Assets.mpvAnime4KShaders.followedBy(Assets.mpvAnime4KShadersLite),
+      Assets.mpvAnime4KShaders
+          .followedBy(Assets.mpvAnime4KShadersLite)
+          .followedBy(Assets.sdr2HdrShaders),
       path.join(appSupportDirPath, 'anime_shaders'),
     );
   }
@@ -1060,30 +1063,26 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       }
     }
     pp ??= _videoPlayerController!;
-    switch (type) {
-      case SuperResolutionType.disable:
-        return pp.command(const ['change-list', 'glsl-shaders', 'clr', '']);
-      case SuperResolutionType.efficiency:
-        return pp.command([
-          'change-list',
-          'glsl-shaders',
-          'set',
-          PathUtils.buildShadersAbsolutePath(
-            await copyShadersToExternalDirectory,
-            Assets.mpvAnime4KShadersLite,
-          ),
-        ]);
-      case SuperResolutionType.quality:
-        return pp.command([
-          'change-list',
-          'glsl-shaders',
-          'set',
-          PathUtils.buildShadersAbsolutePath(
-            await copyShadersToExternalDirectory,
-            Assets.mpvAnime4KShaders,
-          ),
-        ]);
+    final dir = await copyShadersToExternalDirectory;
+    // mediacodec-embed renders inside the decoder surface, so mpv shaders
+    // cannot be applied on top of it.
+    final shaders = <String>[
+      if (Pref.videoOutput != VideoOutputType.mediacodecEmbed) ...switch (type) {
+        SuperResolutionType.disable => const <String>[],
+        SuperResolutionType.efficiency => Assets.mpvAnime4KShadersLite,
+        SuperResolutionType.quality => Assets.mpvAnime4KShaders,
+      },
+      if (Pref.enableSdr2Hdr) ...Assets.sdr2HdrShaders,
+    ];
+    if (shaders.isEmpty) {
+      return pp.command(const ['change-list', 'glsl-shaders', 'clr', '']);
     }
+    return pp.command([
+      'change-list',
+      'glsl-shaders',
+      'set',
+      PathUtils.buildShadersAbsolutePath(dir, shaders),
+    ]);
   }
 
   // Media3 bridge instance (Android only, when engine is set to media3)
@@ -1165,6 +1164,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         enableHardwareAcceleration: hwdec != null,
         androidAttachSurfaceAfterVideoParameters: false,
         hwdec: hwdec,
+        vo: Pref.videoOutput.value,
       ),
     );
 

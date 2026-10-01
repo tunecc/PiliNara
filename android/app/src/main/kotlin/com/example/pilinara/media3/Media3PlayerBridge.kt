@@ -7,7 +7,11 @@ import android.view.SurfaceView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -62,9 +66,31 @@ class Media3PlayerBridge(private val context: Context) {
         eventSink = null
     }
 
+    private var currentHeaders: Map<String, String> = emptyMap()
+
+    private fun createHttpDataSource(): DataSource.Factory {
+        return DefaultHttpDataSource.Factory()
+            .setUserAgent(currentHeaders["User-Agent"] ?: currentHeaders["user-agent"])
+            .setDefaultRequestProperties(currentHeaders)
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(15_000)
+    }
+
+    private fun createDataSourceFactory(): DataSource.Factory {
+        return DefaultDataSource.Factory(context, createHttpDataSource())
+    }
+
     fun setDataSource(url: String, headers: Map<String, String>?): Boolean {
         val p = player ?: return false
-        val mediaItem = MediaItem.fromUri(url)
+        currentHeaders = headers?.filterValues { it.isNotEmpty() } ?: emptyMap()
+        p.setMediaSourceFactory(
+            DefaultMediaSourceFactory(context)
+                .setDataSourceFactory(createDataSourceFactory())
+        )
+        val mediaItem = MediaItem.Builder()
+            .setUri(url)
+            .build()
         p.setMediaItem(mediaItem)
         p.prepare()
         return true
@@ -113,6 +139,25 @@ class Media3PlayerBridge(private val context: Context) {
 
     fun attachSurface(surfaceView: SurfaceView) {
         this.surfaceView = surfaceView
-        player?.setVideoSurfaceView(surfaceView)
+        // SurfaceView needs a valid holder before ExoPlayer can render into it.
+        surfaceView.holder.addCallback(object : android.view.SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+                player?.setVideoSurface(holder.surface)
+            }
+
+            override fun surfaceChanged(
+                holder: android.view.SurfaceHolder,
+                format: Int,
+                width: Int,
+                height: Int
+            ) {
+                player?.setVideoSurface(holder.surface)
+            }
+
+            override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+                player?.clearVideoSurface()
+            }
+        })
+        surfaceView.holder.surface?.let { player?.setVideoSurface(it) }
     }
 }
