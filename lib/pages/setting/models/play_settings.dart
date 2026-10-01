@@ -386,6 +386,15 @@ List<SettingsModel> get playSettings => [
     },
     onTap: _showDanmakuSourceDialog,
   ),
+  if (Pref.danmakuSources.contains(DanmakuSource.dandanplay))
+    NormalModel(
+      title: '弹弹play 凭据',
+      leading: const Icon(Icons.key_outlined),
+      getSubtitle: () => Pref.dandanplayAppId.isEmpty
+          ? '未配置（弹弹play 需要 AppId / Secret）'
+          : '已配置 AppId: ${Pref.dandanplayAppId}',
+      onTap: _showDandanplayCredentialDialog,
+    ),
   NormalModel(
     title: '默认全屏方向',
     leading: const Icon(Icons.open_with_outlined),
@@ -487,6 +496,56 @@ Future<void> _showSuperChatTimeDialog(
     await GStorage.setting.put(SettingBoxKey.superChatTimeType, res.index);
     setState();
   }
+}
+
+Future<void> _showDandanplayCredentialDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final idController = TextEditingController(text: Pref.dandanplayAppId);
+  final secretController = TextEditingController(
+    text: Pref.dandanplayAppSecret,
+  );
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('弹弹play 凭据'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: idController,
+            decoration: const InputDecoration(labelText: 'AppId'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: secretController,
+            decoration: const InputDecoration(labelText: 'AppSecret'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('保存'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  await GStorage.setting.put(
+    SettingBoxKey.dandanplayAppId,
+    idController.text.trim(),
+  );
+  await GStorage.setting.put(
+    SettingBoxKey.dandanplayAppSecret,
+    secretController.text.trim(),
+  );
+  setState();
 }
 
 Future<void> _showDanmakuSourceDialog(

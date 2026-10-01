@@ -374,7 +374,9 @@ abstract final class SettingBoxKey {
       danmakuSources = 'danmakuSources',
       todayRecommendHideWatched = 'todayRecommendHideWatched',
       todayRecommendMaxAgeHours = 'todayRecommendMaxAgeHours',
-      kazumiPlugins = 'kazumiPlugins';
+      kazumiPlugins = 'kazumiPlugins',
+      dandanplayAppId = 'dandanplayAppId',
+      dandanplayAppSecret = 'dandanplayAppSecret';
 }
 
 abstract final class LocalCacheKey {

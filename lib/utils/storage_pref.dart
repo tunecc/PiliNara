@@ -1877,7 +1877,7 @@ abstract final class Pref {
   static set sdr2HdrIntensity(int value) =>
       _setting.put(SettingBoxKey.sdr2HdrIntensity, value);
 
-  /// Enabled third-party danmaku sources, bilibili is always available.
+  /// Enabled danmaku sources; bilibili is included by default.
   static Set<String> get danmakuSources {
     final raw = _setting.get(SettingBoxKey.danmakuSources);
     if (raw is List) {
@@ -1888,6 +1888,12 @@ abstract final class Pref {
 
   static set danmakuSources(Set<String> value) =>
       _setting.put(SettingBoxKey.danmakuSources, value.toList());
+
+  /// 弹弹play 开放平台凭据（第三方弹幕来源需要）。
+  static String get dandanplayAppId =>
+      _setting.get(SettingBoxKey.dandanplayAppId, defaultValue: '');
+  static String get dandanplayAppSecret =>
+      _setting.get(SettingBoxKey.dandanplayAppSecret, defaultValue: '');
 
   static bool get todayRecommendHideWatched => _setting.get(
     SettingBoxKey.todayRecommendHideWatched,

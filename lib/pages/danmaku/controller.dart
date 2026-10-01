@@ -10,6 +10,7 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/danmaku_options.dart';
 import 'package:PiliPlus/models/common/danmaku_source.dart';
+import 'package:PiliPlus/services/third_party_danmaku.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/danmaku_merge/models.dart';
 import 'package:PiliPlus/utils/danmaku_merge/worker_client.dart';
@@ -24,8 +25,9 @@ class PlDanmakuController {
   PlDanmakuController(
     this._cid,
     this._plPlayerController,
-    this._isFileSource,
-  ) : _mergeDanmaku = _plPlayerController.mergeDanmaku {
+    this._isFileSource, {
+    this.title,
+  }) : _mergeDanmaku = _plPlayerController.mergeDanmaku {
     if (kDebugMode) {
       debugPrint(
         '[PlDanmakuController] create instance=${identityHashCode(this)} '
@@ -42,6 +44,10 @@ class PlDanmakuController {
   final PlPlayerController _plPlayerController;
   final bool _mergeDanmaku;
   final bool _isFileSource;
+
+  /// Video title, used to match third-party danmaku libraries.
+  final String? title;
+  bool _thirdPartyLoaded = false;
 
   late final _isLogin = Accounts.main.isLogin;
 
@@ -105,6 +111,31 @@ class PlDanmakuController {
     _mergedSeg.clear();
     _mergingSeg.clear();
     _downloadQueue.clear();
+  }
+
+
+  /// Loads danmaku from third-party libraries and splits it into segments.
+  Future<void> loadThirdPartyDanmaku() async {
+    if (_thirdPartyLoaded || _isFileSource) return;
+    _thirdPartyLoaded = true;
+    final sources = Pref.danmakuSources;
+    final wantsThirdParty =
+        sources.contains(DanmakuSource.gamer) ||
+        sources.contains(DanmakuSource.dandanplay);
+    final keyword = title;
+    if (!wantsThirdParty || keyword == null || keyword.isEmpty) return;
+    final elems = await ThirdPartyDanmakuService.fetch(
+      keyword: keyword,
+      sources: sources,
+    );
+    if (elems.isEmpty || _disposed) return;
+    final bySegment = <int, List<DanmakuElem>>{};
+    for (final e in elems) {
+      (bySegment[calcSegment(e.progress)] ??= []).add(e);
+    }
+    for (final entry in bySegment.entries) {
+      await handleDanmaku(entry.key, entry.value);
+    }
   }
 
   static int calcSegment(int progress) {
