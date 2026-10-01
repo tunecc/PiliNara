@@ -1,4 +1,5 @@
 import 'package:PiliPlus/http/connection_failover_interceptor.dart';
+import 'package:PiliPlus/http/doh.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -131,6 +132,11 @@ class Request {
     );
   }
 
+  static HttpClient _applyDoH(HttpClient client) {
+    applyDoH(client);
+    return client;
+  }
+
   static void _watchConnectivity() {
     Connectivity().onConnectivityChanged.skip(1).listen(_onConnectivityChanged);
   }
@@ -149,14 +155,14 @@ class Request {
 
     final http11Adapter = IOHttpClientAdapter(
       createHttpClient: enableSystemProxy
-          ? () => HttpClient()
+          ? () => _applyDoH(HttpClient()
               ..idleTimeout = const Duration(seconds: 15)
               ..autoUncompress = false
               ..findProxy = ((_) => 'PROXY $systemProxyHost:$systemProxyPort')
-              ..badCertificateCallback = (cert, host, port) => true
-          : () => HttpClient()
+              ..badCertificateCallback = (cert, host, port) => true)
+          : () => _applyDoH(HttpClient()
               ..idleTimeout = const Duration(seconds: 15)
-              ..autoUncompress = false, // Http2Adapter没有自动解压, 统一行为
+              ..autoUncompress = false), // Http2Adapter没有自动解压, 统一行为
     );
 
     final connectionManager = _enableHttp2
@@ -181,6 +187,7 @@ class Request {
   @pragma('vm:notify-debugger-on-exception')
   static void _resetAdaptersForNetworkChange() {
     try {
+      DoHResolver.clearCache();
       final (h11, connectionManager) = _createPool();
       if (connectionManager != null) {
         (dio.httpClientAdapter as Http2Adapter)

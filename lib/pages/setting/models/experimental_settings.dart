@@ -1,9 +1,12 @@
+import 'package:PiliPlus/http/doh.dart';
+import 'package:PiliPlus/http/network_security_policy.dart';
 import 'package:PiliPlus/models/common/setting_type.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide Icons, showDialog, SimpleDialog, SimpleDialogOption, AlertDialog, InputDecoration, TextField, TextButton;
 
@@ -82,18 +85,17 @@ List<SettingsModel> get experimentalSettings => [
     leading: const Icon(Icons.cloud_outlined),
     title: 'DoH 服务商',
     getSubtitle: () {
-      final p = Pref.dohProvider;
-      if (p == 'custom') {
-        return Pref.customDohUrl.isEmpty ? '自定义（未配置）' : Pref.customDohUrl;
-      }
-      const names = {
+      final names = {
         'cloudflare': 'Cloudflare',
         'google': 'Google',
         'quad9': 'Quad9',
         'alidns': '阿里 DNS',
         'tencent': '腾讯 DNSPod',
+        'dnspod': '腾讯 DNSPod',
       };
-      return names[p] ?? p;
+      final label = names[Pref.dohProvider] ?? '自定义';
+      final endpoint = DoHResolver.endpoint;
+      return endpoint.isEmpty ? '$label（未启用）' : '$label · $endpoint';
     },
   ),
 
@@ -132,30 +134,41 @@ Future<void> _showDohProviderDialog(BuildContext context, VoidCallback setState)
   );
 
   if (selected != null) {
-    await GStorage.setting.put(SettingBoxKey.dohProvider, selected);
     if (selected == 'custom') {
+      final controller = TextEditingController(text: Pref.customDohUrl);
       final url = await showDialog<String>(
         context: context,
-        builder: (ctx) {
-          final controller = TextEditingController(text: Pref.customDohUrl);
-          return AlertDialog(
-            title: const Text('自定义 DoH URL'),
-            content: TextField(
-              controller: controller,
-              decoration: const InputDecoration(hintText: 'https://your-doh-server.com/dns-query'),
-              autofocus: true,
+        builder: (ctx) => AlertDialog(
+          title: const Text('自定义 DoH URL'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: 'https://your-doh-server.com/dns-query',
+              helperText: '需返回 application/dns-json',
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-              TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('确定')),
-            ],
-          );
-        },
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
       );
-      if (url != null) {
-        await GStorage.setting.put(SettingBoxKey.customDohUrl, url);
+      if (url == null) return;
+      if (url.isEmpty || !NetworkSecurityPolicy.validateUrl(url)) {
+        SmartDialog.showToast('请输入以 https:// 开头的有效地址');
+        return;
       }
+      await GStorage.setting.put(SettingBoxKey.customDohUrl, url);
     }
+    await GStorage.setting.put(SettingBoxKey.dohProvider, selected);
+    DoHResolver.clearCache();
     setState();
   }
 }

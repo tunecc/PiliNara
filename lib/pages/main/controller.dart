@@ -233,12 +233,12 @@ class MainController extends GetxController
         (GStorage.setting.get(SettingBoxKey.navBarSort) as List?)?.fromCast();
     late final List<NavigationBarType> navigationBars;
     if (navBarSort == null || navBarSort.isEmpty) {
-      // Default order: 我的 → 动态 → 历史 → 首页
+      // Default order: 首页 → 动态 → 历史 → 我的
       navigationBars = [
-        NavigationBarType.mine,
+        NavigationBarType.home,
         NavigationBarType.dynamics,
         NavigationBarType.history,
-        NavigationBarType.home,
+        NavigationBarType.mine,
       ];
     } else {
       navigationBars = navBarSort
