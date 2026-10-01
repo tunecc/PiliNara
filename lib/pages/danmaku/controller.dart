@@ -9,6 +9,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/danmaku_options.dart';
+import 'package:PiliPlus/models/common/danmaku_source.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/danmaku_merge/models.dart';
 import 'package:PiliPlus/utils/danmaku_merge/worker_client.dart';
@@ -112,6 +113,10 @@ class PlDanmakuController {
 
   Future<void> queryDanmaku(int segmentIndex, {bool isPrefetch = false}) async {
     if (_isFileSource) {
+      return;
+    }
+    // The danmaku source setting can disable the official Bilibili feed.
+    if (!Pref.danmakuSources.contains(DanmakuSource.bilibili)) {
       return;
     }
     if (_requestedSeg.contains(segmentIndex)) {
