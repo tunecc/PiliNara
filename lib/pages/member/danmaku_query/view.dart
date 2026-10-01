@@ -1,8 +1,9 @@
 import 'package:PiliPlus/http/member_query.dart';
 import 'package:PiliPlus/http/loading_state.dart';
-import 'package:flutter/material.dart';
+import 'package:PiliPlus/pages/member/danmaku_query/view.dart';
+import 'package:flutter/material.dart' hide Scaffold, AppBar, TabBar, TabController, TabBarView, Card, ListTile;
 import 'package:get/get.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide Scaffold, AppBar, TabBar, TabController, TabBarView, Card, ListTile;
 
 class MemberDanmakuQueryPage extends StatefulWidget {
   const MemberDanmakuQueryPage({super.key, required this.mid});
@@ -15,8 +16,8 @@ class MemberDanmakuQueryPage extends StatefulWidget {
 class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tab = TabController(length: 2, vsync: this);
-  late final RxnString _error = RxnString();
-  late final RxBool _loading = false.obs;
+  final RxnString _error = RxnString();
+  final RxBool _loading = false.obs;
   final RxList<Map<String, dynamic>> _comments = <Map<String, dynamic>>[].obs;
   int _commentPage = 0;
   bool _commentHasMore = false;
@@ -58,8 +59,8 @@ class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
       if (reset) _comments.assignAll(list.map((e) => e as Map<String, dynamic>));
       else _comments.addAll(list.map((e) => e as Map<String, dynamic>));
       _commentHasMore = hasMore;
-    } else if (res case Error(:final msg?)) {
-      _error.value = msg;
+    } else if (res case Error(:final errMsg?)) {
+      _error.value = errMsg;
     }
     setState(() => _loading.value = false);
   }
@@ -78,8 +79,8 @@ class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
       final list = data as List;
       _danmakus.assignAll(list);
       _danmakuHasMore = list.length >= 20;
-    } else if (res case Error(:final msg?)) {
-      _error.value = msg;
+    } else if (res case Error(:final errMsg?)) {
+      _error.value = errMsg;
     }
     setState(() => _loading.value = false);
   }
@@ -103,8 +104,7 @@ class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
               children: [_buildCommentTab(), _buildDanmakuTab()],
             ),
           ),
-          if (_loading.value)
-            LinearProgressIndicator(),
+          if (_loading.value) const LinearProgressIndicator(),
         ],
       ),
     );
