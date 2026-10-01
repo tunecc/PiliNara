@@ -9,13 +9,13 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.Executors
 
 class Media3PlayerBridge(private val context: Context) {
     private var player: ExoPlayer? = null
     private var surfaceView: SurfaceView? = null
-    private var eventSink: MethodChannel.EventSink? = null
+    private var eventSink: EventChannel.EventSink? = null
 
     private var audioGainDb: Float = 0f
     private var audioDynamicEnabled: Boolean = false
@@ -26,7 +26,7 @@ class Media3PlayerBridge(private val context: Context) {
     private var audioEqQ: Float = 1f
     private var superResolutionMode: String = "disable"
 
-    fun init(eventSink: MethodChannel.EventSink?) {
+    fun init(eventSink: EventChannel.EventSink?) {
         this.eventSink = eventSink
     }
 
@@ -93,17 +93,22 @@ class Media3PlayerBridge(private val context: Context) {
             return
         }
         val bitmap = Bitmap.createBitmap(sv.width, sv.height, Bitmap.Config.ARGB_8888)
-        val executor = Executors.newSingleThreadExecutor()
-        PixelCopy.request(sv, bitmap, { copyResult ->
-            if (copyResult == PixelCopy.SUCCESS) {
-                val stream = java.io.ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                result.success(stream.toByteArray())
-            } else {
-                result.error("CAPTURE_FAILED", "PixelCopy failed: $copyResult", null)
-            }
-            bitmap.recycle()
-        }, executor)
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        PixelCopy.request(
+            sv,
+            bitmap,
+            PixelCopy.OnPixelCopyFinishedListener { copyResult ->
+                if (copyResult == PixelCopy.SUCCESS) {
+                    val stream = java.io.ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    result.success(stream.toByteArray())
+                } else {
+                    result.error("CAPTURE_FAILED", "PixelCopy failed: $copyResult", null)
+                }
+                bitmap.recycle()
+            },
+            handler,
+        )
     }
 
     fun attachSurface(surfaceView: SurfaceView) {
