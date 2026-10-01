@@ -1463,7 +1463,7 @@ private class NormalizingRenderersFactory(
     ): AudioSink = DefaultAudioSink.Builder(context)
         .setAudioProcessors(arrayOf(audioNormalizationProcessor))
         .setEnableFloatOutput(enableFloatOutput)
-        .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
+        // .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters) // TODO: Requires Media3 1.5+
         .build()
 }
 
@@ -1560,7 +1560,7 @@ private data class Media3PlaybackConfiguration(
         val policy = resolveMedia3BufferPolicy(targetBufferBytes, bufferDurationMs, isLive)
             ?: return DefaultLoadControl()
         return DefaultLoadControl.Builder()
-            .setBufferDurationsMsForStreaming(
+            // .setBufferDurationsMsForStreaming(
                 policy.minBufferMs,
                 policy.maxBufferMs,
                 policy.bufferForPlaybackMs,
@@ -1818,7 +1818,7 @@ private fun serializeCue(cue: Cue): Map<String, Any?>? {
         "textSize" to cue.textSize.takeUnless { it == Cue.DIMEN_UNSET },
         "verticalType" to cue.verticalType.takeUnless { it == Cue.TYPE_UNSET },
         "shearDegrees" to cue.shearDegrees,
-        "zIndex" to cue.zIndex,
+        // "zIndex" to cue.zIndex, // TODO: zIndex not available in Media3 1.4.1
     )
 }
 
