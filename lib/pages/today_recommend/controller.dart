@@ -1,49 +1,43 @@
-import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/http/video.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:PiliPlus/models/home/rcmd/result.dart';
+import 'package:PiliPlus/models/model_rcmd_video_item.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
-import 'package:PiliPlus/services/logger.dart';
+import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class TodayRecommendController
-    extends CommonListController<dynamic, RcmdVideoItemAppModel> {
+    extends CommonListController<List<RcmdItem>, List<RcmdItem>> {
+  final RcmdApi _rcmdApi = RcmdApi();
+
   @override
-  void onInit() {
-    super.onInit();
-    queryData();
+  Future<void> customGetData() async {
+    final response = await _rcmdApi.rcmdList(freshIdx: page);
+    if (response.isSuccess) {
+      return Success(response.data ?? []);
+    }
+    return Error(response.toString());
   }
 
   @override
-  Future<LoadingState<dynamic>> customGetData() async {
-    try {
-      return await VideoHttp.rcmdVideoListApp(freshIdx: page);
-    } catch (e) {
-      logger.e('TodayRecommend fetch failed: $e');
-      return Error(e.toString());
+  void handleListResponse(List<RcmdItem> dataList) {}
+
+  @override
+  List<RcmdItem>? getDataList(List<RcmdItem> response) => response;
+
+  @override
+  void checkIsEnd(int length) {
+    isEnd = length < 20;
+    hasFooter = !isEnd;
+  }
+
+  @override
+  void onLoad() {
+    if (hasFooter == true) {
+      Future.microtask(onLoadMore);
     }
   }
 
-  @override
-  List<RcmdVideoItemAppModel>? getDataList(dynamic response) {
-    if (response is! List<RcmdVideoItemAppModel>) return null;
-    final hideWatched = Pref.todayRecommendHideWatched;
-    final maxAgeHours = Pref.todayRecommendMaxAgeHours;
-    if (!hideWatched && maxAgeHours <= 0) return response;
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    return response.where((item) {
-      if (hideWatched && _isWatched(item)) return false;
-      if (maxAgeHours > 0 && item.pubdate != null) {
-        final ageHours = (now - item.pubdate!) ~/ 3600;
-        if (ageHours > maxAgeHours) return false;
-      }
-      return true;
-    }).toList();
-  }
+  /// 加载下一页
+  Future<void> onLoadMore() => queryData(false);
 
-  /// A video counts as watched once we have non-trivial watch progress for it.
-  bool _isWatched(RcmdVideoItemAppModel item) {
-    final progress = GStorage.watchProgress.get(item.cid);
-    return progress != null && progress > 5000;
-  }
+  /// 刷新
+  Future<void> refresh() => queryData(true);
 }
