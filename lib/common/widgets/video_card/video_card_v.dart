@@ -214,21 +214,27 @@ class VideoCardV extends StatelessWidget {
                   ),
                 Expanded(
                   flex: 1,
-                  child: Text(
-                    remarkedName(
-                      videoItem.owner.mid,
-                      videoItem.owner.name.toString(),
-                    ),
-                    maxLines: 1,
-                    overflow: .clip,
-                    semanticsLabel: 'UP：${remarkedName(
-                      videoItem.owner.mid,
-                      videoItem.owner.name.toString(),
-                    )}',
-                    style: TextStyle(
-                      height: 1.5,
-                      fontSize: theme.textTheme.labelMedium!.fontSize,
-                      color: theme.colorScheme.outline,
+                  child: GestureDetector(
+                    onTap: () {
+                      final mid = videoItem.owner.mid;
+                      if (mid != null) Get.toNamed('/member?mid=$mid');
+                    },
+                    child: Text(
+                      remarkedName(
+                        videoItem.owner.mid,
+                        videoItem.owner.name.toString(),
+                      ),
+                      maxLines: 1,
+                      overflow: .clip,
+                      semanticsLabel: 'UP：${remarkedName(
+                        videoItem.owner.mid,
+                        videoItem.owner.name.toString(),
+                      )}',
+                      style: TextStyle(
+                        height: 1.5,
+                        fontSize: theme.textTheme.labelMedium!.fontSize,
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                   ),
                 ),
@@ -251,32 +257,28 @@ class VideoCardV extends StatelessWidget {
           type: .play,
           value: videoItem.stat.view,
         ),
-        if (videoItem.goto != 'picture') ...[
-          const SizedBox(width: 4),
-          StatWidget(
-            type: .danmaku,
-            value: videoItem.stat.danmu,
-          ),
-        ],
-        if (videoItem is RcmdVideoItemModel) ...[
-          const Spacer(),
-          Text.rich(
-            maxLines: 1,
-            TextSpan(
-              style: TextStyle(
-                fontSize: theme.textTheme.labelSmall!.fontSize,
-                color: theme.colorScheme.outline.withValues(alpha: 0.8),
-              ),
-              text: DateFormatUtils.dateFormat(
-                videoItem.pubdate,
-                short: shortFormat,
-                long: longFormat,
-                showYesterdayTime: false,
-              ),
+        const SizedBox(width: 4),
+        StatWidget(
+          type: .reply,
+          value: videoItem.stat.reply,
+        ),
+        const Spacer(),
+        Text.rich(
+          maxLines: 1,
+          TextSpan(
+            style: TextStyle(
+              fontSize: theme.textTheme.labelSmall!.fontSize,
+              color: theme.colorScheme.outline.withValues(alpha: 0.8),
+            ),
+            text: DateFormatUtils.dateFormat(
+              videoItem.pubdate,
+              short: shortFormat,
+              long: longFormat,
+              showYesterdayTime: false,
             ),
           ),
-          const SizedBox(width: 2),
-        ],
+        ),
+        const SizedBox(width: 2),
       ],
     );
   }

@@ -24,6 +24,7 @@ abstract class BaseStat {
   int? view;
   int? like;
   int? danmu;
+  int? reply;
 }
 
 class Stat extends BaseStat {

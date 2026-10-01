@@ -23,6 +23,7 @@ class RcmdVideoItemAppModel extends BaseRcmdVideoItemModel {
     duration = json['player_args']?['duration'] ?? 0;
     //duration = json['cover_right_text'];
     title = json['title'];
+    pubdate = json['pubdate'] ?? json['args']?['pubdate'];
     goto = json['card_goto'];
     owner = RcmdOwner.fromJson(json, goto);
     rcmdReason = json['rcmd_reason'];
@@ -61,6 +62,7 @@ class RcmdStat extends BaseStat {
   RcmdStat.fromJson(Map<String, dynamic> json) {
     view = NumUtils.parseNum(json["cover_left_text_1"] ?? '');
     danmu = NumUtils.parseNum(json["cover_left_text_2"] ?? '');
+    reply = NumUtils.parseNum(json["cover_right_text_2"] ?? '');
   }
 }
 
