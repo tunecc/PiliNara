@@ -82,11 +82,11 @@ internal object ExoPlayerPlugin {
     private const val METHOD_CHANNEL = "com.example.piliplus/exo_player"
     private const val EVENT_CHANNEL = "com.example.piliplus/exo_player_events"
 
-    fun registerWith(flutterEngine: FlutterEngine) {
-        val manager = ExoPlayerManager(context.applicationContext, engine.renderer)
-        MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
+    fun registerWith(flutterEngine: FlutterEngine, context: Context) {
+        val manager = ExoPlayerManager(context, flutterEngine.renderer)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler(manager)
-        EventChannel(engine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             .setStreamHandler(manager)
     }
 }

@@ -11,7 +11,7 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        ExoPlayerPlugin.registerWith(flutterEngine)
+        ExoPlayerPlugin.registerWith(flutterEngine, this)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -40,6 +40,6 @@ class MainActivity : AudioServiceActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         AndroidHelper.isPipMode = isInPictureInPictureMode
-        AndroidHelper.ToDart.onPipChanged?.invoke(isInPictureInPictureMode)
+        AndroidHelper.ToDart.onPictureInPictureModeChanged?.run(isInPictureInPictureMode)
     }
 }
