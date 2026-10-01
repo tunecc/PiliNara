@@ -1,3 +1,4 @@
+import 'package:PiliPlus/pages/media_source/search_view.dart';
 import 'dart:io' show Platform;
 import 'dart:math';
 
@@ -1897,6 +1898,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           onTap: videoDetailController.toAudioPage,
           child: const Text('听音频'),
         ),
+      PopupMenuItem(
+        onTap: () {
+          final title = videoDetailController.args['title']?.toString() ?? '';
+          if (title.isEmpty) {
+            SmartDialog.showToast('无法获取标题');
+          } else {
+            Get.to(() => MediaSourceSearchPage(keyword: title));
+          }
+        },
+        child: const Text('搜索外部源'),
+      ),
       PopupMenuItem(
         onTap: () {
           if (!Accounts.main.isLogin) {
