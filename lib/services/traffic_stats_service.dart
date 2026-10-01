@@ -33,7 +33,7 @@ final class TrafficStatsService with WidgetsBindingObserver {
 
   Timer? _timer;
   Future<void>? _initializeFuture;
-  StreamSubscription<NetworkPolicyChange>? _networkSubscription;
+  StreamSubscription<NetworkProfile>? _networkSubscription;
   ({int received, int sent})? _last;
   ({int received, int sent})? _lastWindowsApp;
   ({int received, int sent})? _lastWindowsInterface;

@@ -165,6 +165,22 @@ abstract final class PlaybackStatsService {
   static Map<String, dynamic>? _videoUpItemCache;
   static Map<String, dynamic>? _videoUpMonthCache;
 
+  static Future<void> init() async {
+    _ensureInitialized();
+  }
+
+  static Future<void> onPlay() async {
+    if (!GStorage.playbackStatsReady) return;
+    _ensureInitialized();
+    updatePlaying(true, Duration(microseconds: _lastPositionUs));
+  }
+
+  static Future<void> onPause() async {
+    if (!GStorage.playbackStatsReady) return;
+    _ensureInitialized();
+    updatePlaying(false, Duration(microseconds: _lastPositionUs));
+  }
+
   static void initializeAppLifecycle() {
     _ensureInitialized();
     if (_appLifecycleListener != null) return;
@@ -2588,8 +2604,4 @@ final class _RewindEpisode {
   int mediaAdvanceUs = 0;
   int pausedUs = 0;
   int bufferingUs = 0;
-
-  static Future<void> init() async {}
-  static Future<void> onPlay() async {}
-  static Future<void> onPause() async {}
 }

@@ -130,7 +130,8 @@ class _SettingPageState extends State<SettingPage> {
                       .videoSetting ||
                       .playSetting ||
                       .styleSetting ||
-                      .extraSetting => CommonSetting(
+                      .extraSetting ||
+                      .experimentalSetting => CommonSetting(
                         settingType: _type,
                         showAppBar: false,
                       ),
@@ -162,7 +163,8 @@ class _SettingPageState extends State<SettingPage> {
           .videoSetting ||
           .playSetting ||
           .styleSetting ||
-          .extraSetting => CommonSetting(settingType: type),
+          .extraSetting ||
+          .experimentalSetting => CommonSetting(settingType: type),
           .webdavSetting => const WebDavSettingPage(),
           .about => const AboutPage(),
         },

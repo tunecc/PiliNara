@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models/user/danmaku_rule_adapter.dart';
-import 'package:PiliPlus/models/video_bookmark_adapter.dart';
 import 'package:PiliPlus/models/user/info.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account_adapter.dart';
