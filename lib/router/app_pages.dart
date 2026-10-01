@@ -131,7 +131,8 @@ GetPage(name: '/', page: () => const MainApp()),
     GetPage(name: '/liveRoom', page: () => const LiveRoomPage()),
     // 用户中心
     GetPage(name: '/member', page: () => const MemberPage()),
-    GetPage(name: '/memberSearch', page: () => const MemberSearchPage()),
+    GetPage(name: '/danmakuQuery', page: () => const MemberDanmakuQueryPage(mid: 0)),
+GetPage(name: '/memberSearch', page: () => const MemberSearchPage()),
     //
     GetPage(name: '/blackListPage', page: () => const BlackListPage()),
     GetPage(name: '/colorSetting', page: () => const ColorSelectPage()),

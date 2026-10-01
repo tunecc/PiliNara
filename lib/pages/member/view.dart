@@ -22,6 +22,7 @@ import 'package:PiliPlus/pages/log_table/view.dart';
 import 'package:PiliPlus/pages/login_devices/view.dart';
 import 'package:PiliPlus/pages/login_log/controller.dart';
 import 'package:PiliPlus/pages/member/controller.dart';
+import 'package:PiliPlus/pages/member/danmaku_query/view.dart';
 import 'package:PiliPlus/pages/member/widget/medal_wall.dart';
 import 'package:PiliPlus/pages/member/widget/reserve_button.dart';
 import 'package:PiliPlus/pages/member/widget/user_info_card.dart';
@@ -448,6 +449,20 @@ class _MemberPageState extends State<MemberPage> {
         //       ],
         //     ),
         //   ),
+        PopupMenuItem(
+          onTap: () => Get.to(
+            MemberDanmakuQueryPage(mid: _mid),
+            transition: Transition.zoom,
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.chat_bubble_outline, size: 19),
+              SizedBox(width: 10),
+              Text('评论与弹幕查询'),
+            ],
+          ),
+        ),
         if (Get.isRegistered<MemberContributeCtr>(tag: _heroTag))
           PopupMenuItem(
             onTap: _toWebArchive,

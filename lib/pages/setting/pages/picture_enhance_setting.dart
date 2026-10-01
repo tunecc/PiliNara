@@ -19,6 +19,7 @@ class _PictureEnhanceSettingPageState
   late SuperResolutionType _superResolution;
   late VideoOutputType _videoOutput;
   late bool _sdr2Hdr;
+  late int _sdr2HdrIntensity = Pref.sdr2HdrIntensity ?? 0;
 
   @override
   void initState() {
@@ -71,6 +72,29 @@ class _PictureEnhanceSettingPageState
             value: _sdr2Hdr,
             onChanged: (v) => _setSdr2Hdr(v),
           ),
+          if (_sdr2Hdr) ...[
+            RadioListTile<int>(
+              value: 0,
+              groupValue: _sdr2HdrIntensity,
+              title: const Text('默认'),
+              subtitle: const Text('标准强度（BT.2087）'),
+              onChanged: (v) => _setSdr2HdrIntensity(v!),
+            ),
+            RadioListTile<int>(
+              value: 1,
+              groupValue: _sdr2HdrIntensity,
+              title: const Text('轻度'),
+              subtitle: const Text('增强幅度较轻，适合日常观看'),
+              onChanged: (v) => _setSdr2HdrIntensity(v!),
+            ),
+            RadioListTile<int>(
+              value: 2,
+              groupValue: _sdr2HdrIntensity,
+              title: const Text('强烈'),
+              subtitle: const Text('高亮扩展更强，HDR 效果更明显'),
+              onChanged: (v) => _setSdr2HdrIntensity(v!),
+            ),
+          ],
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -109,5 +133,10 @@ class _PictureEnhanceSettingPageState
   Future<void> _setSdr2Hdr(bool value) async {
     setState(() => _sdr2Hdr = value);
     await GStorage.setting.put(SettingBoxKey.enableSdr2Hdr, value);
+  }
+
+  Future<void> _setSdr2HdrIntensity(int v) async {
+    setState(() => _sdr2HdrIntensity = v);
+    await GStorage.setting.put(SettingBoxKey.sdr2HdrIntensity, v);
   }
 }
