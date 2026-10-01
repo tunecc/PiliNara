@@ -1870,4 +1870,16 @@ abstract final class Pref {
 
   static set enableSdr2Hdr(bool value) =>
       _setting.put(SettingBoxKey.enableSdr2Hdr, value);
+
+  /// Enabled third-party danmaku sources, bilibili is always available.
+  static Set<String> get danmakuSources {
+    final raw = _setting.get(SettingBoxKey.danmakuSources);
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toSet();
+    }
+    return const <String>{'bilibili'};
+  }
+
+  static set danmakuSources(Set<String> value) =>
+      _setting.put(SettingBoxKey.danmakuSources, value.toList());
 }

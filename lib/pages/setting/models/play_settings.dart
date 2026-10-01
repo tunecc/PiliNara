@@ -372,6 +372,19 @@ List<SettingsModel> get playSettings => [
     defaultVal: false,
   ),
   NormalModel(
+    title: '弹幕来源',
+    leading: const Icon(Icons.subtitles_outlined),
+    getSubtitle: () {
+      final sources = Pref.danmakuSources;
+      if (sources.isEmpty) return '未启用任何来源';
+      return DanmakuSource.labels.entries
+          .where((e) => sources.contains(e.key))
+          .map((e) => e.value)
+          .join('、');
+    },
+    onTap: _showDanmakuSourceDialog,
+  ),
+  NormalModel(
     title: '默认全屏方向',
     leading: const Icon(Icons.open_with_outlined),
     getSubtitle: () => '当前全屏方向：${Pref.fullScreenMode.desc}',
@@ -494,6 +507,26 @@ Future<void> _showSuperChatTimeDialog(
     await GStorage.setting.put(SettingBoxKey.superChatTimeType, res.index);
     setState();
   }
+}
+
+Future<void> _showDanmakuSourceDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<Set<String>>(
+    context: context,
+    builder: (context) => MultiSelectDialog<String>(
+      title: '弹幕来源',
+      initValues: Pref.danmakuSources.toList(),
+      values: DanmakuSource.labels,
+    ),
+  );
+  if (res == null) return;
+  await GStorage.setting.put(
+    SettingBoxKey.danmakuSources,
+    res.toList(),
+  );
+  setState();
 }
 
 Future<void> _showFullScreenModeDialog(

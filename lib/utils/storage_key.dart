@@ -369,7 +369,8 @@ abstract final class SettingBoxKey {
       mediaSourceCustom = 'mediaSourceCustom',
       mediaSourceDisabled = 'mediaSourceDisabled',
       videoOutput = 'videoOutput',
-      enableSdr2Hdr = 'enableSdr2Hdr';
+      enableSdr2Hdr = 'enableSdr2Hdr',
+      danmakuSources = 'danmakuSources';
 }
 
 abstract final class LocalCacheKey {

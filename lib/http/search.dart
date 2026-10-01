@@ -16,6 +16,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:PiliPlus/services/bilibili_guest_fingerprint.dart';
 
 abstract final class SearchHttp {
   // 获取搜索建议
@@ -31,6 +32,7 @@ abstract final class SearchHttp {
         'spmid': 333.1365,
         'web_location': 333.1365,
       }),
+      options: Options(headers: BilibiliGuestFingerprint.buildGuestHeaders()),
     );
     final resData = res.data;
     if (resData is Map && resData['code'] == 0) {
@@ -82,6 +84,7 @@ abstract final class SearchHttp {
       queryParameters: params,
       options: Options(
         headers: {
+          ...BilibiliGuestFingerprint.buildGuestHeaders(),
           if (gaiaVtoken != null) 'cookie': 'x-bili-gaia-vtoken=$gaiaVtoken',
           'origin': 'https://search.bilibili.com',
           'referer':

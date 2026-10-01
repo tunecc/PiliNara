@@ -39,7 +39,13 @@ class Media3PlayerBridge(private val context: Context) {
         val renderersFactory = DefaultRenderersFactory(context).apply {
             setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         }
-        player = ExoPlayer.Builder(context, renderersFactory).build().apply {
+        player = ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(context)
+                    .setDataSourceFactory(createDataSourceFactory())
+            )
+            .build()
+            .apply {
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     eventSink?.success(mapOf("event" to "stateChanged", "state" to playbackState))
@@ -82,12 +88,18 @@ class Media3PlayerBridge(private val context: Context) {
     }
 
     fun setDataSource(url: String, headers: Map<String, String>?): Boolean {
-        val p = player ?: return false
+        var p = player
         currentHeaders = headers?.filterValues { it.isNotEmpty() } ?: emptyMap()
-        p.setMediaSourceFactory(
-            DefaultMediaSourceFactory(context)
-                .setDataSourceFactory(createDataSourceFactory())
-        )
+        // Headers are baked into the media source factory, so the player is
+        // rebuilt whenever they change.
+        if (p != null) {
+            p.release()
+            p = null
+            player = null
+            surfaceView = null
+        }
+        if (!createPlayer()) return false
+        p = player ?: return false
         val mediaItem = MediaItem.Builder()
             .setUri(url)
             .build()
