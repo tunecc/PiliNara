@@ -553,7 +553,7 @@ class ReplyItemGrpc extends StatelessWidget {
         const SizedBox(width: 2),
         if (replyControl.translationSwitch ==
                 .TRANSLATION_SWITCH_SHOW_TRANSLATION ||
-            _looksNonChinese(replyItem.content)) ...[
+            _looksNonChinese(replyItem.content.message)) ...[
           _buildTranslateBtn(
             context,
             colorScheme,

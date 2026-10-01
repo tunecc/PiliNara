@@ -56,9 +56,22 @@ abstract final class ThemeUtils {
       );
     }
 
+    // AMOLED black: pure black surfaces save power on OLED panels.
+    final amoledScheme = isDark && Pref.experimentalAmoledBlack
+        ? colorScheme.copyWith(
+            surface: Colors.black,
+            onSurface: Colors.white,
+            surfaceContainerLowest: Colors.black,
+            surfaceContainerLow: Colors.black,
+            surfaceContainer: const Color(0xFF0A0A0A),
+            surfaceContainerHigh: const Color(0xFF121212),
+            surfaceContainerHighest: const Color(0xFF1A1A1A),
+          )
+        : colorScheme;
+
     final theme = ThemeData(
       useMaterial3: true,
-      colorScheme: colorScheme,
+      colorScheme: amoledScheme,
       fontFamily: fontFamily,
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
