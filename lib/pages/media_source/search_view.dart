@@ -1,4 +1,7 @@
 import 'package:PiliPlus/pages/media_source/controller.dart';
+import 'package:PiliPlus/pages/media_source/kazumi_chapter_view.dart';
+import 'package:PiliPlus/services/media_source/kazumi_plugin.dart';
+import 'package:PiliPlus/services/media_source/kazumi_rule_executor.dart';
 import 'package:PiliPlus/services/media_source/media_source.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -19,6 +22,8 @@ class _MediaSourceSearchPageState extends State<MediaSourceSearchPage> {
   final RxnString _error = RxnString();
   final RxList<({String name, List<MediaMatch> matches})> _results =
       <({String name, List<MediaMatch> matches})>[].obs;
+  final RxList<({String name, List<KazumiSearchItem> items})> _kazumiResults =
+      <({String name, List<KazumiSearchItem> items})>[].obs;
 
   late final MediaSourceController _ctrl =
       Get.isRegistered<MediaSourceController>()
@@ -35,6 +40,7 @@ class _MediaSourceSearchPageState extends State<MediaSourceSearchPage> {
     _loading.value = true;
     _error.value = null;
     _results.clear();
+    _kazumiResults.clear();
     if (!_ctrl.isEnabled.value) {
       _error.value = '订阅源总开关已关闭';
       _loading.value = false;
@@ -57,6 +63,10 @@ class _MediaSourceSearchPageState extends State<MediaSourceSearchPage> {
         // A failing source must not hide the others' results.
       }
       _results.add((name: source.metadata.name, matches: matches));
+    }
+    for (final plugin in KazumiPluginService.stored.where((p) => p.enabled)) {
+      final items = await KazumiRuleExecutor.search(plugin, widget.keyword);
+      _kazumiResults.add((name: plugin.name, items: items));
     }
     _loading.value = false;
   }
@@ -134,6 +144,34 @@ class _MediaSourceSearchPageState extends State<MediaSourceSearchPage> {
                           match.media.properties.subtitleGroup!,
                         match.kind == MatchKind.exact ? '精确匹配' : '模糊匹配',
                       ].join(' · '),
+                    ),
+                  ),
+              ],
+            for (final group in _kazumiResults)
+              if (group.items.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    '${group.name} · ${group.items.length} 条',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                    ),
+                  ),
+                ),
+                for (final item in group.items)
+                  ListTile(
+                    leading: const Icon(Icons.rule),
+                    title: Text(item.name),
+                    subtitle: Text(
+                      item.url,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => Get.to(
+                      () => KazumiChapterPage(
+                        pluginName: group.name,
+                        url: item.url,
+                      ),
                     ),
                   ),
               ],
