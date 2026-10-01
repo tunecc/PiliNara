@@ -1828,4 +1828,32 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.dohProvider, defaultValue: 'cloudflare');
   static String get customDohUrl =>
       _setting.get(SettingBoxKey.customDohUrl, defaultValue: '');
+
+  // === Experimental (visual effects + network) ===
+  static bool get enableDoh =>
+      _setting.get(SettingBoxKey.enableDoh, defaultValue: false);
+  static bool get experimentalLiquidGlass => _setting.get(
+    SettingBoxKey.experimentalLiquidGlass,
+    defaultValue: false,
+  );
+  static bool get experimentalBlurBackdrop => _setting.get(
+    SettingBoxKey.experimentalBlurBackdrop,
+    defaultValue: false,
+  );
+  static bool get experimentalAmoledBlack => _setting.get(
+    SettingBoxKey.experimentalAmoledBlack,
+    defaultValue: false,
+  );
+  static bool get experimentalCardAnimation => _setting.get(
+    SettingBoxKey.experimentalCardAnimation,
+    defaultValue: false,
+  );
+  static bool get experimentalDynamicColor => _setting.get(
+    SettingBoxKey.experimentalDynamicColor,
+    defaultValue: false,
+  );
+  static bool get experimentalCompactMode => _setting.get(
+    SettingBoxKey.experimentalCompactMode,
+    defaultValue: false,
+  );
 }
