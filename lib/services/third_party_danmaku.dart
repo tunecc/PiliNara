@@ -66,9 +66,7 @@ abstract final class ThirdPartyDanmakuService {
           if (item is Map)
             DanmakuElem(
               content: item['text']?.toString() ?? '',
-              // Gamer reports time in seconds.
-              progress:
-                  (((item['time'] as num?)?.toDouble() ?? 0) * 1000).round(),
+              progress: (((item['time'] as num?)?.toDouble() ?? 0) * 1000).round(),
               mode: (item['position'] as num?)?.toInt() ?? 1,
               fontsize: (item['size'] as num?)?.toInt() ?? 25,
               color: _parseColor(item['color']?.toString()),
@@ -80,13 +78,12 @@ abstract final class ThirdPartyDanmakuService {
     }
   }
 
-  // --- 弹弹play ---
+  // --- 弹弹play (公共API，无需凭据) ---
 
   static Future<List<DanmakuElem>> _fetchDandanplay(
     String keyword,
     int? episode,
   ) async {
-    // 使用公共API，无需凭据
     try {
       final search = await _dio.get<dynamic>(
         'https://api.dandanplay.net/api/v2/search/episodes',
@@ -104,56 +101,6 @@ abstract final class ThirdPartyDanmakuService {
       final comment = await _dio.get<dynamic>(
         'https://api.dandanplay.net/api/v2/comment/$episodeId',
         queryParameters: {'withRelated': 'true'},
-      );
-      final body = comment.data;
-      final comments = body is Map ? (body['comments'] as List?) : null;
-      if (comments == null) return const [];
-      final result = <DanmakuElem>[];
-      for (final c in comments) {
-        if (c is! Map) continue;
-        final p = c['p']?.toString() ?? '';
-        final parts = p.split(',');
-        if (parts.length < 3) continue;
-        final seconds = double.tryParse(parts[0]) ?? 0;
-        final mode = int.tryParse(parts[1]) ?? 1;
-        final color = int.tryParse(parts[2]) ?? 0xFFFFFF;
-        result.add(
-          DanmakuElem(
-            content: c['m']?.toString() ?? '',
-            progress: (seconds * 1000).round(),
-            mode: mode,
-            fontsize: 25,
-            color: color,
-          ),
-        );
-      }
-      return result;
-    } catch (e) {
-      logger.w('dandanplay danmaku failed: $e');
-      return const [];
-    }
-  };
-    }
-    try {
-      final headers = _dandanplayHeaders(appId, appSecret);
-      final search = await _dio.get<dynamic>(
-        'https://api.dandanplay.net/api/v2/search/episodes',
-        queryParameters: {'anime': keyword},
-        options: Options(headers: headers),
-      );
-      final data = search.data;
-      final animes = data is Map ? (data['animes'] as List?) : null;
-      if (animes == null || animes.isEmpty) return const [];
-
-      final target = _pickEpisode(animes, episode);
-      if (target == null) return const [];
-      final episodeId = (target['episodeId'] as num?)?.toInt();
-      if (episodeId == null) return const [];
-
-      final comment = await _dio.get<dynamic>(
-        'https://api.dandanplay.net/api/v2/comment/$episodeId',
-        queryParameters: {'withRelated': 'true'},
-        options: Options(headers: headers),
       );
       final body = comment.data;
       final comments = body is Map ? (body['comments'] as List?) : null;
@@ -202,21 +149,6 @@ abstract final class ThirdPartyDanmakuService {
       if (first is Map) return Map<String, dynamic>.from(first);
     }
     return null;
-  }
-
-  static Map<String, String> _dandanplayHeaders(
-    String appId,
-    String secret,
-  ) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final signature = base64.encode(
-      md5.convert(utf8.encode('$appId$timestamp$secret')).bytes,
-    );
-    return {
-      'X-AppId': appId,
-      'X-Signature': signature,
-      'X-Timestamp': timestamp.toString(),
-    };
   }
 
   static int _parseColor(String? value) {
