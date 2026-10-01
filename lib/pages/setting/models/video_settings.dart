@@ -72,6 +72,12 @@ List<SettingsModel> get videoSettings => [
     getSubtitle: () => '当前使用：${Pref.liveCdnUrl ?? "默认"}',
     onTap: _showLiveCDNDialog,
   ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/cdnSetting'),
+    leading: const Icon(Icons.dns_outlined),
+    title: 'CDN 节点管理',
+    subtitle: '查看节点列表并批量测速',
+  ),
   const SwitchModel(
     title: 'CDN 测速',
     leading: Icon(Icons.speed),

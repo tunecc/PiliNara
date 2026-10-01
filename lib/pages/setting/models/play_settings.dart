@@ -455,6 +455,12 @@ List<SettingsModel> get playSettings => [
     subtitle: '动漫花园/蜜柑计划/Nyaa 等外部数据源',
   ),
   NormalModel(
+    onTap: (context, setState) => Get.toNamed('/accountUsage'),
+    leading: const Icon(Icons.manage_accounts_outlined),
+    title: '账号使用设置',
+    subtitle: '播放/评论账号、1080P+ 试看',
+  ),
+  NormalModel(
     onTap: (context, setState) => Get.toNamed('/cdnDiagnostics'),
     leading: const Icon(Icons.speed_outlined),
     title: 'CDN 测速诊断',
