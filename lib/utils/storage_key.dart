@@ -370,6 +370,7 @@ abstract final class SettingBoxKey {
       mediaSourceDisabled = 'mediaSourceDisabled',
       videoOutput = 'videoOutput',
       enableSdr2Hdr = 'enableSdr2Hdr',
+      sdr2HdrIntensity = 'sdr2HdrIntensity',
       danmakuSources = 'danmakuSources',
       todayRecommendHideWatched = 'todayRecommendHideWatched',
       todayRecommendMaxAgeHours = 'todayRecommendMaxAgeHours',

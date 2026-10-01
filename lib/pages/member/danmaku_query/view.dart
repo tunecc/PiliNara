@@ -54,7 +54,7 @@ class _MemberDanmakuQueryPageState extends State<MemberDanmakuQueryPage>
     if (!mounted) return;
     if (res case Success(:final data)) {
       final list = (data['list'] as List?) ?? [];
-      final hasMore = (data['has_more'] as num?)?.toInt() ?? false;
+      final hasMore = ((data['has_more'] as num?)?.toInt() ?? 0) != 0;
       if (reset) _comments.assignAll(list.map((e) => e as Map<String, dynamic>));
       else _comments.addAll(list.map((e) => e as Map<String, dynamic>));
       _commentHasMore = hasMore;

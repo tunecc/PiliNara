@@ -1871,6 +1871,12 @@ abstract final class Pref {
   static set enableSdr2Hdr(bool value) =>
       _setting.put(SettingBoxKey.enableSdr2Hdr, value);
 
+  static int get sdr2HdrIntensity =>
+      _setting.get(SettingBoxKey.sdr2HdrIntensity, defaultValue: 0);
+
+  static set sdr2HdrIntensity(int value) =>
+      _setting.put(SettingBoxKey.sdr2HdrIntensity, value);
+
   /// Enabled third-party danmaku sources, bilibili is always available.
   static Set<String> get danmakuSources {
     final raw = _setting.get(SettingBoxKey.danmakuSources);
