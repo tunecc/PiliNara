@@ -128,9 +128,10 @@ class VideoCardV extends StatelessWidget {
                             ),
                           if (videoItem case RcmdVideoItemAppModel(
                             :final canPlay,
-                          ) when canPlay != 1)
+                            :final isUgcPay,
+                          ) when canPlay != 1 || isUgcPay)
                             const PBadge(
-                              text: '充电专属',
+                              text: '付费',
                               top: 6,
                               right: 6,
                               size: .small,

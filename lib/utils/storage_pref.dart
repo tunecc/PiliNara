@@ -1882,4 +1882,14 @@ abstract final class Pref {
 
   static set danmakuSources(Set<String> value) =>
       _setting.put(SettingBoxKey.danmakuSources, value.toList());
+
+  static bool get todayRecommendHideWatched => _setting.get(
+    SettingBoxKey.todayRecommendHideWatched,
+    defaultValue: false,
+  );
+
+  static int get todayRecommendMaxAgeHours => _setting.get(
+    SettingBoxKey.todayRecommendMaxAgeHours,
+    defaultValue: 0,
+  );
 }

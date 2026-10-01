@@ -1,4 +1,5 @@
 import 'package:PiliPlus/pages/media_source/controller.dart';
+import 'package:PiliPlus/services/media_source/kazumi_plugin.dart';
 import 'package:PiliPlus/services/media_source/rss_media_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -21,6 +22,11 @@ class _MediaSourcePageState extends State<MediaSourcePage> {
       appBar: AppBar(
         title: const Text('订阅源管理'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.cloud_sync_outlined),
+            tooltip: '同步 Kazumi 规则',
+            onPressed: _syncPlugins,
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: '添加订阅源',
@@ -122,6 +128,17 @@ class _MediaSourcePageState extends State<MediaSourcePage> {
       ),
       onLongPress: canDelete ? () => _ctrl.removeSource(src.id) : null,
     );
+  }
+
+  Future<void> _syncPlugins() async {
+    SmartDialog.showLoading(msg: '正在同步规则');
+    final res = await KazumiPluginService.syncRemote();
+    SmartDialog.dismiss();
+    final error = res.error;
+    SmartDialog.showToast(
+      error ?? '规则已同步，新增 ${res.added} 条，共 ${res.total} 条',
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _showAddDialog() async {

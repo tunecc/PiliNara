@@ -6,6 +6,9 @@ import 'package:PiliPlus/utils/parse_string.dart';
 
 class RcmdVideoItemAppModel extends BaseRcmdVideoItemModel {
   int? get id => aid;
+
+  /// Whether this is a paid UGC video (充电专属 / 付费视频).
+  bool isUgcPay = false;
   String? talkBack;
   String? tname;
   int? canPlay;
@@ -23,6 +26,9 @@ class RcmdVideoItemAppModel extends BaseRcmdVideoItemModel {
     duration = json['player_args']?['duration'] ?? 0;
     //duration = json['cover_right_text'];
     title = json['title'];
+    isUgcPay = json['is_ugc_pay'] == 1 ||
+        json['ugc_pay'] == 1 ||
+        json['args']?['is_ugc_pay'] == 1;
     pubdate = json['pubdate'] ?? json['args']?['pubdate'];
     goto = json['card_goto'];
     owner = RcmdOwner.fromJson(json, goto);

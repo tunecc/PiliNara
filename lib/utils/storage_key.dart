@@ -370,7 +370,10 @@ abstract final class SettingBoxKey {
       mediaSourceDisabled = 'mediaSourceDisabled',
       videoOutput = 'videoOutput',
       enableSdr2Hdr = 'enableSdr2Hdr',
-      danmakuSources = 'danmakuSources';
+      danmakuSources = 'danmakuSources',
+      todayRecommendHideWatched = 'todayRecommendHideWatched',
+      todayRecommendMaxAgeHours = 'todayRecommendMaxAgeHours',
+      kazumiPlugins = 'kazumiPlugins';
 }
 
 abstract final class LocalCacheKey {
