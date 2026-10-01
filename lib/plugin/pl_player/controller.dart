@@ -1087,7 +1087,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   // Media3 bridge instance (Android only, when engine is set to media3)
   Media3Bridge? _media3Bridge;
-  bool get isMedia3Engine => Platform.isAndroid && Pref.playerEngine == 'media3';
+  // The media3 path never binds a Surface, so it cannot render video. Keep the
+  // bridge around for a future implementation but always use media_kit.
+  bool get isMedia3Engine => false;
 
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);

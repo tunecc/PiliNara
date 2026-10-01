@@ -238,7 +238,13 @@ class VideoCardV extends StatelessWidget {
                       style: TextStyle(
                         height: 1.5,
                         fontSize: theme.textTheme.labelMedium!.fontSize,
-                        color: theme.colorScheme.outline,
+                        color: videoItem.goto == 'av' &&
+                                (videoItem.owner.mid ?? 0) > 0
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline,
+                        fontWeight: videoItem.goto == 'av'
+                            ? FontWeight.w600
+                            : null,
                       ),
                     ),
                   ),

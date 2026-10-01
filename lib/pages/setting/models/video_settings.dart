@@ -16,7 +16,6 @@ import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/filtering_text.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
-import 'package:PiliPlus/plugin/pl_player/models/video_output_type.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:flutter/foundation.dart';
@@ -237,12 +236,6 @@ List<SettingsModel> get videoSettings => [
     leading: const Icon(Icons.memory_outlined),
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: _showHwDecDialog,
-  ),
-  NormalModel(
-    title: '视频渲染器',
-    leading: const Icon(Icons.view_in_ar_outlined),
-    getSubtitle: () => '当前：${Pref.videoOutput.label}（此项即mpv的--vo）',
-    onTap: _showVideoOutputDialog,
   ),
   NormalModel(
     onTap: (context, setState) => Get.toNamed('/pictureEnhance'),
@@ -590,27 +583,6 @@ Future<void> _showVideoSyncDialog(
   }
 }
 
-Future<void> _showVideoOutputDialog(
-  BuildContext context,
-  VoidCallback setState,
-) async {
-  final res = await showDialog<VideoOutputType>(
-    context: context,
-    builder: (context) => SimpleDialog(
-      title: const Text('视频渲染器'),
-      children: [
-        for (final e in VideoOutputType.values)
-          SimpleDialogOption(
-            onPressed: () => Get.back(result: e),
-            child: Text(e.label),
-          ),
-      ],
-    ),
-  );
-  if (res == null) return;
-  await GStorage.setting.put(SettingBoxKey.videoOutput, res.value);
-  setState();
-}
 
 Future<void> _showHwDecDialog(
   BuildContext context,

@@ -420,34 +420,6 @@ List<SettingsModel> get playSettings => [
         .put(VideoBoxKey.playRepeat, value.index)
         .whenComplete(setState),
   ),
-  // --- Media3 Engine Settings (Android only) ---
-  if (Platform.isAndroid)
-    NormalModel(
-      leading: const Icon(Icons.settings_suggest_outlined),
-      title: 'Media3 播放引擎',
-      getSubtitle: () => Pref.playerEngine == 'media3' ? '已启用（音频处理/超分/截帧）' : '使用默认 media_kit',
-      onTap: (context, setState) async {
-        final engine = await showDialog<String>(
-          context: context,
-          builder: (ctx) => SimpleDialog(
-            title: const Text('Media3 播放引擎'),
-            children: [
-              for (final entry in const [
-                ('mediaKit', 'media_kit（默认）'),
-                ('media3', 'Media3（音频处理/超分/截帧）'),
-              ])
-                SimpleDialogOption(
-                  onPressed: () => Navigator.pop(ctx, entry.$1),
-                  child: Text(entry.$2),
-                ),
-            ],
-          ),
-        );
-        if (engine == null) return;
-        await GStorage.setting.put(SettingBoxKey.playerEngine, engine);
-        setState();
-      },
-    ),
   NormalModel(
     onTap: (context, setState) => Get.toNamed('/mediaSource'),
     leading: const Icon(Icons.rss_feed_outlined),

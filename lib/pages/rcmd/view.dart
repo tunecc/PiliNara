@@ -6,6 +6,8 @@ import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_v.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/pages/home/home_preview_scope.dart';
 import 'package:PiliPlus/utils/grid.dart';
@@ -44,6 +46,7 @@ class _RcmdPageState extends State<RcmdPage>
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
+            const SliverToBoxAdapter(child: _TodayRecommendSection()),
             SliverPadding(
               padding: const .only(top: Style.cardSpace, bottom: 100),
               sliver: Obx(
@@ -143,4 +146,78 @@ class _RcmdPageState extends State<RcmdPage>
       child: VideoCardVSkeleton(),
     ),
   );
+}
+
+/// Collapsible "today's picks" strip shown above the recommendation feed.
+class _TodayRecommendSection extends StatefulWidget {
+  const _TodayRecommendSection();
+
+  @override
+  State<_TodayRecommendSection> createState() => _TodayRecommendSectionState();
+}
+
+class _TodayRecommendSectionState extends State<_TodayRecommendSection> {
+  bool _expanded = false;
+  List<RcmdVideoItemAppModel>? _items;
+  bool _loading = false;
+
+  Future<void> _load() async {
+    if (_items != null || _loading) return;
+    setState(() => _loading = true);
+    final res = await VideoHttp.rcmdVideoListApp(freshIdx: 0);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (res case Success(:final response)) {
+        _items = response.take(12).toList();
+      } else {
+        _items = const [];
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(
+              Icons.auto_awesome,
+              color: theme.colorScheme.primary,
+            ),
+            title: const Text('今日推荐单'),
+            subtitle: const Text('基于当前热门的每日精选'),
+            trailing: Icon(
+              _expanded ? Icons.expand_less : Icons.expand_more,
+            ),
+            onTap: () {
+              setState(() => _expanded = !_expanded);
+              if (_expanded) _load();
+            },
+          ),
+          if (_expanded)
+            SizedBox(
+              height: 200,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : (_items == null || _items!.isEmpty)
+                  ? const Center(child: Text('暂无推荐'))
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      itemCount: _items!.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) => SizedBox(
+                        width: 150,
+                        child: VideoCardV(videoItem: _items![index]),
+                      ),
+                    ),
+            ),
+        ],
+      ),
+    );
+  }
 }
