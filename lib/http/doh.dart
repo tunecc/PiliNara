@@ -121,7 +121,7 @@ void applyDoH(HttpClient client) {
     final host = url.host;
     final port = url.port;
     final isSecure = url.scheme == 'https';
-    return () async {
+    return Future<ConnectionTask<Socket>>(() async {
       final addresses = await DoHResolver.lookup(host);
       final candidates = addresses.isNotEmpty
           ? addresses
@@ -140,6 +140,6 @@ void applyDoH(HttpClient client) {
         }
       }
       throw SocketException('Failed host lookup: $host');
-    };
+    }());
   };
 }
