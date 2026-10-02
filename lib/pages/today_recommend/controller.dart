@@ -54,14 +54,12 @@ class TodayRecommendController extends CommonListController {
           if (_creatorSignals.isNotEmpty) {
             final sorted = videos.toList()
               ..sort((a, b) {
-                final aMid = (a as RcmdVideoItemAppModel).owner.mid;
-                final bMid = (b as RcmdVideoItemAppModel).owner.mid;
                 final aSignal = _creatorSignals.firstWhere(
-                  (s) => s.mid == aMid,
+                  (s) => s.mid == a.owner.mid,
                   orElse: () => CreatorSignal(mid: 0, name: '', score: 0, watchCount: 0),
                 );
                 final bSignal = _creatorSignals.firstWhere(
-                  (s) => s.mid == bMid,
+                  (s) => s.mid == b.owner.mid,
                   orElse: () => CreatorSignal(mid: 0, name: '', score: 0, watchCount: 0),
                 );
                 return bSignal.score.compareTo(aSignal.score);
