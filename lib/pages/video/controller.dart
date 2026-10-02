@@ -1172,16 +1172,21 @@ class VideoDetailController extends GetxController
 
       if (!fromReset) {
         final progress = args.remove('progress');
-        final playUrlStartTime = defaultST == null
-            ? _resolvePlayUrlStartTime(
-                lastPlayTime: data.lastPlayTime,
-                lastPlayCid: data.lastPlayCid,
-              )
-            : null;
-        if (progress != null) {
-          defaultST = Duration(milliseconds: progress);
-        } else if (playUrlStartTime != null) {
-          defaultST = playUrlStartTime;
+        // 播放起点偏好：若开启"默认从头播放"，则忽略历史位置
+        if (Pref.playFromBegin) {
+          defaultST = Duration.zero;
+        } else {
+          final playUrlStartTime = defaultST == null
+              ? _resolvePlayUrlStartTime(
+                  lastPlayTime: data.lastPlayTime,
+                  lastPlayCid: data.lastPlayCid,
+                )
+              : null;
+          if (progress != null) {
+            defaultST = Duration(milliseconds: progress);
+          } else if (playUrlStartTime != null) {
+            defaultST = playUrlStartTime;
+          }
         }
       }
 
@@ -1640,7 +1645,8 @@ class VideoDetailController extends GetxController
       }
       if (response.lastPlayTime != null &&
           response.lastPlayTime! > 0 &&
-          _canUseLastPlayTime(response.lastPlayCid)) {
+          _canUseLastPlayTime(response.lastPlayCid) &&
+          !Pref.playFromBegin) {
         if (Accounts.get(AccountType.video).mid !=
             Accounts.get(AccountType.heartbeat).mid) {
           if (plPlayerController.position.value <= 3) {

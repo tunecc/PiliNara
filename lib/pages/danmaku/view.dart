@@ -38,13 +38,18 @@ class PlDanmaku extends StatefulWidget {
   bool get notFullscreen => !isFullScreen || isPipMode;
 }
 
-class _PlDanmakuState extends State<PlDanmaku> {
+class _PlDanmakuState extends State<PlDanmaku>
+    with SingleTickerProviderStateMixin {
   PlPlayerController get playerController => widget.playerController;
 
   late final PlDanmakuController _plDanmakuController;
   DanmakuController<DanmakuExtra>? _controller;
   int latestAddedPosition = -1;
   bool _loggedEarlySpecialDanmaku = false;
+
+  // 帧率解耦相关
+  AnimationController? _fpsDecoupleController;
+  bool _isFpsDecoupleActive = false;
 
   @override
   void initState() {
@@ -76,6 +81,124 @@ class _PlDanmakuState extends State<PlDanmaku> {
     if (!widget.isPipMode) {
       playerController.danmakuMaskPath.addListener(_onMaskPathChanged);
     }
+    _setupFpsDecouple();
+  }
+
+  void _setupFpsDecouple() {
+    if (!DanmakuOptions.enableFpsDecouple) {
+      return;
+    }
+    _fpsDecoupleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 16),
+    );
+    _isFpsDecoupleActive = true;
+  }
+
+  void _startFpsDecouple() {
+    if (_fpsDecoupleController != null &&
+        !_fpsDecoupleController!.isAnimating) {
+      _fpsDecoupleController!.addListener(_fpsDecoupleListener);
+      _fpsDecoupleController!.repeat();
+    }
+  }
+
+  void _stopFpsDecouple() {
+    if (_fpsDecoupleController != null) {
+      _fpsDecoupleController!.stop();
+      _fpsDecoupleController!.removeListener(_fpsDecoupleListener);
+    }
+  }
+
+  void _fpsDecoupleListener() {
+    if (_controller == null || !playerController.enableShowDanmaku.value) {
+      return;
+    }
+    if (!playerController.showDanmaku && !widget.isPipMode) {
+      return;
+    }
+    if (!playerController.playerStatus.isPlaying) {
+      return;
+    }
+    final currentPosition = playerController.positionInMilliseconds;
+    _processDanmakuAtPosition(currentPosition);
+  }
+
+  void _processDanmakuAtPosition(int currentPosition) {
+    currentPosition -= currentPosition % 100;
+    if (currentPosition == latestAddedPosition) {
+      return;
+    }
+    latestAddedPosition = currentPosition;
+
+    List<DanmakuElem>? currentDanmakuList = _plDanmakuController
+        .getCurrentDanmaku(currentPosition);
+    if (currentDanmakuList != null) {
+      final blockColorful = DanmakuOptions.blockColorful;
+      final danmakuWeight = DanmakuOptions.danmakuWeight;
+      for (DanmakuElem e in currentDanmakuList) {
+        if (e.weight < danmakuWeight) return;
+        if (e.mode == 7) {
+          if (kDebugMode &&
+              !_loggedEarlySpecialDanmaku &&
+              currentPosition <= 10000) {
+            _loggedEarlySpecialDanmaku = true;
+          }
+          try {
+            _controller!.addDanmaku(
+              SpecialDanmakuContentItem.fromList(
+                DmUtils.decimalToColor(e.color),
+                e.fontsize.toDouble(),
+                jsonDecode(e.content.replaceAll('\n', '\\n')),
+                extra: VideoDanmaku(
+                  id: e.id.toInt(),
+                  mid: e.midHash,
+                  like: e.likeCount.toInt(),
+                ),
+              ),
+            );
+          } catch (_) {}
+        } else {
+          final displayCount = e.count > Pref.mergeDanmakuMarkThreshold
+              ? e.count
+              : null;
+          final preferredCountPosition = switch (Pref.mergeDanmakuMarkPosition) {
+            0 => DanmakuCountPosition.hidden,
+            2 => DanmakuCountPosition.tail,
+            _ => DanmakuCountPosition.head,
+          };
+          final countPosition = displayCount == null
+              ? DanmakuCountPosition.hidden
+              : preferredCountPosition;
+          double? itemFontSize;
+          if (e.fontsize > 0 && e.count > 1) {
+            final scale = !widget.isFullScreen || widget.isPipMode
+                ? DanmakuOptions.danmakuFontScale
+                : DanmakuOptions.danmakuFontScaleFS;
+            itemFontSize = e.fontsize.toDouble() * scale;
+          }
+          _controller!.addDanmaku(
+            DanmakuContentItem(
+              e.content,
+              color: blockColorful ? Colors.white : DmUtils.decimalToColor(e.color),
+              type: DmUtils.getPosition(e.mode),
+              isColorful:
+                  playerController.showVipDanmaku &&
+                  e.colorful == DmColorfulType.VipGradualColor,
+              count: displayCount,
+              countPosition: countPosition,
+              fontSize: itemFontSize,
+              selfSend: e.isSelf,
+              extra: VideoDanmaku(
+                id: e.id.toInt(),
+                mid: e.midHash,
+                like: e.likeCount.toInt(),
+              ),
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _onMaskPathChanged() =>
@@ -106,14 +229,24 @@ class _PlDanmakuState extends State<PlDanmaku> {
     if (_controller case final controller?) {
       if (status.isPlaying) {
         controller.resume();
+        if (DanmakuOptions.enableFpsDecouple && _isFpsDecoupleActive) {
+          _startFpsDecouple();
+        }
       } else {
         controller.pause();
+        if (DanmakuOptions.enableFpsDecouple && _isFpsDecoupleActive) {
+          _stopFpsDecouple();
+        }
       }
     }
   }
 
   @pragma('vm:notify-debugger-on-exception')
   void videoPositionListen(Duration position) {
+    // 帧率解耦模式下，由 _fpsDecoupleListener 处理弹幕刷新
+    if (DanmakuOptions.enableFpsDecouple && _isFpsDecoupleActive) {
+      return;
+    }
     if (_controller == null || !playerController.enableShowDanmaku.value) {
       return;
     }
@@ -187,7 +320,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
             itemFontSize = e.fontsize.toDouble() * scale;
           }
           // If itemFontSize is null, canvas_danmaku uses global fontSize from DanmakuOption
-          
+
           _controller!.addDanmaku(
             DanmakuContentItem(
               e.content,
@@ -216,6 +349,8 @@ class _PlDanmakuState extends State<PlDanmaku> {
 
   @override
   void dispose() {
+    _stopFpsDecouple();
+    _fpsDecoupleController?.dispose();
     playerController.danmakuMaskPath.removeListener(_onMaskPathChanged); // 未注册也安全
     if (kDebugMode) {
       debugPrint(

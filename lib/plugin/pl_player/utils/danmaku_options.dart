@@ -3,6 +3,7 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/models/common/danmaku/danmaku_font_sync_mode.dart';
+import 'package:PiliPlus/models/common/danmaku/danmaku_speed_mode.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 
 abstract final class DanmakuOptions {
@@ -24,6 +25,10 @@ abstract final class DanmakuOptions {
 
   static bool get sameFontScale => danmakuFontScale == danmakuFontScaleFS;
 
+  // 弹幕速度模式：0=跟随视频，1=阅读优先，2=自定义
+  static DanmakuSpeedMode get speedMode =>
+      DanmakuSpeedMode.values.getOrNull(Pref.danmakuSpeedMode) ?? DanmakuSpeedMode.followVideo;
+
   static DanmakuOption get({
     required bool notFullscreen,
     double speed = 1.0,
@@ -41,8 +46,13 @@ abstract final class DanmakuOptions {
       fontSize: 15 * (notFullscreen ? danmakuFontScale : danmakuFontScaleFS),
       fontWeight: danmakuFontWeight,
       area: danmakuShowArea,
-      duration: danmakuDuration / speed,
-      staticDuration: danmakuStaticDuration / speed,
+      // 弹幕速度模式：跟随视频时除以倍速，阅读优先时保持固定速度
+      duration: speedMode == DanmakuSpeedMode.readPriority
+          ? danmakuDuration
+          : danmakuDuration / speed,
+      staticDuration: speedMode == DanmakuSpeedMode.readPriority
+          ? danmakuStaticDuration
+          : danmakuStaticDuration / speed,
       hideBottom: blockTypes.contains(4),
       hideScroll: blockTypes.contains(2),
       hideTop: blockTypes.contains(5),
@@ -65,6 +75,7 @@ abstract final class DanmakuOptions {
       SettingBoxKey.danmakuFontScaleFS: danmakuFontScaleFS,
       SettingBoxKey.danmakuDuration: danmakuDuration,
       SettingBoxKey.danmakuStaticDuration: danmakuStaticDuration,
+      SettingBoxKey.danmakuSpeedMode: Pref.danmakuSpeedMode,
       SettingBoxKey.danmakuStrokeWidth: danmakuStrokeWidth,
       SettingBoxKey.danmakuFontWeight: danmakuFontWeight,
       SettingBoxKey.danmakuLineHeight: danmakuLineHeight,

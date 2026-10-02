@@ -1,10 +1,13 @@
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
+import 'package:PiliPlus/models/common/danmaku/danmaku_speed_mode.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/menu_row.dart';
 import 'package:PiliPlus/pages/danmaku/mask/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/danmaku_options.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -416,6 +419,39 @@ mixin HeaderMixin<T extends StatefulWidget> on State<T> {
                         Text('滚动弹幕时长 ${DanmakuOptions.danmakuDuration} 秒'),
                         resetBtn(theme, 7.0, () => updateDuration(7.0)),
                       ],
+                    ),
+                    // 弹幕速度模式选择
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('弹幕速度模式'),
+                          SegmentedButton<DanmakuSpeedMode>(
+                            segments: const [
+                              ButtonSegment(
+                                value: DanmakuSpeedMode.followVideo,
+                                label: Text('跟随视频'),
+                              ),
+                              ButtonSegment(
+                                value: DanmakuSpeedMode.readPriority,
+                                label: Text('阅读优先'),
+                              ),
+                            ],
+                            selected: {
+                              DanmakuOptions.speedMode,
+                            },
+                            onSelectionChanged: (selection) {
+                              final mode = selection.first;
+                              GStorage.setting.put(
+                                SettingBoxKey.danmakuSpeedMode,
+                                mode.index,
+                              );
+                              setState(() {});
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                     Padding(
                       padding: sliderPadding,

@@ -40,6 +40,20 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.enableDanmakuMask,
     defaultVal: false,
   ),
+  const SwitchModel(
+    title: '弹幕帧率解耦',
+    subtitle: '弹幕刷新与屏幕刷新率解耦，使用独立定时器驱动，减少卡顿',
+    leading: Icon(Icons.refresh_outlined),
+    setKey: SettingBoxKey.enableDanmakuFpsDecouple,
+    defaultVal: false,
+  ),
+  const SwitchModel(
+    title: '默认从头播放',
+    subtitle: '开启后每次播放视频都从头开始，不恢复到历史位置',
+    leading: Icon(Icons.replay_outlined),
+    setKey: SettingBoxKey.playFromBegin,
+    defaultVal: false,
+  ),
   if (PlatformUtils.isMobile)
     const SwitchModel(
       title: '启用点击弹幕',
