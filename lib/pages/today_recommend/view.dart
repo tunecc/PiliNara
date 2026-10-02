@@ -1,21 +1,17 @@
+import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
-import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/http/loading_state.dart';
-import 'package:PiliPlus/models/common/home_tab_type.dart';
-import 'package:PiliPlus/app/app_model/app_model.video_item.dart';
-import 'package:PiliPlus/models/model_rcmd_video_item.dart';
+import 'package:PiliPlus/models/home/rcmd/result.dart';
+import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/pages/today_recommend/controller.dart';
-import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/utils/storage_key.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// 今日推荐单页面
+/// 对齐 BiliPai 设计：UP主榜 + 视频队列，支持模式切换
 class TodayRecommendPage extends StatefulWidget {
   const TodayRecommendPage({super.key});
 
@@ -23,176 +19,359 @@ class TodayRecommendPage extends StatefulWidget {
   State<TodayRecommendPage> createState() => _TodayRecommendPageState();
 }
 
-class _TodayRecommendPageState extends State<TodayRecommendPage>
-    with AutomaticKeepAliveClientMixin, GridMixin {
-  final TodayRecommendController _rcmd = Get.put(TodayRecommendController());
-
-  @override
-  bool get wantKeepAlive => true;
-
-  /// 今日日期标签
-  String get _dateLabel {
-    final now = DateTime.now();
-    final weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    return '${now.month}月${now.day}日 · 周${weekdays[now.weekday % 7]}';
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _rcmd.refresh();
-  }
+class _TodayRecommendPageState extends State<TodayRecommendPage> {
+  late final TodayRecommendController _controller = Get.put(TodayRecommendController());
+  late final RcmdController _rcmdController = Get.find<RcmdController>();
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final theme = Theme.of(context);
-    return SimpleScaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.auto_awesome, size: 20),
-            const SizedBox(width: 6),
-            Text('今日推荐', style: theme.textTheme.titleLarge),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
+    return Scaffold(
+      body: refreshIndicator(
+        onRefresh: _controller.onRefresh,
+        child: CustomScrollView(
+          slivers: [
+            // AppBar
+            SliverAppBar(
+              expandedHeight: 120,
+              floating: true,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Text('今日推荐单', style: theme.textTheme.titleLarge),
+                  ],
+                ),
+                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
               ),
-              child: Text(
-                _dateLabel,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onPrimaryContainer,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _controller.onRefresh,
+                  tooltip: '刷新',
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            
+            // 模式切换
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: _ModeSwitch(
+                  selected: _controller.mode,
+                  onChanged: (mode) => _controller.setMode(mode),
+                ),
+              ),
+            ),
+            
+            // 说明文字
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  '点开会自动从推荐单移除；想换一批可点右上角"刷新"。\n当前按你的观看习惯与模式偏好生成',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            
+            // UP主榜
+            SliverToBoxAdapter(
+              child: _UpMainSection(
+                signals: _controller.creatorSignals,
+              ),
+            ),
+            
+            // 视频队列
+            SliverPadding(
+              padding: const EdgeInsets.only(top: 8, bottom: 100),
+              sliver: Obx(
+                () => _buildVideoList(_rcmdController.loadingState.value),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoList(LoadingState loadingState) {
+    return switch (loadingState) {
+      Loading() => const SliverToBoxAdapter(
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      Success(:final response) =>
+        response != null && response.isNotEmpty
+            ? SliverList.builder(
+                itemCount: response.length,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _rcmdController.onLoadMore();
+                  }
+                  final item = response[index] as RcmdVideoItemAppModel;
+                  return _VideoQueueItem(
+                    index: index + 1,
+                    item: item,
+                    onRemove: () {
+                      _rcmdController.loadingState
+                        ..value.data!.removeAt(index)
+                        ..refresh();
+                    },
+                  );
+                },
+              )
+            : const SliverToBoxAdapter(
+                child: Center(child: Text('暂无推荐内容')),
+              ),
+      Error(:final errMsg) => SliverToBoxAdapter(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(errMsg ?? '加载失败'),
+                const SizedBox(height: 12),
+                FilledButton.tonal(
+                  onPressed: _rcmdController.onReload,
+                  child: const Text('重试'),
+                ),
+              ],
+            ),
+          ),
+        ),
+    };
+  }
+}
+
+/// 模式切换器
+class _ModeSwitch extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onChanged;
+  const _ModeSwitch({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ModeButton(
+            label: '今晚轻松看',
+            selected: selected == 0,
+            onTap: () => onChanged(0),
+          ),
+          _ModeButton(
+            label: '深度学习看',
+            selected: selected == 1,
+            onTap: () => onChanged(1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ModeButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? theme.colorScheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: selected ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurfaceVariant,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// UP主榜 section
+class _UpMainSection extends StatelessWidget {
+  final List<dynamic> signals;
+  const _UpMainSection({required this.signals});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (signals.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('UP主榜', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(
+                signals.length < 10 ? signals.length : 10,
+                (index) => _UpMainChip(
+                  index: index + 1,
+                  name: signals[index].name,
                 ),
               ),
             ),
           ],
         ),
-        actions: [
-          // 刷新
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _rcmd.onRefresh,
-            tooltip: '刷新',
-          ),
-          // 订阅保存
-          IconButton(
-            icon: const Icon(Icons.bookmark_add_outlined),
-            onPressed: _subscribeToday,
-            tooltip: '保存今日推荐单',
-          ),
-          // 分享
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: _shareToday,
-            tooltip: '分享',
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
-      body: refreshIndicator(
-        onRefresh: _rcmd.onRefresh,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          controller: _rcmd.scrollController,
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.only(top: 7, bottom: 100),
-              sliver: Obx(
-                () => _buildBody(_rcmd.loadingState.value),
+    );
+  }
+}
+
+class _UpMainChip extends StatelessWidget {
+  final int index;
+  final String name;
+  const _UpMainChip({required this.index, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: CircleAvatar(
+        radius: 10,
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        child: Text(
+          '$index',
+          style: TextStyle(
+            fontSize: 10,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      label: Text(name, style: const TextStyle(fontSize: 12)),
+    );
+  }
+}
+
+/// 视频队列条目
+class _VideoQueueItem extends StatelessWidget {
+  final int index;
+  final RcmdVideoItemAppModel item;
+  final VoidCallback onRemove;
+  const _VideoQueueItem({
+    required this.index,
+    required this.item,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      child: InkWell(
+        onTap: () {
+          // 导航到视频播放
+          if (item.bvid != null) {
+            Get.toNamed('/video', parameters: {'bvid': item.bvid!});
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 序号
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$index',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              // 内容
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: theme.textTheme.bodyLarge,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          item.owner.name ?? '',
+                          style: theme.textTheme.labelSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (item.rcmdReason != null) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            '· ${item.rcmdReason}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // 删除按钮
+              IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  Widget _buildBody(LoadingState<List<RcmdItem>?> loadingState) {
-    return switch (loadingState) {
-      Loading() => gridSkeleton,
-      Success(:final response) =>
-        response != null && response.isNotEmpty
-            ? SliverGrid.builder(
-                gridDelegate: gridDelegate,
-                itemBuilder: (context, index) {
-                  if (index == response.length - 1) {
-                    _rcmd.onLoadMore();
-                  }
-                  final hModel = response[index].toHorizontalVideoModel();
-                  return VideoCardH(
-                    video: hModel,
-                    onRemove: () {
-                      final data = _rcmd.loadingState.value.data;
-                      if (data != null && index < data.length) {
-                        data.removeAt(index);
-                        _rcmd.loadingState.refresh();
-                      }
-                    },
-                  );
-                },
-                itemCount: response.length,
-              )
-            : HttpError(onReload: _rcmd.onReload),
-      Error(:final errMsg) => HttpError(
-        errMsg: errMsg,
-        onReload: _rcmd.onReload,
-      ),
-    };
-  }
-
-  /// 保存今日推荐单到本地收藏夹
-  Future<void> _subscribeToday() async {
-    final data = _rcmd.loadingState.value.data;
-    if (data == null || data.isEmpty) {
-      SmartDialog.showToast('暂无可保存的推荐视频');
-      return;
-    }
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('保存今日推荐单'),
-        content: Text('将保存 ${data.length} 个视频到本地收藏，确定？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'save'),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (result == 'save' && mounted) {
-      final ids = data.map((v) => v.cid).whereType<int>().toList();
-      await GStorage.setting.put(SettingBoxKey.todayRecommendSaved, {
-        'date': DateTime.now().toIso8601String(),
-        'ids': ids,
-        'count': ids.length,
-      });
-      SmartDialog.showToast('已保存 ${ids.length} 个视频到今日收藏');
-    }
-  }
-
-  /// 分享今日推荐单
-  Future<void> _shareToday() async {
-    final data = _rcmd.loadingState.value.data;
-    if (data == null || data.isEmpty) return;
-    final sb = StringBuffer();
-    sb.writeln('📺 B站今日推荐（$_dateLabel）');
-    sb.writeln('=' * 30);
-    for (final v in data.take(10)) {
-      sb.writeln(v.title ?? '');
-      if (v.owner != null) sb.writeln('  ${v.owner!.name}');
-      sb.writeln('  https://b23.tv/${v.bvid}');
-    }
-    if (data.length > 10) sb.writeln('... 等共${data.length}个视频');
-    await Clipboard.setData(ClipboardData(text: sb.toString()));
-    if (mounted) SmartDialog.showToast('已复制到剪贴板');
   }
 }

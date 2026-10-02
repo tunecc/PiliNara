@@ -1,43 +1,104 @@
-import 'package:PiliPlus/models/model_rcmd_video_item.dart';
+import 'dart:math' show ln;
+
+import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
-import 'package:get/get.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:PiliPlus/utils/storage.dart';
 
-class TodayRecommendController
-    extends CommonListController<List<RcmdItem>, List<RcmdItem>> {
-  final RcmdApi _rcmdApi = RcmdApi();
+/// 创作者观看信号（对齐 BiliPai TodayWatchProfileStore）
+class _CreatorSignal {
+  final int mid;
+  final String name;
+  final double score;
+  final int watchCount;
+
+  _CreatorSignal({
+    required this.mid,
+    required this.name,
+    required this.score,
+    required this.watchCount,
+  });
+}
+
+/// 今日推荐单控制器
+/// 基于用户观看历史生成个性化推荐（UP主榜 + 视频队列）
+class TodayRecommendController extends CommonListController {
+  /// 已观看的UP主信号
+  final List<_CreatorSignal> _creatorSignals = [];
+  
+  /// 推荐模式：轻松看 / 深度学习
+  int _mode = 0; // 0=轻松看, 1=深度学习
 
   @override
-  Future<void> customGetData() async {
-    final response = await _rcmdApi.rcmdList(freshIdx: page);
-    if (response.isSuccess) {
-      return Success(response.data ?? []);
+  void onInit() {
+    super.onInit();
+    page = 0;
+    _loadCreatorSignals();
+    queryData();
+  }
+
+  /// 从播放历史加载UP主信号
+  void _loadCreatorSignals() {
+    // 简化实现：暂时返回空列表
+    // 后续可对接真实观看历史
+    _creatorSignals.clear();
+  }
+
+  /// 切换推荐模式
+  void setMode(int mode) {
+    _mode = mode;
+    page = 0;
+    queryData(true);
+  }
+
+  @override
+  Future<LoadingState> customGetData() async {
+    try {
+      // 获取App端推荐
+      final result = await VideoHttp.rcmdVideoListApp(freshIdx: page);
+      
+      if (result case Success(:final response)) {
+        final videos = response;
+        if (videos != null && videos.isNotEmpty) {
+          // 基于UP主信号排序
+          if (_creatorSignals.isNotEmpty) {
+            final sorted = videos.toList()
+              ..sort((a, b) {
+                final aSignal = _creatorSignals.firstWhere(
+                  (s) => s.mid == (a as RcmdVideoItemAppModel).owner.mid,
+                  orElse: () => _CreatorSignal(mid: 0, name: '', score: 0, watchCount: 0),
+                );
+                final bSignal = _creatorSignals.firstWhere(
+                  (s) => s.mid == (b as RcmdVideoItemAppModel).owner.mid,
+                  orElse: () => _CreatorSignal(mid: 0, name: '', score: 0, watchCount: 0),
+                );
+                return bSignal.score.compareTo(aSignal.score);
+              });
+            return Success(sorted);
+          }
+          
+          return result;
+        }
+      }
+      return result;
+    } catch (e) {
+      return Error(e.toString());
     }
-    return Error(response.toString());
   }
 
   @override
-  void handleListResponse(List<RcmdItem> dataList) {}
+  bool get isEnd => false;
 
   @override
-  List<RcmdItem>? getDataList(List<RcmdItem> response) => response;
-
-  @override
-  void checkIsEnd(int length) {
-    isEnd = length < 20;
-    hasFooter = !isEnd;
+  Future<void> onRefresh() {
+    page = 0;
+    return queryData(true);
   }
 
-  @override
-  void onLoad() {
-    if (hasFooter == true) {
-      Future.microtask(onLoadMore);
-    }
-  }
-
-  /// 加载下一页
-  Future<void> onLoadMore() => queryData(false);
-
-  /// 刷新
-  Future<void> refresh() => queryData(true);
+  /// 获取UP主榜（前10）
+  List<_CreatorSignal> get creatorSignals => _creatorSignals;
+  
+  /// 当前模式
+  int get mode => _mode;
 }

@@ -1,3 +1,4 @@
+import 'package:PiliPlus/models/horizontal_video_model.dart';
 import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
@@ -61,6 +62,30 @@ class RcmdVideoItemAppModel extends BaseRcmdVideoItemModel {
         ? ThreePoint.fromJson(json['three_point_v2'])
         : null;
     desc = json['desc'];
+  }
+
+  /// 适配为横向视频卡片（[VideoCardH]）可用的 [HorizontalVideoModel]。
+  /// 让 app 推荐数据源（今日推荐单等）也能走统一的横向卡片渲染。
+  HorizontalVideoModel toHorizontalVideoModel() =>
+      RcmdHorizontalModel.fromRcmd(this);
+}
+
+/// 将 app 推荐数据源（[RcmdVideoItemAppModel]）适配为 [HorizontalVideoModel]，
+/// 供 [VideoCardH] 渲染横向视频卡片。仅映射横向卡片实际用到的字段。
+class RcmdHorizontalModel extends HorizontalVideoModel {
+  RcmdHorizontalModel.fromRcmd(RcmdVideoItemAppModel src) {
+    aid = src.aid;
+    cid = src.cid;
+    bvid = src.bvid;
+    cover = src.cover;
+    title = src.title;
+    pubdate = src.pubdate;
+    desc = src.desc;
+    duration = src.duration;
+    owner = src.owner;
+    stat = src.stat;
+    isFollowed = src.isFollowed;
+    badge = src.pgcBadge;
   }
 }
 
