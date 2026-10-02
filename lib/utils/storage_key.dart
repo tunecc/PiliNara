@@ -211,6 +211,9 @@ abstract final class SettingBoxKey {
       danmakuLineHeight = 'danmakuLineHeight',
       danmakuStrokeWidth = 'strokeWidth',
       danmakuFontWeight = 'fontWeight';
+      bangumiUsername = 'bangumiUsername',
+      dandanplayAppId = 'dandanplayAppId',
+      dandanplayAppSecret = 'dandanplayAppSecret';
 
   static const String systemProxyHost = 'systemProxyHost',
       systemProxyPort = 'systemProxyPort';
