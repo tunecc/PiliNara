@@ -1779,4 +1779,7 @@ abstract final class Pref {
 
   static bool get enableEmoteTooltip =>
       _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
+
+  static bool get useExoPlayer =>
+      _setting.get(SettingBoxKey.useExoPlayer, defaultValue: true);
 }
