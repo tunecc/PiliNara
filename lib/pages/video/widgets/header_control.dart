@@ -583,7 +583,7 @@ class HeaderControlState extends State<HeaderControl>
                     SuperResolutionType.values,
                   ),
                   onSelected: (value, setState) {
-                    plPlayerController.setShader(value);
+                    plPlayerController.setSuperResolution(value);
                     setState();
                   },
                   descPosType: .subtitle,

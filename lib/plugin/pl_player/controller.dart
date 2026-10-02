@@ -13,6 +13,8 @@ import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/common/audio_normalization.dart';
 import 'package:PiliPlus/models/common/dm_chart_source.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
+import 'package:PiliPlus/models/common/video_enhancement_algorithm.dart';
+import 'package:PiliPlus/models/common/fsr10_shaders.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/video/play/url.dart';

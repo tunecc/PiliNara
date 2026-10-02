@@ -61,6 +61,9 @@ import 'package:PiliPlus/pages/setting/pages/double_tap_seek_zone_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/font_setting.dart';
 import 'package:PiliPlus/pages/setting/pages/logs.dart';
 import 'package:PiliPlus/pages/setting/pages/play_speed_set.dart';
+import 'package:PiliPlus/pages/setting/pages/playback_stats.dart';
+import 'package:PiliPlus/pages/setting/pages/traffic_stats.dart';
+import 'package:PiliPlus/pages/setting/pages/tv_remote_setup.dart';
 import 'package:PiliPlus/pages/setting/view.dart';
 import 'package:PiliPlus/pages/settings_search/view.dart';
 import 'package:PiliPlus/pages/space_setting/view.dart';
@@ -128,6 +131,9 @@ class Routes {
 
     // 历史记录搜索
     GetPage(name: '/playSpeedSet', page: () => const PlaySpeedPage()),
+    GetPage(name: '/playbackStats', page: () => const PlaybackStatsPage()),
+    GetPage(name: '/trafficStats', page: () => const TrafficStatsPage()),
+    GetPage(name: '/tvRemoteSetup', page: () => const TvRemoteSetupPage()),
     // 收藏搜索
     GetPage(name: '/favSearch', page: () => const FavSearchPage()),
     GetPage(name: '/historySearch', page: () => const HistorySearchPage()),

@@ -12,6 +12,7 @@ import 'package:PiliPlus/pages/setting/widgets/ordered_multi_select_dialog.dart'
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/models/audio_output_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/hwdec_type.dart';
+import 'package:PiliPlus/pages/setting/pages/video_enhancement.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/filtering_text.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -230,6 +231,14 @@ List<SettingsModel> get videoSettings => [
     leading: const Icon(Icons.memory_outlined),
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: _showHwDecDialog,
+  ),
+  NormalModel(
+    title: '画质增强',
+    subtitle: '配置 Anime4K / FSR 1.0 超分辨率选项',
+    leading: const Icon(Icons.tune),
+    onTap: (context) {
+      Get.to(() => const VideoEnhancementPage());
+    },
   ),
 ];
 

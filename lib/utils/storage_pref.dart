@@ -22,6 +22,7 @@ import 'package:PiliPlus/models/common/sponsor_block/skip_type.dart';
 import 'package:PiliPlus/models/common/super_chat_time_type.dart';
 import 'package:PiliPlus/models/common/super_chat_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
+import 'package:PiliPlus/models/common/video_enhancement_algorithm.dart';
 import 'package:PiliPlus/models/common/theme/theme_type.dart';
 import 'package:PiliPlus/models/common/video/audio_quality.dart';
 import 'package:PiliPlus/models/common/video/author_play_speed.dart';
@@ -485,8 +486,13 @@ abstract final class Pref {
 
   static String get hardwareDecoding => _setting.get(
     SettingBoxKey.hardwareDecoding,
-    defaultValue: HwDecType.kHwdec,
+    defaultValue: Platform.isAndroid
+        ? HwDecType.androidDefault
+        : HwDecType.auto.hwdec,
   );
+
+  static bool get useExoPlayer =>
+      _setting.get(SettingBoxKey.useExoPlayer, defaultValue: true);
 
   static String get videoSync =>
       _setting.get(SettingBoxKey.videoSync, defaultValue: 'display-resample');
@@ -810,6 +816,39 @@ abstract final class Pref {
     }
     return superResolutionType ?? SuperResolutionType.disable;
   }
+
+  // Video enhancement (Kototoro-style)
+  static VideoEnhancementAlgorithm get videoEnhancementAlgorithm =>
+      VideoEnhancementAlgorithm.values.elementAtOrNull(
+            _setting.get(SettingBoxKey.videoEnhancementAlgorithm, defaultValue: 0),
+          ) ??
+          VideoEnhancementAlgorithm.anime4k;
+
+  static void setVideoEnhancementAlgorithm(VideoEnhancementAlgorithm v) =>
+      _setting.put(SettingBoxKey.videoEnhancementAlgorithm, v.index);
+
+  static Anime4KPreset get videoAnime4KPreset =>
+      Anime4KPreset.values.elementAtOrNull(
+            _setting.get(SettingBoxKey.videoAnime4KPreset, defaultValue: 0),
+          ) ??
+          Anime4KPreset.fast;
+
+  static void setVideoAnime4KPreset(Anime4KPreset v) =>
+      _setting.put(SettingBoxKey.videoAnime4KPreset, v.index);
+
+  static double get videoFsrSharpness {
+    final v = _setting.get(SettingBoxKey.videoFsrSharpness, defaultValue: 0.9);
+    return (v is num ? v.toDouble() : 0.9).clamp(0.0, 1.0);
+  }
+
+  static void setVideoFsrSharpness(double v) =>
+      _setting.put(SettingBoxKey.videoFsrSharpness, v.clamp(0.0, 1.0));
+
+  static bool get videoEnhancementRemember =>
+      _setting.get(SettingBoxKey.videoEnhancementRemember, defaultValue: false);
+
+  static void setVideoEnhancementRemember(bool v) =>
+      _setting.put(SettingBoxKey.videoEnhancementRemember, v);
 
   static bool get preInitPlayer =>
       _setting.get(SettingBoxKey.preInitPlayer, defaultValue: false);

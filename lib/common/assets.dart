@@ -53,4 +53,10 @@ abstract final class Assets {
     'Anime4K_AutoDownscalePre_x4.glsl',
     'Anime4K_Upscale_CNN_x2_S.glsl',
   ];
+
+  /// FSR 1.0 EASU + RCAS 双步 pass
+  static const List<String> mpvFsr10Shaders = ['fsr10_easu.glsl', 'fsr10_rcas.glsl'];
+
+  /// FSR 1.0 低锐度 preset（efficiency 模式）
+  static const List<String> mpvFsr10ShadersLite = ['fsr10_easu.glsl', 'fsr10_rcas.glsl'];
 }
