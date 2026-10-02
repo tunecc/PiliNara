@@ -104,6 +104,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   late final VideoDetailController videoDetailController;
   late final VideoReplyController _videoReplyController;
   PlPlayerController? plPlayerController;
+  /// Title used to search DanDan (弹弹play) for third-party danmaku.
+  String get _dandanSearchTitle {
+    try {
+      if (videoDetailController.isUgc) {
+        return ugcIntroController.videoDetail.value.title ?? '';
+      } else if (!videoDetailController.isFileSource) {
+        return pgcIntroController.videoDetail.value.title ?? '';
+      }
+    } catch (_) {}
+    return '';
+  }
 
   // 标志位：是否正在进入 PiP 模式（用于防止 dispose/didPushNext 时清理播放器状态）
   bool _isEnteringPipMode = false;
@@ -1952,6 +1963,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           isFullScreen: plPlayerController!.isFullScreen.value,
                           isFileSource: videoDetailController.isFileSource,
                           size: Size(width, height),
+                          dandanSearchTitle: _dandanSearchTitle,
                         ),
                       ),
                 showEpisodes: showEpisodes,
@@ -3055,6 +3067,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                   isFullScreen: false,
                   isFileSource: videoDetailController.isFileSource,
                   size: Size(w, h),
+                  dandanSearchTitle: _dandanSearchTitle,
                 ),
               ),
       ),

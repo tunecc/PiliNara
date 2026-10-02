@@ -48,6 +48,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
+import 'package:PiliPlus/services/deep_link_handler.dart';
 import 'package:window_manager/window_manager.dart' hide calcWindowPosition;
 
 WebViewEnvironment? webViewEnvironment;
@@ -260,6 +261,12 @@ void _onBack() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) => DeepLinkHandler());
+  }
 
   static ColorScheme? _light, _dark;
 

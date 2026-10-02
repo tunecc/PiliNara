@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:PiliPlus/grpc/bilibili/community/service/dm/v1.pb.dart';
@@ -21,6 +22,10 @@ class PlDanmaku extends StatefulWidget {
   final bool isFullScreen;
   final bool isFileSource;
   final Size size;
+  /// Optional anime title used to search DanDan (弹弹play) for third-party
+  /// danmaku. Pass the video/anime title from the parent controller so the
+  /// danmaku layer can look up comments from external sources.
+  final String? dandanSearchTitle;
 
   const PlDanmaku({
     super.key,
@@ -30,6 +35,7 @@ class PlDanmaku extends StatefulWidget {
     required this.isFullScreen,
     required this.isFileSource,
     required this.size,
+    this.dandanSearchTitle,
   });
 
   @override
@@ -60,6 +66,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
       widget.cid,
       playerController,
       widget.isFileSource,
+      dandanSearchTitle: widget.dandanSearchTitle,
     );
     if (playerController.enableShowDanmaku.value) {
       if (widget.isFileSource) {
@@ -68,6 +75,8 @@ class _PlDanmakuState extends State<PlDanmaku> {
         _plDanmakuController.queryDanmaku(
           DmUtils.calcSegment(playerController.positionInMilliseconds),
         );
+        // Fire-and-forget DanDan load in parallel with Bilibili danmaku
+        unawaited(_plDanmakuController.loadDanDanIfNeeded());
       }
     }
     playerController

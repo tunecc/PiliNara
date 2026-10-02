@@ -27,14 +27,21 @@ import 'package:material_ui/material_ui.dart';
 
 List<SettingsModel> get playSettings => [
   const SwitchModel(
-    title: '弹幕开关',
+    '弹幕开关',
     subtitle: '是否展示弹幕',
     leading: Icon(CustomIcons.dm_settings),
     setKey: SettingBoxKey.enableShowDanmaku,
     defaultVal: true,
   ),
   const SwitchModel(
-    title: '智能防挡',
+    '弹弹play 弹幕',
+    subtitle: '启用第三方弹幕源（需配置 API 密钥）',
+    leading: Icon(Icons.forum_outlined),
+    setKey: SettingBoxKey.enableDanDanSource,
+    defaultVal: false,
+  ),
+  const SwitchModel(
+    '智能防挡',
     subtitle: '让弹幕避开画面中的人物（部分视频支持）',
     leading: Icon(Icons.person_off_outlined),
     setKey: SettingBoxKey.enableDanmakuMask,
@@ -411,6 +418,12 @@ List<SettingsModel> get playSettings => [
     leading: Icon(Icons.video_settings_outlined),
     setKey: SettingBoxKey.tempPlayerConf,
     defaultVal: false,
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/pluginManager'),
+    leading: const Icon(Icons.subscriptions_outlined),
+    title: '订阅规则管理',
+    subtitle: '导入/管理 KazumiRules 订阅源（支持 DM84、FQDM 等第三方站点）',
   ),
 ];
 

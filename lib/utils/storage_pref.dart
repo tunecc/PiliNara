@@ -775,6 +775,11 @@ abstract final class Pref {
   static bool get mergeDanmakuSkipBottom =>
       _setting.get(SettingBoxKey.mergeDanmakuSkipBottom, defaultValue: false);
 
+  /// Enable DanDan (弹弹play) as a third-party danmaku source.
+  /// Requires DANDANAPI_APPID and DANDANAPI_KEY dart-defines to actually work.
+  static bool get enableDanDanSource =>
+      _setting.get(SettingBoxKey.enableDanDanSource, defaultValue: false);
+
   static int get mergeDanmakuMarkPosition =>
       _setting.get(SettingBoxKey.mergeDanmakuMarkPosition, defaultValue: 2);
 
@@ -1364,6 +1369,11 @@ abstract final class Pref {
   static int get danmakuFontWeight => _setting.get(
     SettingBoxKey.danmakuFontWeight,
     defaultValue: PlatformUtils.isMobile ? 5 : 6,
+  );
+
+  static double get danmakuDandanTimelineOffset => _setting.get(
+    SettingBoxKey.dandanTimelineOffset,
+    defaultValue: 0.0,
   );
 
   static bool get enableLongShowControl =>

@@ -189,12 +189,12 @@ class SwitchModel extends SettingsModel {
   final bool needReboot;
   final void Function(BuildContext context)? onTap;
 
-  const SwitchModel({
+  const SwitchModel(
+    this.title, {
     super.subtitle,
     super.leading,
     super.contentPadding,
     super.titleStyle,
-    required String this.title,
     required this.setKey,
     this.defaultVal = false,
     this.onChanged,

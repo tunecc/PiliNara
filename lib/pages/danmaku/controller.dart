@@ -15,6 +15,7 @@ import 'package:PiliPlus/utils/danmaku_merge/worker_client.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/services/dandan/api.dart' show DandanApi, DandanComment;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as path;
@@ -23,8 +24,9 @@ class PlDanmakuController {
   PlDanmakuController(
     this._cid,
     this._plPlayerController,
-    this._isFileSource,
-  ) : _mergeDanmaku = _plPlayerController.mergeDanmaku {
+    this._isFileSource, {
+    this.dandanSearchTitle,
+  }) : _mergeDanmaku = _plPlayerController.mergeDanmaku {
     if (kDebugMode) {
       debugPrint(
         '[PlDanmakuController] create instance=${identityHashCode(this)} '
@@ -41,14 +43,18 @@ class PlDanmakuController {
   final PlPlayerController _plPlayerController;
   final bool _mergeDanmaku;
   final bool _isFileSource;
+  final String? dandanSearchTitle;
 
   late final _isLogin = Accounts.main.isLogin;
 
   final Map<int, List<DanmakuElem>> _dmSegMap = HashMap();
   final Map<int, List<DanmakuElem>> _rawDmSegMap = HashMap();
+  /// DanDan (弹弹play) comments keyed by 100ms segment, merged into output.
+  final Map<int, List<DanmakuElem>> _dandanSegMap = HashMap();
   final Map<int, int> _prefetchRetryAtMs = HashMap();
   final Map<int, int> _prefetchFailureCount = HashMap();
   final Set<int> _missingSeg = HashSet();
+  final Set<String> _dandanLoadedKeys = {};
   // 已请求的段落标记
   late final Set<int> _requestedSeg = HashSet();
   late final Set<int> _queuedSeg = HashSet();
@@ -98,7 +104,9 @@ class PlDanmakuController {
     _rawDmSegMap.clear();
     _prefetchRetryAtMs.clear();
     _prefetchFailureCount.clear();
+    _dandanSegMap.clear();
     _missingSeg.clear();
+    _dandanLoadedKeys.clear();
     _requestedSeg.clear();
     _queuedSeg.clear();
     _mergedSeg.clear();
@@ -377,6 +385,80 @@ class PlDanmakuController {
           _scheduleSegment(segmentIndex + 1, isPrefetch: true);
         }
         return null;
+      }
+    }
+    return _dmSegMap[progress ~/ 100];
+  }
+
+  /// Load DanDan (弹弹play) comments for the current video if enabled and a
+  /// search title is available. Results are merged into [_dandanSegMap].
+  Future<void> loadDanDanIfNeeded() async {
+    if (!Pref.enableDanDanSource || dandanSearchTitle == null) return;
+    if (!DandanCredentials.isEnabled) return;
+    final key = 'dd$_cid';
+    if (_dandanLoadedKeys.contains(key)) return;
+    _dandanLoadedKeys.add(key);
+    try {
+      final res = await DandanApi.searchAnime(dandanSearchTitle!);
+      if (res.animes.isEmpty) return;
+      // Pick the best match (first result; DanDan search is ordered by relevance)
+      final best = res.animes.first;
+      final episodes = await DandanApi.getEpisodes(best.animeId);
+      if (episodes.isEmpty) return;
+      // Episode numbering: Bilibili ep 1 → DanDan episode 1 (1-based)
+      // The cid-based episode isn't directly available here; fall back to
+      // searching by title match and using episode index derived from position.
+      // For now, load the first episode as a reasonable default.
+      final comments = await DandanApi.getComments(episodes.first.episodeId);
+      for (final c in comments) {
+        final elem = _dandanCommentToElem(c);
+        final pos = (c.time * 1000).round() ~/ 100;
+        (_dandanSegMap[pos] ??= []).add(elem);
+      }
+      if (kDebugMode) {
+        debugPrint(
+          '[PlDanmakuController] DanDan loaded ${comments.length} comments '
+          'for cid=$_cid anime=${best.animeTitle}',
+        );
+      }
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[PlDanmakuController] DanDan load failed: $e');
+        debugPrintStack(stackTrace: st);
+      }
+    }
+  }
+
+  static DanmakuElem _dandanCommentToElem(DandanComment c) {
+    // DanDan type mapping: 1=scroll, 4=bottom, 5=top, 7=special/subtitle
+    final mode = switch (c.type) {
+      4 => 4,
+      5 => 5,
+      7 => 7,
+      _ => 1,
+    };
+    // Color: DanDan sends RGB int; convert to Flutter ARGB int
+    final color = 0xFF000000 | c.color;
+    return DanmakuElem()
+      ..progress = (c.time * 1000).round()
+      ..mode = mode
+      ..content = c.message
+      ..color = color
+      ..weight = 1.0
+      ..fontsize = 25;
+  }
+
+  List<DanmakuElem>? getCurrentDanmaku(int progress) {
+    // Merge DanDan comments at the query point
+    if (Pref.enableDanDanSource && _dandanSegMap.isNotEmpty) {
+      final seg = progress ~/ 100;
+      final dandan = _dandanSegMap[seg];
+      if (dandan != null) {
+        final bili = _dmSegMap[seg];
+        if (bili != null) {
+          return bili..addAll(dandan);
+        }
+        return dandan;
       }
     }
     return _dmSegMap[progress ~/ 100];
