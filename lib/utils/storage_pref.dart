@@ -1423,6 +1423,22 @@ abstract final class Pref {
   static bool get enableAutoLongPressSpeed =>
       _setting.get(SettingBoxKey.enableAutoLongPressSpeed, defaultValue: false);
 
+  static bool get enableLongPressSlideSpeed =>
+      _setting.get(SettingBoxKey.enableLongPressSlideSpeed, defaultValue: true);
+
+  static double get longPressSpeedFactor =>
+      _setting.get(SettingBoxKey.longPressSpeedFactor, defaultValue: 2.0);
+
+  static bool get enableTvMode =>
+      _setting.get(SettingBoxKey.enableTvMode, defaultValue: false);
+
+  static bool get tvFocusEnabled =>
+      _setting.get(SettingBoxKey.tvFocusEnabled, defaultValue: true);
+
+  static int get tvDpadSpeed =>
+      _setting.get(SettingBoxKey.tvDpadSpeed, defaultValue: 10);
+
+
   static double get playSpeedDefault =>
       _video.get(VideoBoxKey.playSpeedDefault, defaultValue: 1.0);
 

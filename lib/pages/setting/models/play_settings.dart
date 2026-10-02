@@ -54,6 +54,18 @@ List<SettingsModel> get playSettings => [
     title: '倍速设置',
     subtitle: '设置视频播放速度',
   ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/playbackStats'),
+    leading: const Icon(Icons.bar_chart_outlined),
+    title: '播放统计',
+    subtitle: '查看倍速使用、时间节约等统计',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/trafficStats'),
+    leading: const Icon(Icons.network_cell_outlined),
+    title: '流量统计',
+    subtitle: '查看网络上下行流量',
+  ),
   if (Platform.isAndroid)
     NormalModel(
       onTap: _showAngleDegreesDialog,
@@ -412,6 +424,13 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.tempPlayerConf,
     defaultVal: false,
   ),
+  if (PlatformUtils.isDesktop)
+    NormalModel(
+      onTap: (context, setState) => Get.toNamed('/tvRemoteSetup'),
+      leading: const Icon(Icons.tv_outlined),
+      title: 'TV 遥控器模式',
+      subtitle: '针对电视/投影仪大屏优化',
+    ),
 ];
 
 Future<void> _showSubtitleDialog(

@@ -55,6 +55,8 @@ abstract final class SettingBoxKey {
       enableInAppPip = 'enableInAppPip',
       enableInAppPipToSystemPip = 'enableInAppPipToSystemPip',
       enableAutoLongPressSpeed = 'enableAutoLongPressSpeed',
+      enableLongPressSlideSpeed = 'enableLongPressSlideSpeed',
+      longPressSpeedFactor = 'longPressSpeedFactor',
       useRelativeSlide = 'useRelativeSlide',
       sliderDuration = 'sliderOffset',
       enableQuickDouble = 'enableQuickDouble',
@@ -205,7 +207,12 @@ abstract final class SettingBoxKey {
       angleDegrees = 'angleDegrees',
       liveStream = 'liveStream',
       enableDocProvider = 'enableDocProvider',
-      enableEmoteTooltip = 'enableEmoteTooltip';
+      enableEmoteTooltip = 'enableEmoteTooltip',
+      playbackStats = 'playbackStats',
+      trafficStats = 'trafficStats',
+      enableTvMode = 'enableTvMode',
+      tvFocusEnabled = 'tvFocusEnabled',
+      tvDpadSpeed = 'tvDpadSpeed';
 
   static const String enableAiChat = 'enableAiChat',
       aiApiUrl = 'aiApiUrl',
