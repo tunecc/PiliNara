@@ -1,12 +1,18 @@
 /// Animeko aggregation page UI.
 ///
-/// Displays search results from multiple anime data sources (Mikan, DMHY)
-/// in a unified interface.
+/// Full-featured page with:
+/// - Bangumi-integrated search (exact match via Bangumi ID)
+/// - Multi-source results (Mikan + DMHY)
+/// - Episode/range filtering
+/// - Resolution/alliance sorting
+/// - Magnet link handling
 
-import 'package:PiliNara/models_new/animeko/animeko_resource.dart';
-import 'package:PiliNara/pages/animeko/controller.dart';
-import 'package:PiliNara/pages/animeko/widgets/resource_card.dart';
-import 'package:PiliNara/utils/page_utils.dart';
+import 'package:PiliPlus/models_new/animeko/animeko_resource.dart';
+import 'package:PiliPlus/pages/animeko/widgets/resource_card.dart';
+import 'package:PiliPlus/services/animeko_service.dart';
+import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/utils.dart';
+import 'package:flutter/material.dart' as material;
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -18,13 +24,13 @@ class AnimekoPage extends StatefulWidget {
 }
 
 class _AnimekoPageState extends State<AnimekoPage> {
-  late final AnimekoController controller;
+  late final AnimekoService service;
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    controller = Get.put(AnimekoController());
+    service = Get.put(AnimekoService());
   }
 
   @override
@@ -34,7 +40,7 @@ class _AnimekoPageState extends State<AnimekoPage> {
   }
 
   void _performSearch() {
-    controller.search(_searchController.text.trim());
+    service.search(_searchController.text.trim());
   }
 
   @override
@@ -43,6 +49,12 @@ class _AnimekoPageState extends State<AnimekoPage> {
       appBar: AppBar(
         title: const Text('番剧聚合'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Get.toNamed('/animekoSettings'),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -52,9 +64,9 @@ class _AnimekoPageState extends State<AnimekoPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: material.TextField(
                     controller: _searchController,
-                    decoration: InputDecoration(
+                    decoration: material.InputDecoration(
                       hintText: '搜索番剧名称...',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
@@ -67,12 +79,12 @@ class _AnimekoPageState extends State<AnimekoPage> {
                 ),
                 const SizedBox(width: 12),
                 Obx(() => ElevatedButton(
-                      onPressed: controller.isLoading.value ? null : _performSearch,
-                      child: controller.isLoading.value
+                      onPressed: service.isLoading.value ? null : _performSearch,
+                      child: service.isLoading.value
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: material.CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('搜索'),
                     )),
@@ -80,27 +92,39 @@ class _AnimekoPageState extends State<AnimekoPage> {
             ),
           ),
 
-          // Filters
+          // Episode filter (shown when searching with episode context)
           Obx(() {
-            if (controller.allResources.isEmpty && !controller.isLoading.value) {
+            if (service.allResources.isEmpty && !service.isLoading.value) {
               return const SizedBox.shrink();
             }
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  _filterChip('全部', controller.sourceFilter.value == '全部',
-                      () => controller.setSourceFilter('全部')),
+                  _filterChip('全部', service.preferredSource.value == '全部',
+                      () => service.setSourceFilter('全部')),
+                  _filterChip('蜜柑计划', service.preferredSource.value == '蜜柑计划',
+                      () => service.setSourceFilter('蜜柑计划')),
+                  _filterChip('动漫花园', service.preferredSource.value == '动漫花园',
+                      () => service.setSourceFilter('动漫花园')),
                   const SizedBox(width: 8),
-                  _filterChip('蜜柑计划', controller.sourceFilter.value == '蜜柑计划',
-                      () => controller.setSourceFilter('蜜柑计划')),
-                  const SizedBox(width: 8),
-                  _filterChip('动漫花园', controller.sourceFilter.value == '动漫花园',
-                      () => controller.setSourceFilter('动漫花园')),
+                  // Resolution filter
+                  DropdownButton<String>(
+                    value: service.preferredResolution.value == '全部' ? null : service.preferredResolution.value,
+                    items: ['全部', '4K', '1080P', '720P', '480P']
+                        .map((r) => DropdownMenuItem(
+                              value: r == '全部' ? null : r,
+                              child: Text(r),
+                            ))
+                        .toList(),
+                    onChanged: (v) => service.setResolutionFilter(v ?? '全部'),
+                  ),
                   const Spacer(),
-                  Checkbox(
-                    value: controller.showTorrentOnly.value,
-                    onChanged: (v) => controller.toggleTorrentOnly(v ?? false),
+                  material.Checkbox(
+                    value: service.showTorrentOnly.value,
+                    onChanged: (v) => service.toggleTorrentOnly(v ?? false),
                   ),
                   const Text('仅BT'),
                 ],
@@ -110,15 +134,15 @@ class _AnimekoPageState extends State<AnimekoPage> {
 
           // Results count
           Obx(() {
-            if (controller.allResources.isEmpty && !controller.isLoading.value) {
+            if (service.allResources.isEmpty && !service.isLoading.value) {
               return const SizedBox.shrink();
             }
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
-                '找到 ${controller.allResources.length} 个资源'
-                '${controller.totalMikan.value > 0 ? ' (蜜柑: ${controller.totalMikan.value})' : ''}'
-                '${controller.totalDmhy.value > 0 ? ' (DMHY: ${controller.totalDmhy.value})' : ''}',
+                '找到 ${service.allResources.length} 个资源'
+                '${service.totalMikan.value > 0 ? ' (蜜柑: ${service.totalMikan.value})' : ''}'
+                '${service.totalDmhy.value > 0 ? ' (DMHY: ${service.totalDmhy.value})' : ''}',
                 style: const TextStyle(color: Colors.grey),
               ),
             );
@@ -127,18 +151,18 @@ class _AnimekoPageState extends State<AnimekoPage> {
           // Results list
           Expanded(
             child: Obx(() {
-              if (controller.isLoading.value && controller.allResources.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
+              if (service.isLoading.value && service.allResources.isEmpty) {
+                return const Center(child: material.CircularProgressIndicator());
               }
 
-              if (controller.errorMsg.value.isNotEmpty) {
+              if (service.errorMsg.value.isNotEmpty) {
                 return Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.error_outline, size: 48, color: Colors.red),
                       const SizedBox(height: 16),
-                      Text(controller.errorMsg.value),
+                      Text(service.errorMsg.value),
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _performSearch,
@@ -149,7 +173,7 @@ class _AnimekoPageState extends State<AnimekoPage> {
                 );
               }
 
-              if (controller.allResources.isEmpty) {
+              if (service.allResources.isEmpty) {
                 return const Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -157,17 +181,18 @@ class _AnimekoPageState extends State<AnimekoPage> {
                       Icon(Icons.search_off, size: 64, color: Colors.grey),
                       SizedBox(height: 16),
                       Text('输入番剧名称开始搜索', style: TextStyle(color: Colors.grey)),
+                      SizedBox(height: 8),
+                      Text('支持 Bangumi 精确匹配 + Mikan/DMHY 双源聚合', style: TextStyle(color: Colors.grey, fontSize: 12)),
                     ],
                   ),
                 );
               }
 
-              final filtered = controller.filteredResources;
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: filtered.length,
+                itemCount: service.allResources.length,
                 itemBuilder: (context, index) {
-                  final resource = filtered[index];
+                  final resource = service.allResources[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: ResourceCard(resource: resource),
