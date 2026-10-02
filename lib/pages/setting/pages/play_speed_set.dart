@@ -473,6 +473,14 @@ class _PlaySpeedPageState extends State<PlaySpeedPage> {
               onChanged: (val) =>
                   setState(() => enableAutoLongPressSpeed = val),
             ),
+            SetSwitchItem(
+              title: '长按滑动临时倍速',
+              subtitle: '长按播放时上下滑动可临时调整倍速，松手后恢复默认',
+              setKey: SettingBoxKey.enableLongPressSlideSpeed,
+              defaultVal: Pref.enableLongPressSlideSpeed,
+              onChanged: (val) =>
+                  setState(() => Pref.enableLongPressSlideSpeed = val),
+            ),
             if (!enableAutoLongPressSpeed)
               ListTile(
                 title: const Text('默认长按倍速'),

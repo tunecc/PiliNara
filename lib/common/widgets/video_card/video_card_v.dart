@@ -214,21 +214,29 @@ class VideoCardV extends StatelessWidget {
                   ),
                 Expanded(
                   flex: 1,
-                  child: Text(
-                    remarkedName(
-                      videoItem.owner.mid,
-                      videoItem.owner.name.toString(),
-                    ),
-                    maxLines: 1,
-                    overflow: .clip,
-                    semanticsLabel: 'UP：${remarkedName(
-                      videoItem.owner.mid,
-                      videoItem.owner.name.toString(),
-                    )}',
-                    style: TextStyle(
-                      height: 1.5,
-                      fontSize: theme.textTheme.labelMedium!.fontSize,
-                      color: theme.colorScheme.outline,
+                  child: InkWell(
+                    onTap: videoItem.owner.mid != null
+                        ? () => PageUtils.toDupNamed(
+                            '/member',
+                            parameters: {
+                              'mid': videoItem.owner.mid.toString(),
+                            },
+                          )
+                        : null,
+                    child: Text(
+                      remarkedName(
+                        videoItem.owner.mid,
+                        videoItem.owner.name.toString(),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      semanticsLabel:
+                          'UP：${remarkedName(videoItem.owner.mid, videoItem.owner.name.toString())}',
+                      style: TextStyle(
+                        height: 1.5,
+                        fontSize: theme.textTheme.labelMedium!.fontSize,
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                   ),
                 ),

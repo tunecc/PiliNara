@@ -1952,6 +1952,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           isFullScreen: plPlayerController!.isFullScreen.value,
                           isFileSource: videoDetailController.isFileSource,
                           size: Size(width, height),
+                          onDanmakuControllerCreated: (ctrl) {
+                            videoDetailController._plDanmakuControllerRef = ctrl;
+                          },
                         ),
                       ),
                 showEpisodes: showEpisodes,
@@ -2200,6 +2203,24 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                     ),
                   );
                 },
+              ),
+            ),
+            // 弹幕池搜索按钮
+            SizedBox.square(
+              dimension: 38,
+              child: IconButton(
+                onPressed: () {
+                  if (videoDetailController._plDanmakuControllerRef == null) {
+                    SmartDialog.showToast('弹幕尚未加载');
+                    return;
+                  }
+                  videoDetailController.showDanmakuPoolSheet(context: context);
+                },
+                icon: Icon(
+                  Icons.format_list_bulleted,
+                  size: 22,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             const SizedBox(width: 14),

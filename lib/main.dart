@@ -15,6 +15,8 @@ import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/services/download/download_collection_service.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/services/logger.dart';
+import 'package:PiliPlus/services/playback_stats_service.dart';
+import 'package:PiliPlus/services/traffic_stats_service.dart';
 import 'package:PiliPlus/services/route_stack_observer.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
@@ -114,6 +116,8 @@ void main() async {
     ..lazyPut(AccountService.new)
     ..lazyPut(DownloadService.new)
     ..put(DownloadCollectionService());
+  PlaybackStatsService.initializeAppLifecycle();
+  TrafficStatsService.instance.initialize();
   HttpOverrides.global = _CustomHttpOverrides();
 
   if (PlatformUtils.isMobile) {

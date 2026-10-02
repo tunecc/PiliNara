@@ -15,9 +15,12 @@ import 'package:PiliPlus/pages/video/reply/vote/reply_vote_item.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/pages/video/reply_reply/view.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/pages/video/reply/comment_search_sheet.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class VideoReplyPanel extends StatefulWidget {
   const VideoReplyPanel({
@@ -109,6 +112,35 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
                               fontSize: 13,
                               color: colorScheme.secondary,
                             ),
+                          ),
+                        ),
+                        // 搜索评论按钮
+                        IconButton(
+                          onPressed: () {
+                            final replies = (_videoReplyController.loadingState.value as? Success)?.data ?? [];
+                            if (replies.isEmpty) {
+                              SmartDialog.showToast('暂无评论可搜索');
+                              return;
+                            }
+                            PageUtils.showVideoBottomSheet(
+                              context,
+                              child: CommentSearchSheet(
+                                replies: replies,
+                                upMid: _videoReplyController.upMid?.toInt() ?? 0,
+                                onCommentClick: (reply) {
+                                  // 点击评论可跳转（暂不实现具体导航）
+                                },
+                                onSubReplyClick: (rootReply) {
+                                  // 点击楼中楼可定位到根评论
+                                },
+                                onDismiss: () => Get.back(),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.search,
+                            size: 18,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
