@@ -1184,6 +1184,31 @@ abstract final class Pref {
     defaultValue: false,
   );
 
+  // 今日推荐单设置
+  static bool get todayWatchEnabled => _setting.get(
+    SettingBoxKey.todayWatchEnabled,
+    defaultValue: false,
+  );
+
+  static set todayWatchEnabled(bool value) =>
+      _setting.put(SettingBoxKey.todayWatchEnabled, value);
+
+  static int get todayWatchMode => _setting.get(
+    SettingBoxKey.todayWatchMode,
+    defaultValue: 0,
+  );
+
+  static set todayWatchMode(int value) =>
+      _setting.put(SettingBoxKey.todayWatchMode, value);
+
+  static int get todayWatchStrategy => _setting.get(
+    SettingBoxKey.todayWatchStrategy,
+    defaultValue: 0,
+  );
+
+  static set todayWatchStrategy(int value) =>
+      _setting.put(SettingBoxKey.todayWatchStrategy, value);
+
   static bool get enableBackgroundPlay =>
       _setting.get(SettingBoxKey.enableBackgroundPlay, defaultValue: true);
 
