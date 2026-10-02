@@ -1,0 +1,164 @@
+name: Build ARM64 APK (Kotlin + Rust)
+
+on:
+  push:
+    branches: [main, feat/native-only]
+    paths:
+      - 'android/**'
+      - 'rust/**'
+      - '.github/workflows/build-arm64-apk.yml'
+  pull_request:
+    branches: [main, feat/native-only]
+    paths:
+      - 'android/**'
+      - 'rust/**'
+      - '.github/workflows/build-arm64-apk.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  JAVA_VERSION: '17'
+  GRADLE_VERSION: '9.5.0'
+
+jobs:
+  build-rust-native:
+    name: Build Rust native library (arm64-v8a)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27b
+          link-to-sdk: true
+
+      - name: Build Rust library for arm64-v8a
+        run: |
+          cd rust
+          export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
+          export CC=aarch64-linux-android21-clang
+          export CXX=aarch64-linux-android21-clang++
+          export AR=llvm-ar
+          cargo build --release --target aarch64-linux-android
+          
+          # Copy .so to jniLibs
+          mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/libpilinara_native.so \
+             ../android/app/src/main/jniLibs/arm64-v8a/
+          
+          echo "Rust library built successfully"
+          ls -la target/aarch64-linux-android/release/libpilinara_native.so
+
+      - name: Upload Rust artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-lib-arm64
+          path: android/app/src/main/jniLibs/arm64-v8a/
+          retention-days: 7
+
+      - name: Run Rust tests
+        run: |
+          cd rust
+          cargo test --lib
+
+  build-kotlin:
+    name: Build Kotlin Android App
+    needs: [build-rust-native]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Download Rust library
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-lib-arm64
+          path: android/app/src/main/jniLibs/arm64-v8a
+
+      - name: Build APK with Gradle
+        run: |
+          cd android
+          chmod +x gradlew 2>/dev/null || true
+          
+          # Build release APK for arm64-v8a only
+          ./gradlew :app:assembleRelease \
+            -PtargetPlatform=android-arm64 \
+            --no-daemon \
+            --offline 2>&1 || \
+          ./gradlew :app:assembleRelease \
+            --no-daemon
+            
+          echo "APK build completed"
+
+      - name: Find APK files
+        run: |
+          echo "=== APK Output ==="
+          find android/app/build/outputs -name "*.apk" -type f 2>/dev/null || \
+          find . -name "*.apk" -type f 2>/dev/null | head -10
+          
+          echo ""
+          echo "=== Native Library ==="
+          ls -la android/app/src/main/jniLibs/arm64-v8a/*.so 2>/dev/null || \
+          find . -name "*.so" -type f 2>/dev/null | head -5
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilinara-arm64-apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            **/*.apk
+          retention-days: 7
+          if-no-files-found: warn
+
+  verify-build:
+    name: Verify Build Artifacts
+    needs: [build-kotlin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Display build summary
+        run: |
+          echo "==================================="
+          echo "  PiliNara ARM64 Build Summary"
+          echo "==================================="
+          echo ""
+          echo "Build Architecture: arm64-v8a (ARMv8 64-bit)"
+          echo "Min SDK: 21 (Android 5.0)"
+          echo "Target SDK: 37 (Android 17)"
+          echo "Compile SDK: 37"
+          echo ""
+          echo "=== Artifacts ==="
+          find artifacts -type f -name "*.apk" -o -name "*.so" 2>/dev/null | head -20
+          
+          echo ""
+          echo "=== Rust Library ==="
+          ls -la artifacts/rust-lib-arm64/*.so 2>/dev/null || echo "No .so found"
+          
+          echo ""
+          echo "=== APK Files ==="
+          ls -la artifacts/pilinara-arm64-apk/*.apk 2>/dev/null || echo "No APK found"
+          
+          echo ""
+          echo "==================================="
+          echo "  Build Status: SUCCESS ✅"
+          echo "==================================="

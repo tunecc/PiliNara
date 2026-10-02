@@ -201,17 +201,25 @@ class VideoCardH extends StatelessWidget {
                 );
               }),
             ),
-          Text(
-            "$pubdate${remarkedName(
-              videoItem.owner.mid,
-              videoItem.owner.name ?? '',
-            )}",
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1,
-              color: theme.colorScheme.outline,
-              overflow: .clip,
+          GestureDetector(
+            onTap: videoItem.owner.mid != null
+                ? () => PageUtils.toDupNamed(
+                    '/member',
+                    parameters: {'mid': videoItem.owner.mid.toString()},
+                  )
+                : null,
+            child: Text(
+              "$pubdate${remarkedName(
+                videoItem.owner.mid,
+                videoItem.owner.name ?? '',
+              )}",
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1,
+                color: theme.colorScheme.outline,
+                overflow: TextOverflow.clip,
+              ),
             ),
           ),
           if (videoItem.isLive != true) ...[
