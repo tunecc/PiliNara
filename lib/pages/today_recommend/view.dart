@@ -110,16 +110,21 @@ class _TodayRecommendPageState extends State<TodayRecommendPage> {
                   if (index == response.length - 1) {
                     _rcmdController.onLoadMore();
                   }
-                  final item = response[index] as RcmdVideoItemAppModel;
-                  return _VideoQueueItem(
-                    index: index + 1,
-                    item: item,
-                    onRemove: () {
-                      _rcmdController.loadingState
-                        ..value.data!.removeAt(index)
-                        ..refresh();
-                    },
-                  );
+                  final rawItem = response[index];
+                  if (rawItem is RcmdVideoItemAppModel) {
+                    return _VideoQueueItem(
+                      index: index + 1,
+                      item: rawItem,
+                      onRemove: () {
+                        final data = _rcmdController.loadingState.value.data;
+                        if (data != null && index < data.length) {
+                          data.removeAt(index);
+                          _rcmdController.loadingState.refresh();
+                        }
+                      },
+                    );
+                  }
+                  return const SizedBox.shrink();
                 },
               )
             : const SliverToBoxAdapter(
@@ -215,7 +220,7 @@ class _ModeButton extends StatelessWidget {
 
 /// UP主榜 section
 class _UpMainSection extends StatelessWidget {
-  final List<dynamic> signals;
+  final List<CreatorSignal> signals;
   const _UpMainSection({required this.signals});
 
   @override

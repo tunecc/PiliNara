@@ -45,7 +45,7 @@ class TodayRecommendController extends CommonListController {
     try {
       // 获取App端推荐
       final result = await VideoHttp.rcmdVideoListApp(freshIdx: page);
-      
+
       if (result case Success(:final response)) {
         final videos = response;
         if (videos.isNotEmpty) {
@@ -65,7 +65,7 @@ class TodayRecommendController extends CommonListController {
               });
             return Success(sorted);
           }
-          
+
           return result;
         }
       }
