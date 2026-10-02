@@ -1,6 +1,5 @@
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
-import 'package:PiliPlus/models/home/rcmd/result.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 
 /// 创作者观看信号（对齐 BiliPai TodayWatchProfileStore）
