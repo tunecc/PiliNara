@@ -182,3 +182,9 @@ test*
 !/.comet/config.yaml
 # <<< Comet managed project state <<<
 docs/comet/.DS_Store
+rust/target/
+.cargo/
+
+# Rust build artifacts
+rust/target/
+.rust-up/.cache/

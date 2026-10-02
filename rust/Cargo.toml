@@ -1,0 +1,31 @@
+[package]
+name = "pilinara-native"
+version = "0.1.0"
+edition = "2021"
+description = "PiliNara native Rust libraries for Android"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "pilinara_native"
+
+[dependencies]
+# For testing on host (x86_64)
+image = { version = "0.25", default-features = false, features = ["webp"], optional = true }
+
+# Audio normalization (simplified, no external deps for now)
+# dynaudnorm = { version = "0.1", optional = true }
+
+# FFI - only for Android target
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+[features]
+default = []
+webp = ["dep:image"]
+audio-normalization = []
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1

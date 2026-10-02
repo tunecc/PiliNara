@@ -1,0 +1,4 @@
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android21-clang"
+ar = "llvm-ar"
+rustflags = ["-C", "link-arg=-fuse-ld=lld", "-C", "link-arg=-Wl,-soname,libpilinara_native.so"]
