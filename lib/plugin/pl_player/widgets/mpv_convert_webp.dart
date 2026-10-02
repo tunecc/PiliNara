@@ -5,6 +5,8 @@ import 'dart:ffi';
 
 import 'package:PiliPlus/http/browser_ua.dart';
 import 'package:PiliPlus/http/constants.dart';
+import 'package:PiliPlus/plugin/pl_player/models/animated_webp_converter.dart';
+import 'package:PiliPlus/plugin/pl_player/models/webp_preset.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:get/get_rx/get_rx.dart';
@@ -15,7 +17,7 @@ import 'package:media_kit/generated/libmpv/bindings.dart' as generated;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit/src/player/native/core/initializer.dart';
 
-class MpvConvertWebp {
+class MpvConvertWebp implements AnimatedWebpConverter {
   final _mpv = NativePlayer.mpv;
   late final Pointer<generated.mpv_handle> _ctx;
   final _completer = Completer<bool>();
@@ -44,7 +46,6 @@ class MpvConvertWebp {
       _mpv,
       _onEvent,
       options: {
-        'idle': 'once',
         'o': outFile,
         'start': start.toStringAsFixed(3),
         'end': (start + duration).toStringAsFixed(3),
@@ -55,11 +56,6 @@ class MpvConvertWebp {
         if (enableHA) 'vo': 'gpu',
         if (enableHA) 'hwdec': '${Pref.hardwareDecoding},auto-copy', // transcode only support copy
       },
-    );
-    _mpv.mpv_request_event(
-      _ctx,
-      generated.mpv_event_id.MPV_EVENT_VIDEO_RECONFIG,
-      0,
     );
     NativePlayer.setHeader(
       _mpv,
@@ -75,12 +71,14 @@ class MpvConvertWebp {
     calloc.free(level);
   }
 
+  @override
   void dispose() {
     Initializer.dispose(_ctx);
     _mpv.mpv_terminate_destroy(_ctx);
     if (!_completer.isCompleted) _completer.complete(false);
   }
 
+  @override
   Future<bool> convert() async {
     await _init();
     _command(['loadfile', url]);
@@ -111,7 +109,8 @@ class MpvConvertWebp {
           _success = false;
         }
         break;
-      case generated.mpv_event_id.MPV_EVENT_SHUTDOWN:
+      case generated.mpv_event_id.MPV_EVENT_END_FILE ||
+          generated.mpv_event_id.MPV_EVENT_SHUTDOWN:
         progress?.value = 1;
         _completer.complete(_success);
         dispose();
@@ -144,21 +143,4 @@ class MpvConvertWebp {
 
     calloc.free(name);
   }
-}
-
-enum WebpPreset {
-  none('none', '无', '不使用预设'),
-  def('default', '默认', '默认预设'),
-  picture('picture', '图片', '数码照片，如人像、室内拍摄'),
-  photo('photo', '照片', '户外摄影，自然光环境'),
-  drawing('drawing', '绘图', '手绘或线稿，高对比度细节'),
-  icon('icon', '图标', '小型彩色图像'),
-  text('text', '文本', '文字类'),
-  ;
-
-  final String flag;
-  final String name;
-  final String desc;
-
-  const WebpPreset(this.flag, this.name, this.desc);
 }

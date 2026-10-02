@@ -1,14 +1,14 @@
 name: Build
 
 on:
-  # pull_request:
-  #     types:
-  #         - opened
-  #         - synchronize
-  #         - reopened
-  #         - ready_for_review
-  #     paths-ignore:
-  #         - "**.md"
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths-ignore:
+      - "**.md"
   workflow_dispatch:
     inputs:
       build_android:
@@ -16,67 +16,107 @@ on:
         required: false
         default: true
         type: boolean
-      build_ios:
-        description: "Build iOS"
-        required: false
-        default: false
-        type: boolean
-      build_mac:
-        description: "Build Mac"
-        required: false
-        default: false
-        type: boolean
-      build_win_x64:
-        description: "Build Win-x64"
-        required: false
-        default: false
-        type: boolean
-      build_linux_x64:
-        description: "Build Linux-x64"
-        required: false
-        default: false
-        type: boolean
       tag:
-        description: "Publish release when non-empty; actual tag uses build number"
+        description: "tag"
         required: false
         default: ""
         type: string
 
 jobs:
+  quality:
+    name: Flutter quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: dart analyze
+      - run: flutter test --no-pub --concurrency=1
+
   android:
-    if: ${{ github.event.inputs.build_android == 'true' }}
-    uses: ./.github/workflows/android_reusable.yml
-    permissions: write-all
-    with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-      dev: false
-    secrets: inherit
-
-  ios:
-    if: ${{ github.event.inputs.build_ios == 'true' }}
-    uses: ./.github/workflows/ios.yml
-    permissions: write-all
-    with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-    secrets: inherit
-
-  mac:
-    if: ${{ github.event.inputs.build_mac == 'true' }}
-    uses: ./.github/workflows/mac.yml
-    permissions: write-all
-    with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-
-  win_x64:
-    if: ${{ github.event.inputs.build_win_x64 == 'true' }}
-    uses: ./.github/workflows/win_x64.yml
-    permissions: write-all
-    with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
-
-  linux_x64:
-    if: ${{ github.event.inputs.build_linux_x64 == 'true' }}
-    uses: ./.github/workflows/linux_x64.yml
-    permissions: write-all
-    with:
-      tag: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_android == 'true' }}
+    needs: quality
+    name: Release Android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+          cache-dependency-path: |
+            android/*.gradle*
+            android/**/gradle-wrapper.properties
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - run: flutter pub get
+      - name: Write key
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          test -n "${{ secrets.SIGN_KEYSTORE_BASE64 }}"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          echo "${{ secrets.SIGN_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
+          printf 'storeFile=key.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+      - name: Write build metadata
+        shell: pwsh
+        run: tool/write_ci_build_metadata.ps1
+      - name: Flutter Build Release Apk
+        if: ${{ github.event_name != 'pull_request' }}
+        run: flutter build apk --release --split-per-abi --dart-define-from-file=pili_release.json --no-pub
+      - name: Flutter Build Dev Apk
+        if: ${{ github.event_name == 'pull_request' }}
+        run: flutter build apk --release --split-per-abi --android-project-arg dev=1 --no-pub
+      - name: Remove signing material
+        if: ${{ always() && github.event_name != 'pull_request' }}
+        run: rm -f android/key.properties android/app/key.jks
+      - name: Rename
+        run: |
+          for file in build/app/outputs/flutter-apk/app-*-release.apk; do
+            abi=$(echo "$file" | sed -E 's|.*app-(.*)-release\.apk|\1|')
+            mv "$file" "PiliNara_android_${{ env.version }}_${abi}.apk"
+          done
+        shell: bash
+      - name: Release
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
+          files: PiliNara_android_*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          archive: false
+          name: Android_arm64-v8a
+          path: PiliNara_android_*_arm64-v8a.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          archive: false
+          name: Android_armeabi-v7a
+          path: PiliNara_android_*_armeabi-v7a.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          archive: false
+          name: Android_x86_64
+          path: PiliNara_android_*_x86_64.apk

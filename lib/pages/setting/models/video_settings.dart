@@ -26,6 +26,14 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:material_ui/material_ui.dart';
 
 List<SettingsModel> get videoSettings => [
+  if (Platform.isAndroid)
+    const SwitchModel(
+      title: '使用 Android Media3 播放视频',
+      subtitle: '适用于点播和直播。切换后请重新打开视频。',
+      leading: Icon(Icons.play_circle_outline),
+      setKey: SettingBoxKey.useExoPlayer,
+      defaultVal: true,
+    ),
   const SwitchModel(
     title: '开启硬解',
     subtitle: '以较低功耗播放视频，若异常卡死请关闭',
