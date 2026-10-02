@@ -1777,6 +1777,21 @@ abstract final class Pref {
     ),
   );
 
-  static bool get enableEmoteTooltip =>
-      _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
+
+  // Interface Style (Kototoro-style)
+  static InterfaceStyle get interfaceStyle {
+    final index = _setting.get(SettingBoxKey.interfaceStyle, defaultValue: 0);
+    return InterfaceStyle.values.elementAtOrNull(index) ?? InterfaceStyle.material3Expressive;
+  }
+
+  static void setInterfaceStyle(InterfaceStyle style) =>
+      _setting.put(SettingBoxKey.interfaceStyle, style.index);
+
+  // Home Hero settings
+  static bool get homeHeroEnabled =>
+      _setting.get(SettingBoxKey.homeHeroEnabled, defaultValue: true);
+
+  static void setHomeHeroEnabled(bool v) =>
+      _setting.put(SettingBoxKey.homeHeroEnabled, v);
+
 }

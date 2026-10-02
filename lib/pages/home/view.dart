@@ -5,6 +5,7 @@ import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/home/home_preview_scope.dart';
+import 'package:PiliPlus/pages/home_hero/view.dart' as hero;
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
@@ -90,6 +91,9 @@ class _HomePageState extends CommonPageState<HomePage>
           if (!_mainController.useSideBar &&
               MediaQuery.sizeOf(context).isPortrait)
             customAppBar(),
+          // Home Hero Section (Kototoro-style)
+          if (!widget.preview && Pref.homeHeroEnabled)
+            const hero.HomeHeroSection(),
           tabBar,
           Expanded(
             child: onBuild(

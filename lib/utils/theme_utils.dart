@@ -77,6 +77,14 @@ abstract final class ThemeUtils {
       navigationBarTheme: NavigationBarThemeData(
         surfaceTintColor: isDark ? colorScheme.surfaceContainerHighest : null,
       ),
+      // Interface Style corner radius
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: const FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       snackBarTheme: SnackBarThemeData(
         elevation: 20,
         actionTextColor: colorScheme.primary,
