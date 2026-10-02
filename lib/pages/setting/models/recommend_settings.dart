@@ -3,6 +3,7 @@ import 'package:PiliPlus/models/common/rcmd_mode.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
+import 'package:PiliPlus/pages/today_watch/view.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/recommend_filter.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -215,6 +216,14 @@ List<SettingsModel> get recommendSettings => [
         );
       },
     ),
+  ),
+  NormalModel(
+    title: '今日推荐单',
+    subtitle: '根据观看历史生成个性化推荐',
+    leading: const Icon(Icons.auto_awesome),
+    onTap: (context, setState) {
+      Get.to(() => const TodayWatchPage());
+    },
   ),
 ];
 

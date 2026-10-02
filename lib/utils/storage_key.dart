@@ -55,6 +55,8 @@ abstract final class SettingBoxKey {
       enableInAppPip = 'enableInAppPip',
       enableInAppPipToSystemPip = 'enableInAppPipToSystemPip',
       enableAutoLongPressSpeed = 'enableAutoLongPressSpeed',
+      enableLongPressSlideSpeed = 'enableLongPressSlideSpeed',
+      longPressSpeedFactor = 'longPressSpeedFactor',
       useRelativeSlide = 'useRelativeSlide',
       sliderDuration = 'sliderOffset',
       enableQuickDouble = 'enableQuickDouble',
@@ -76,6 +78,9 @@ abstract final class SettingBoxKey {
       applyFilterToHotVideos = 'applyFilterToHotVideos',
       applyFilterToRankVideos = 'applyFilterToRankVideos',
       applyFilterToSearch = 'applyFilterToSearch',
+      todayWatchEnabled = 'today_watch_enabled',
+      todayWatchMode = 'today_watch_mode',
+      todayWatchStrategy = 'today_watch_strategy',
       autoUpdate = 'autoUpdate',
       preReleaseUpdate = 'preReleaseUpdate',
       skipVersion = 'skipVersion',
@@ -205,7 +210,12 @@ abstract final class SettingBoxKey {
       angleDegrees = 'angleDegrees',
       liveStream = 'liveStream',
       enableDocProvider = 'enableDocProvider',
-      enableEmoteTooltip = 'enableEmoteTooltip';
+      enableEmoteTooltip = 'enableEmoteTooltip',
+      playbackStats = 'playbackStats',
+      trafficStats = 'trafficStats',
+      enableTvMode = 'enableTvMode',
+      tvFocusEnabled = 'tvFocusEnabled',
+      tvDpadSpeed = 'tvDpadSpeed';
 
   static const String enableAiChat = 'enableAiChat',
       aiApiUrl = 'aiApiUrl',
