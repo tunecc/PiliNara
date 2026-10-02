@@ -1779,4 +1779,10 @@ abstract final class Pref {
 
   static bool get enableEmoteTooltip =>
       _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
+
+  static String? get bangumiUsername =>
+      _setting.get(SettingBoxKey.bangumiUsername);
+
+  static set bangumiUsername(String? value) =>
+      _setting.put(SettingBoxKey.bangumiUsername, value);
 }

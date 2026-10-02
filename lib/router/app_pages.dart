@@ -5,6 +5,12 @@ import 'package:PiliPlus/pages/article_list/view.dart';
 import 'package:PiliPlus/pages/audio/view.dart';
 import 'package:PiliPlus/pages/blacklist/view.dart';
 import 'package:PiliPlus/pages/bubble/view.dart';
+import 'package:PiliPlus/pages/animeko/view.dart';
+import 'package:PiliPlus/pages/animeko/collection_page.dart';
+import 'package:PiliPlus/pages/animeko/subject_detail.dart';
+import 'package:PiliPlus/pages/bangumi_login/view.dart';
+import 'package:PiliPlus/pages/source_manager/view.dart';
+
 import 'package:PiliPlus/pages/danmaku_block/view.dart';
 import 'package:PiliPlus/pages/dlna/view.dart';
 import 'package:PiliPlus/pages/download/view.dart';
@@ -188,5 +194,10 @@ class Routes {
     GetPage(name: '/ssWeb', page: () => const MemberSSWeb()),
     GetPage(name: '/memberGuard', page: () => const MemberGuard()),
     GetPage(name: '/bubble', page: () => const BubblePage()),
+    GetPage(name: '/animeko', page: () => const AnimekoPage()),
+    GetPage(name: '/animekoCollection', page: () => const AnimekoCollectionPage()),
+    GetPage(name: '/animekoDetail', page: () => const AnimekoSubjectDetailPage(seasonId: 0)),
+    GetPage(name: '/bangumiLogin', page: () => const BangumiLoginPage()),
+    GetPage(name: '/sourceManager', page: () => const SourceManagerPage()),
   ];
 }
