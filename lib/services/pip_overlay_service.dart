@@ -1,21 +1,24 @@
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'dart:math' show max, min;
+import 'dart:math' show max, pow;
 
-import 'package:PiliPlus/common/widgets/pip_control_button.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/services/logger.dart';
-import 'package:PiliPlus/services/pip_transition_coordinator.dart';
-import 'package:PiliPlus/services/route_stack_observer.dart';
+import 'package:PiliPlus/pilimax/services/pip_transition_coordinator.dart';
+import 'package:PiliPlus/pilimax/services/pip_route_stack_observer.dart';
 import 'package:PiliPlus/services/service_locator.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
-import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart'
-    show PointerEnterEvent, PointerExitEvent, PointerScrollEvent;
+    show
+        GestureBinding,
+        PointerEnterEvent,
+        PointerExitEvent,
+        PointerScrollEvent;
 import 'package:material_ui/material_ui.dart';
 import 'package:get/get.dart';
 
@@ -51,6 +54,8 @@ class VideoStackManager {
 }
 
 class PipOverlayService {
+  static const double pipWidth = 200;
+  static const double pipHeight = 112;
   static bool isVertical = false;
 
   static OverlayEntry? _overlayEntry;
@@ -59,14 +64,9 @@ class PipOverlayService {
   static bool get isNativePip => _isNativePip.value;
   static set isNativePip(bool value) => _isNativePip.value = value;
 
-  /// 小窗过渡动画协调器(收起/展开的相位机与恢复握手)
   static final PipTransitionCoordinator transition = PipTransitionCoordinator()
     ..onRestoreFinished = _finalizeRestore;
 
-  // 恢复握手完成:执行与旧路径完全相同的非销毁式关闭(清引用/移除 overlay/
-  // 同步 auto-PiP),只是从"恢复页 initState 瞬时执行"推迟到了此刻。
-  // 传入当前 saved key 使 shouldResetState=false;控制器所有权已由恢复页面
-  // 接管,不释放 owner
   static void _finalizeRestore() {
     stopPip(
       callOnClose: false,
@@ -79,10 +79,9 @@ class PipOverlayService {
   static VoidCallback? _onTapToReturnCallback;
 
   static void onTapToReturn() {
-    final callback = _onTapToReturnCallback;
-    _onCloseCallback = null;
-    _onTapToReturnCallback = null;
-    callback?.call();
+    if (transition.beginRestore()) {
+      _onTapToReturnCallback?.call();
+    }
   }
 
   // 保存控制器引用，防止被 GC
@@ -96,21 +95,16 @@ class PipOverlayService {
     return route.startsWith('/video') || route.startsWith('/liveRoom');
   }
 
-  /// 静默移除 [context] 所在路由正下方连续的视频/直播播放页，返回移除数量。
-  /// 手动进小窗前调用：这些页面若留在栈内，当前页 pop 后会作为新顶层收到
-  /// didPopNext，发现小窗里不是自己的内容而把小窗关掉。removeRoute 只发
-  /// didRemove，RouteObserver 不会据此触发 didPopNext；被移除的页面按普通
-  /// 离栈语义 dispose（下一帧），最终由小窗独占播放器。
-  /// 这里是破坏性删除，用精确路由名而非 isVideoLikeRoute 的前缀匹配：
-  /// /videoWeb（UP 主投稿页）等同前缀的非播放页不能被误删
+  /// Removes consecutive nested player routes below the current route without
+  /// invoking didPopNext on them. Exact route names avoid matching /videoWeb.
   static int removeNestedVideoLikeRoutesBelow(BuildContext context) {
-    final navigator = Get.key.currentState;
+    final navigator = Navigator.maybeOf(context);
     final current = ModalRoute.of(context);
     if (navigator == null || current == null) {
       return 0;
     }
     const playerRoutes = {'/videoV', '/liveRoom'};
-    final nested = routeStackObserver.routesBelowWhile(
+    final nested = pipRouteStackObserver.routesBelowWhile(
       current,
       (route) => playerRoutes.contains(route.settings.name),
     );
@@ -118,24 +112,16 @@ class PipOverlayService {
       navigator.removeRoute(route);
     }
     if (kDebugMode && nested.isNotEmpty) {
-      debugPrint('[PiP] Removed ${nested.length} nested video/live routes');
+      debugPrint('[PiP] Removed ${nested.length} nested player routes');
     }
     return nested.length;
   }
 
-  /// 等待布局落定：[isReady] 成立即返回，超时则不再等。
-  /// 退出全屏后设备转屏由 OS 异步完成，MediaQuery（isPortrait/尺寸）要再过
-  /// 若干帧才更新；此时立即判定可 pop 状态或量取源矩形会拿到全屏时的旧值。
-  /// 超时后由调用方按当前状态决定（该拒绝就拒绝）
-  ///
-  /// 用时间而非帧数设限：转屏耗时与显示刷新率无关，高刷屏上同样的帧数
-  /// 只有几分之一的时间，按帧计会提前放弃
+  /// Waits for a full-screen exit to settle before measuring page geometry.
   static Future<void> awaitLayoutSettled(
     bool Function() isReady, {
     Duration timeout = const Duration(milliseconds: 600),
   }) async {
-    // 至少等一帧：退出全屏的状态变更在下一帧才重新布局，此刻量取的矩形
-    // 仍是全屏几何；即使 isReady 立刻为真也要让这一帧过去
     await WidgetsBinding.instance.endOfFrame;
     final stopwatch = Stopwatch()..start();
     while (!isReady() && stopwatch.elapsed < timeout) {
@@ -248,24 +234,24 @@ class PipOverlayService {
     );
   }
 
-  static void startPip({
+  static bool startPip({
     required BuildContext context,
     required PlPlayerController plPlayerController,
     required Widget Function(bool isNative, double width, double height)
     videoPlayerBuilder,
     VoidCallback? onClose,
     VoidCallback? onTapToReturn,
+    VoidCallback? onStartFailed,
+    VoidCallback? onOverlayInserted,
     dynamic controller,
     Map<String, dynamic>? additionalControllers,
     Rect? sourceRect,
   }) {
     if (isInPipMode) {
-      return;
+      return false;
     }
 
     isInPipMode = true;
-    // 收起动画:从页面播放器矩形缩至小窗;sourceRect 为空(量取失败的
-    // 兜底路径)时直接以活跃态出现
     transition.beginEnter(sourceRect: sourceRect);
     isVertical = false;
     if (controller is VideoDetailController) {
@@ -288,13 +274,9 @@ class PipOverlayService {
           stopPip(callOnClose: true, immediate: true);
         },
         onTapToReturn: () {
-          // 归位相位启动:窗口保持显示并飞向页面,导航由回调负责。
-          // 回调不清空——超时回退活跃态后仍可再次展开或关闭,
-          // 引用统一由握手完成后的 _finalizeRestore(stopPip)清理
-          if (!transition.beginRestore()) {
-            return;
+          if (transition.beginRestore()) {
+            _onTapToReturnCallback?.call();
           }
-          _onTapToReturnCallback?.call();
         },
       ),
     );
@@ -303,6 +285,7 @@ class PipOverlayService {
       try {
         final overlayContext = Get.overlayContext ?? context;
         Overlay.of(overlayContext).insert(_overlayEntry!);
+        onOverlayInserted?.call();
 
         // 允许应用内小窗继续使用 Auto-PiP 手势
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -321,8 +304,10 @@ class PipOverlayService {
         _savedPlayerController = null;
         _savedVideoContextKey = null;
         _savedControllers.clear();
+        onStartFailed?.call();
       }
     });
+    return true;
   }
 
   static T? getSavedController<T>() => _savedController as T?;
@@ -353,9 +338,6 @@ class PipOverlayService {
     }
 
     isInPipMode = false;
-    // 瞬时关闭(X 关闭已在窗体侧播完淡出、被其他视频抢占、握手 finalize 等)
-    // 一律复位相位机;若页面此后才上报 attach,协调器会立即回调防止其
-    // 停留在透明占位
     transition.reset();
     // isNativePip 是 Rx 变量，不能在 build 阶段（如 initState）同步修改，
     // 否则会触发 Obx rebuild 导致 "setState during build" 错误。
@@ -383,9 +365,9 @@ class PipOverlayService {
     // TabController/ScrollController 仍会被旧页面再次使用。
     // 若 controller 已由 GetX 关闭，页面已离栈，此时再执行完整清理。
     if (shouldResetState && _savedController is VideoDetailController) {
-      final ctrl = _savedController as VideoDetailController;
-      ctrl.isEnteringPip = false;
-      ctrl.cancelBlockListener();
+      final ctrl = (_savedController as VideoDetailController)
+        ..isEnteringPip = false
+        ..cancelBlockListener();
       if (ctrl.isClosed) {}
       for (final controller in _savedControllers.values) {
         _setEnteringPipFlag(controller, false);
@@ -469,34 +451,31 @@ class _PipWidgetState extends State<PipWidget>
   double? _left;
   double? _top;
   double _scale = PipWindowMemory.scale;
-  double _scaleStart = 1.0; // onScaleStart 时记录的起始 scale,捏合按此累乘
-  // 捏合/滚轮中尺寸须与位置同帧生效:位置钳制是瞬时的,尺寸若走 250ms
-  // 过渡,边缘处会"位置先瞬移、尺寸后长大"地抽搐
-  bool _instantResize = false;
+  double _scaleStart = 1.0;
+  bool _scaleGestureActive = false;
   Timer? _wheelResizeTimer;
+
+  bool get _instantResize =>
+      _scaleGestureActive || _wheelResizeTimer?.isActive == true;
 
   PipTransitionCoordinator get _transition => PipOverlayService.transition;
   PipPhase _lastPhase = PipPhase.hidden;
 
-  // 收起/归位的 Rect 插值进度
-  late final AnimationController _phaseCtr = AnimationController(
+  late final AnimationController _phaseController = AnimationController(
     vsync: this,
     duration: PipTransitionCoordinator.animDuration,
-  )..addStatusListener(_onPhaseAnimStatus);
+  )..addStatusListener(_onPhaseAnimationStatus);
 
-  // X 关闭的缩小淡出
-  late final AnimationController _closeCtr = AnimationController(
+  late final AnimationController _closeController = AnimationController(
     vsync: this,
     duration: PipTransitionCoordinator.closeFadeDuration,
   );
 
-  double _baseLong = 200; // 当前设备档的长边基准(未乘 _scale),build 时更新
-  double _baseShort = 112;
-
-  double get _width =>
-      (PipOverlayService.isVertical ? _baseShort : _baseLong) * _scale;
-  double get _height =>
-      (PipOverlayService.isVertical ? _baseLong : _baseShort) * _scale;
+  Size get _unscaledWindowSize => PipOverlayService.isVertical
+      ? const Size(PipOverlayService.pipHeight, PipOverlayService.pipWidth)
+      : const Size(PipOverlayService.pipWidth, PipOverlayService.pipHeight);
+  double get _width => _unscaledWindowSize.width * _scale;
+  double get _height => _unscaledWindowSize.height * _scale;
 
   bool _showControls = true;
   Timer? _hideTimer;
@@ -512,9 +491,9 @@ class _PipWidgetState extends State<PipWidget>
     _transition.addListener(_onPhaseChanged);
     _lastPhase = _transition.phase;
     if (_lastPhase == PipPhase.entering) {
-      _phaseCtr.forward(from: 0);
+      _phaseController.forward(from: 0);
     } else {
-      _phaseCtr.value = 1;
+      _phaseController.value = 1;
     }
     // 桌面端控制栏初始隐藏,由 hover 显示
     if (PlatformUtils.isDesktop) {
@@ -528,24 +507,31 @@ class _PipWidgetState extends State<PipWidget>
     final phase = _transition.phase;
     if (phase != _lastPhase) {
       _lastPhase = phase;
+      if (phase != PipPhase.active) {
+        _cancelWheelResize();
+        _scaleGestureActive = false;
+      }
       switch (phase) {
         case PipPhase.entering:
         case PipPhase.restoring:
-          _phaseCtr.forward(from: 0);
+          _phaseController.forward(from: 0);
         case PipPhase.active:
-          // 入场完成后的常规落位;或超时回退——窗口直接回到小窗矩形
-          _phaseCtr
+          _phaseController
             ..stop()
             ..value = 1;
         case PipPhase.hidden:
-          _phaseCtr.stop();
+          _phaseController.stop();
       }
     }
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
-  void _onPhaseAnimStatus(AnimationStatus status) {
-    if (status != AnimationStatus.completed) return;
+  void _onPhaseAnimationStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) {
+      return;
+    }
     switch (_transition.phase) {
       case PipPhase.entering:
         _transition.markEnterDone();
@@ -557,15 +543,18 @@ class _PipWidgetState extends State<PipWidget>
     }
   }
 
-  // X 关闭:先播缩小淡出,动画完成后才真正走 stopPip;
-  // 期间窗口不可交互。外部若提前移除 overlay(如被抢占),widget 已
-  // dispose,then 不会触发
   void _beginClose() {
-    if (_isClosing) return;
+    if (_isClosing) {
+      return;
+    }
     _hideTimer?.cancel();
+    _cancelWheelResize();
+    _scaleGestureActive = false;
     setState(() => _isClosing = true);
-    _closeCtr.forward(from: 0).then((_) {
-      if (mounted) widget.onClose();
+    _closeController.forward(from: 0).then((_) {
+      if (mounted) {
+        widget.onClose();
+      }
     });
   }
 
@@ -573,12 +562,12 @@ class _PipWidgetState extends State<PipWidget>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _transition.removeListener(_onPhaseChanged);
-    _phaseCtr
-      ..removeStatusListener(_onPhaseAnimStatus)
+    _phaseController
+      ..removeStatusListener(_onPhaseAnimationStatus)
       ..dispose();
-    _closeCtr.dispose();
+    _closeController.dispose();
     _hideTimer?.cancel();
-    _wheelResizeTimer?.cancel();
+    _cancelWheelResize();
     if (PipOverlayService._overlayEntry != null) {
       PipOverlayService._onCloseCallback = null;
       PipOverlayService._onTapToReturnCallback = null;
@@ -642,30 +631,82 @@ class _PipWidgetState extends State<PipWidget>
     }
   }
 
-  void _onDoubleTap() {
-    final screenSize = MediaQuery.of(context).size;
-    // 档位目标同样钳入连续区间(上限按方向分流:横屏 0.95×短边;竖屏
-    // factor×min(屏高,屏宽×宽高比),竖屏屏 0.8 / 横屏屏 0.95):窄屏/横屏
-    // 屏幕上 2.0 档由此封顶不再溢出。钳后与当前值几乎重合(已停在封顶
-    // 档)则跳回 1.0 档,保证循环不卡死
-    double next = _scale < 1.1 ? 1.5 : (_scale < 1.6 ? 2.0 : 1.0);
-    next = PipWindowMemory.clampScaleContinuous(
-      next,
-      screenSize,
-      isVertical: PipOverlayService.isVertical,
+  double _clampScale(double scale, Size screenSize) {
+    return PipWindowMemory.clampScaleToViewport(
+      scale: scale,
+      viewport: screenSize,
+      unscaledWindowSize: _unscaledWindowSize,
     );
-    if ((next - _scale).abs() < 0.05) {
-      next = PipWindowMemory.clampScaleContinuous(
-        1.0,
-        screenSize,
-        isVertical: PipOverlayService.isVertical,
-      );
+  }
+
+  void _clampPositionInScreen(Size screenSize) {
+    _left = (_left ?? 0.0)
+        .clamp(0.0, max(0.0, screenSize.width - _width))
+        .toDouble();
+    _top = (_top ?? 0.0)
+        .clamp(0.0, max(0.0, screenSize.height - _height))
+        .toDouble();
+  }
+
+  void _applyScaleAroundCenter(double targetScale, Size screenSize) {
+    _clampPositionInScreen(screenSize);
+    final center = Offset(_left! + _width / 2, _top! + _height / 2);
+    _scale = _clampScale(targetScale, screenSize);
+    _left = center.dx - _width / 2;
+    _top = center.dy - _height / 2;
+    _clampPositionInScreen(screenSize);
+  }
+
+  void _rememberWindow() {
+    PipWindowMemory.scale = _scale;
+    PipWindowMemory.position = Offset(_left ?? 0, _top ?? 0);
+  }
+
+  void _cancelWheelResize() {
+    _wheelResizeTimer?.cancel();
+    _wheelResizeTimer = null;
+  }
+
+  void _handlePointerScroll(PointerScrollEvent event, Size screenSize) {
+    if (!mounted || _transition.phase != PipPhase.active) {
+      return;
     }
-    // 双击档位切换:按缩放前窗口距屏幕四边的距离,选较近的一对边作为锚定,
-    // 缩放后保持该边缘到屏幕边缘的距离不变。
-    // 否则贴右窗口放大→缩小会"跑到左边":放大时钳制把 _left 顶到
-    // screenW-w2(贴右);缩小时 _left=screenW-w2 落在合法区间内不变,
-    // 但右边缘变成 screenW-w2+w3 < screenW,视觉上窗口向左缩。
+
+    final exponent = (-event.scrollDelta.dy / 100).clamp(-1.0, 1.0);
+    final factor = pow(1.1, exponent).toDouble();
+    _cancelWheelResize();
+    _wheelResizeTimer = Timer(const Duration(milliseconds: 300), () {
+      _wheelResizeTimer = null;
+      if (mounted) {
+        setState(() {});
+      }
+    });
+    setState(() {
+      _applyScaleAroundCenter(_scale * factor, screenSize);
+    });
+    _rememberWindow();
+    if (_showControls) {
+      _startHideTimer();
+    }
+  }
+
+  void _onDoubleTap() {
+    final screenSize = MediaQuery.sizeOf(context);
+    _cancelWheelResize();
+    var nextScale = _scale < 1.1
+        ? 1.5
+        : _scale < 1.6
+        ? 2.0
+        : 1.0;
+    nextScale = _clampScale(nextScale, screenSize);
+    if ((nextScale - _scale).abs() < 0.05) {
+      nextScale = _clampScale(1.0, screenSize);
+    }
+
+    // Keep the nearest horizontal/vertical edge anchored while changing the
+    // scale. A plain clamp after changing _scale makes right/bottom windows
+    // appear to drift because their far edge is no longer preserved.
+    _clampPositionInScreen(screenSize);
     final oldLeft = _left ?? 0.0;
     final oldTop = _top ?? 0.0;
     final oldWidth = _width;
@@ -676,17 +717,13 @@ class _PipWidgetState extends State<PipWidget>
     final distBottom = screenSize.height - oldTop - oldHeight;
 
     setState(() {
-      _scale = next;
-
-      // 水平:距左≤距右则左锚定(_left 不变),否则右锚定(右边缘到屏距离不变)
-      final double newLeft = distLeft <= distRight
+      _scale = nextScale;
+      final newLeft = distLeft <= distRight
           ? oldLeft
           : screenSize.width - distRight - _width;
-      // 垂直:距上≤距下则上锚定(_top 不变),否则下锚定(下边缘到屏距离不变)
-      final double newTop = distTop <= distBottom
+      final newTop = distTop <= distBottom
           ? oldTop
           : screenSize.height - distBottom - _height;
-      // 兜底钳制,防极端窗口/旋转后越界
       _left = newLeft
           .clamp(0.0, max(0.0, screenSize.width - _width))
           .toDouble();
@@ -694,36 +731,8 @@ class _PipWidgetState extends State<PipWidget>
           .clamp(0.0, max(0.0, screenSize.height - _height))
           .toDouble();
     });
-    PipWindowMemory.scale = _scale;
-    PipWindowMemory.position = Offset(_left ?? 0, _top ?? 0);
+    _rememberWindow();
     _startHideTimer();
-  }
-
-  // 捏合/滚轮:绕小窗中心把 _scale 设为目标值(钳入连续区间),再钳位置
-  void _applyScaleAroundCenter(double targetScale, Size screenSize) {
-    final centerX = _left! + _width / 2;
-    final centerY = _top! + _height / 2;
-    _scale = PipWindowMemory.clampScaleContinuous(
-      targetScale,
-      screenSize,
-      isVertical: PipOverlayService.isVertical,
-    );
-    _left = centerX - _width / 2; // _width 已反映新 _scale
-    _top = centerY - _height / 2;
-    _clampPositionInScreen(screenSize);
-  }
-
-  void _clampPositionInScreen(Size screenSize) {
-    _left = _left!.clamp(0.0, max(0.0, screenSize.width - _width)).toDouble();
-    _top = _top!.clamp(0.0, max(0.0, screenSize.height - _height)).toDouble();
-  }
-
-  @override
-  void didChangeMetrics() {
-    // 屏幕旋转 / 桌面窗口尺寸变化：触发重建，让 build 按新尺寸把小窗位置
-    // 钳回界内。仅重建、不改 _left/_top 意图值，窗口恢复时能自动回原位。
-    // 系统 PiP 期间尺寸变化来自 PiP 窗口本身，build 会整段跳过几何计算。
-    if (mounted) setState(() {});
   }
 
   @override
@@ -732,10 +741,7 @@ class _PipWidgetState extends State<PipWidget>
       final screenSize = MediaQuery.of(context).size;
       final bool isNative = PipOverlayService.isNativePip;
 
-      // 系统 PiP 模式下直接铺满窗口，且不执行任何自定义尺寸/位置计算：此时
-      // MediaQuery 给出的是系统 PiP 窗口自身的尺寸（非整屏），若照常钳制会把
-      // 缩放下限强加给小窗并写回会话记忆，退出 PiP 后小窗就永久停在最小档。
-      // 收起/归位动画同时让位（相位仍由协调器推进，回到应用内后自然衔接）。
+      // 系统 PiP 模式下，直接铺满窗口，不执行任何自定义尺寸或位置计算
       if (isNative) {
         return Positioned.fill(
           child: ColoredBox(
@@ -751,63 +757,54 @@ class _PipWidgetState extends State<PipWidget>
         );
       }
 
-      // 按当前窗口短边分档:手机维持现状,平板/桌面放大
-      _baseLong = PipWindowMemory.basePipLong(screenSize);
-      _baseShort = PipWindowMemory.basePipShort(screenSize);
-      // 旋转/窗口尺寸变化后按新屏幕重新钳制 scale:竖屏屏拉大后转横屏时
-      // 上限变小,超出即自动缩小;同时回写会话记忆,恢复时保持缩小后的值
-      _scale = PipWindowMemory.clampScaleContinuous(
-        _scale,
-        screenSize,
-        isVertical: PipOverlayService.isVertical,
-      );
-      PipWindowMemory.scale = _scale;
+      // 系统 PiP 的 MediaQuery 尺寸属于系统小窗，不能用于更新应用内小窗
+      // 的缩放和位置记忆；只有离开系统 PiP 后才执行这些计算。
+      final viewportScale = _clampScale(_scale, screenSize);
+      if (viewportScale != _scale) {
+        _scale = viewportScale;
+        PipWindowMemory.scale = _scale;
+      }
+
       _left ??= (PipWindowMemory.position?.dx ?? screenSize.width - _width - 16)
           .clamp(0.0, max(0.0, screenSize.width - _width))
           .toDouble();
-      _top ??= (PipWindowMemory.position?.dy ?? screenSize.height - _height - 100)
-          .clamp(0.0, max(0.0, screenSize.height - _height))
-          .toDouble();
-
-      return AnimatedBuilder(
-        animation: Listenable.merge([_phaseCtr, _closeCtr, _transition]),
-        builder: (context, _) {
-          final phase = _transition.phase;
-          // 显示位置按当前屏幕钳回界内；不回写 _left/_top，窗口恢复时自动归位
-          final dispLeft = _left!
-              .clamp(0.0, max(0.0, screenSize.width - _width))
-              .toDouble();
-          final dispTop = _top!
+      _top ??=
+          (PipWindowMemory.position?.dy ?? screenSize.height - _height - 100)
               .clamp(0.0, max(0.0, screenSize.height - _height))
               .toDouble();
-          final miniRect = Rect.fromLTWH(dispLeft, dispTop, _width, _height);
+
+      return AnimatedBuilder(
+        animation: Listenable.merge([
+          _phaseController,
+          _closeController,
+          _transition,
+        ]),
+        builder: (context, _) {
+          final phase = _transition.phase;
+          final displayLeft = _left!
+              .clamp(0.0, max(0.0, screenSize.width - _width))
+              .toDouble();
+          final displayTop = _top!
+              .clamp(0.0, max(0.0, screenSize.height - _height))
+              .toDouble();
+          final miniRect = Rect.fromLTWH(
+            displayLeft,
+            displayTop,
+            _width,
+            _height,
+          );
           final progress = PipTransitionCoordinator.animCurve.transform(
-            _phaseCtr.value,
+            _phaseController.value,
           );
           final rect = _transition.resolveRect(
             miniRect: miniRect,
             progress: progress,
           );
           final radius = _transition.resolveRadius(base: 8, progress: progress);
-          final bool inTransition =
+          final inTransition =
               phase == PipPhase.entering || phase == PipPhase.restoring;
-          final bool interactive = phase == PipPhase.active && !_isClosing;
+          final interactive = phase == PipPhase.active && !_isClosing;
 
-          // 控件触控目标随窗口短边自适应
-          final double shortSide = min(_width, _height);
-          final double topControl = (shortSide * 0.38)
-              .clamp(28.0, 37.0)
-              .toDouble();
-          final double bottomControl = (shortSide - 2 - topControl - 4)
-              .clamp(40.0, 48.0)
-              .toDouble();
-
-          // AnimatedPositioned 与下方 AnimatedContainer 共用相同的
-          // duration/curve 条件:双击档位切换时位置与尺寸同步 250ms 过渡,
-          // 否则右边缘双击放大时"位置先瞬移、尺寸后长大"地抽搐
-          // (左边缘因 _left 钳制后仍为 0 不受影响,故仅右侧显现)。
-          // inTransition(收起/归位)与 _instantResize(捏合/滚轮)期间归零,
-          // 与 AnimatedContainer 行为一致。
           return AnimatedPositioned(
             duration: inTransition || _instantResize
                 ? Duration.zero
@@ -816,47 +813,67 @@ class _PipWidgetState extends State<PipWidget>
             left: rect.left,
             top: rect.top,
             child: IgnorePointer(
-              // 收起中/归位中/关闭淡出中不可交互
               ignoring: !interactive,
               child: Listener(
-                // 桌面滚轮缩放:绕中心乘性 ±10%/格,同捏合连续区间
                 onPointerSignal: (event) {
-                  if (event is PointerScrollEvent) {
-                    _instantResize = true;
-                    _wheelResizeTimer?.cancel();
-                    _wheelResizeTimer = Timer(
-                      const Duration(milliseconds: 300),
-                      () {
-                        if (mounted) {
-                          setState(() => _instantResize = false);
-                        }
-                      },
-                    );
-                    setState(() {
-                      final factor = event.scrollDelta.dy < 0 ? 1.1 : 1 / 1.1;
-                      _applyScaleAroundCenter(_scale * factor, screenSize);
-                    });
-                    PipWindowMemory.scale = _scale;
-                    PipWindowMemory.position = Offset(_left!, _top!);
-                    if (_showControls) _startHideTimer();
+                  if (event is! PointerScrollEvent ||
+                      event.scrollDelta.dy == 0) {
+                    return;
                   }
+
+                  GestureBinding.instance.pointerSignalResolver.register(
+                    event,
+                    (resolvedEvent) => _handlePointerScroll(
+                      resolvedEvent as PointerScrollEvent,
+                      screenSize,
+                    ),
+                  );
                 },
-                child: MouseRegion(
+                child: GestureDetector(
+                  onTap: _onTap,
+                  onDoubleTap: _onDoubleTap,
+                  onScaleStart: (_) {
+                    _hideTimer?.cancel();
+                    _cancelWheelResize();
+                    _clampPositionInScreen(screenSize);
+                    _scaleStart = _scale;
+                    setState(() => _scaleGestureActive = true);
+                  },
+                  onScaleUpdate: (details) {
+                    setState(() {
+                      _left = _left! + details.focalPointDelta.dx;
+                      _top = _top! + details.focalPointDelta.dy;
+                      if (details.pointerCount > 1) {
+                        _applyScaleAroundCenter(
+                          _scaleStart * details.scale,
+                          screenSize,
+                        );
+                      } else {
+                        _clampPositionInScreen(screenSize);
+                      }
+                    });
+                    _rememberWindow();
+                  },
+                  onScaleEnd: (_) {
+                    setState(() => _scaleGestureActive = false);
+                    if (_showControls) {
+                      _startHideTimer();
+                    }
+                  },
+                  child: MouseRegion(
                     onEnter: _onHoverEnter,
                     onExit: _onHoverExit,
                     child: FadeTransition(
-                      opacity: _closeCtr.drive(Tween(begin: 1.0, end: 0.0)),
+                      opacity: _closeController.drive(
+                        Tween<double>(begin: 1, end: 0),
+                      ),
                       child: ScaleTransition(
-                        scale: _closeCtr.drive(
-                          Tween(
-                            begin: 1.0,
-                            end: 0.85,
-                          ).chain(CurveTween(curve: Curves.easeOut)),
+                        scale: _closeController.drive(
+                          Tween<double>(begin: 1, end: 0.85).chain(
+                            CurveTween(curve: Curves.easeOut),
+                          ),
                         ),
                         child: AnimatedContainer(
-                          // 过渡中矩形逐帧由协调器插值给出;捏合/滚轮中尺寸须与
-                          // 位置同帧生效(见 _instantResize)。两者时长归零,
-                          // 仅双击档位切换保留 250ms 尺寸过渡
                           duration: inTransition || _instantResize
                               ? Duration.zero
                               : const Duration(milliseconds: 250),
@@ -879,211 +896,149 @@ class _PipWidgetState extends State<PipWidget>
                             child: Stack(
                               children: [
                                 Positioned.fill(
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: _onTap,
-                                    onDoubleTap: _onDoubleTap,
-                                    // 仅视频区域处理小窗移动/缩放，避免与控制按钮竞争手势。
-                                    onScaleStart: (_) {
-                                      _hideTimer?.cancel();
-                                      _scaleStart = _scale;
-                                      _instantResize = true;
-                                    },
-                                    onScaleUpdate: (details) {
-                                      setState(() {
-                                        // 平移:单指拖动 / 双指整体移动(focalPointDelta)
-                                        _left = _left! + details.focalPointDelta.dx;
-                                        _top = _top! + details.focalPointDelta.dy;
-                                        // 缩放:双指时 scale≠1;单指恒为 1,仅钳位置
-                                        if (details.scale != 1.0) {
-                                          _applyScaleAroundCenter(
-                                            _scaleStart * details.scale,
-                                            screenSize,
-                                          );
-                                        } else {
-                                          _clampPositionInScreen(screenSize);
-                                        }
-                                      });
-                                      PipWindowMemory.position =
-                                          Offset(_left!, _top!);
-                                      PipWindowMemory.scale = _scale;
-                                    },
-                                    onScaleEnd: (_) {
-                                      setState(() => _instantResize = false);
-                                      if (_showControls) {
-                                        _startHideTimer();
-                                      }
-                                    },
-                                    child: AbsorbPointer(
-                                      child: widget.videoPlayerBuilder(
-                                        false,
-                                        rect.width,
-                                        rect.height,
-                                      ),
+                                  child: AbsorbPointer(
+                                    child: widget.videoPlayerBuilder(
+                                      false,
+                                      rect.width,
+                                      rect.height,
                                     ),
                                   ),
                                 ),
                                 if (interactive && _showControls) ...[
                                   Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: Container(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.4,
+                                    child: Container(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  // 左上角关闭
+                                  Positioned(
+                                    top: 3,
+                                    left: 4,
+                                    child: GestureDetector(
+                                      onTap: _beginClose,
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 21,
                                         ),
                                       ),
                                     ),
                                   ),
-                                  // 左上角关闭：先播缩小淡出再 stopPip。
-                                  // 次要按钮触控目标仅比图标大一圈,
-                                  // 同系统 PiP 顶部按钮,降低误触
+                                  // 右上角还原
                                   Positioned(
-                                    top: 2,
-                                    left: 4,
-                                    child: PipControlButton(
-                                      targetSize: topControl,
-                                      onTap: _beginClose,
-                                      icon: const Icon(
-                                        Icons.close,
-                                        color: Colors.white,
-                                        size: 21,
-                                      ),
-                                    ),
-                                  ),
-                                  // 右上角还原：归位动画启动，窗口保持显示飞向页面。
-                                  // 次要按钮,触控目标仅比图标大一圈
-                                  Positioned(
-                                    top: 2,
+                                    top: 3,
                                     right: 4,
-                                    child: PipControlButton(
-                                      targetSize: topControl,
+                                    child: GestureDetector(
                                       onTap: () {
                                         _hideTimer?.cancel();
                                         widget.onTapToReturn();
                                       },
-                                      icon: const Icon(
-                                        Icons.open_in_full,
-                                        color: Colors.white,
-                                        size: 19,
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: Icon(
+                                          Icons.open_in_full,
+                                          color: Colors.white,
+                                          size: 19,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                  // 底部控制栏:主操作按钮触控目标自适应(正常档 48,
-                                  // 同系统 PiP 的 pip_action_size,图标居中四周留白;
-                                  // 窄窗收缩见 bottomControl),间距 8dp
+                                  // 底部控制栏
                                   Positioned(
                                     left: 0,
                                     right: 0,
-                                    bottom: 4,
+                                    bottom: 8,
                                     child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
                                       children: [
                                         // 后退10秒
-                                        Expanded(
-                                          child: Center(
-                                            child: PipControlButton(
-                                              targetSize: bottomControl,
-                                              onTap: () {
-                                                _resetHideTimer();
-                                                final controller =
-                                                    PipOverlayService
-                                                        .getSavedController<
-                                                          VideoDetailController
-                                                        >();
-                                                final plController =
-                                                    controller
-                                                        ?.plPlayerController;
-                                                if (plController != null) {
-                                                  final current = Duration(
-                                                    seconds: plController
-                                                        .position.value,
-                                                  );
-                                                  plController.seekTo(
-                                                    current -
-                                                        const Duration(
-                                                          seconds: 10,
-                                                        ),
-                                                  );
-                                                }
-                                              },
-                                              icon: const Icon(
-                                                Icons.replay_10,
-                                                color: Colors.white,
-                                                size: 22,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        // 播放/暂停
-                                        Expanded(
-                                          child: Center(
-                                            child: Obx(() {
-                                              final controller =
-                                                  PipOverlayService
-                                                      .getSavedController<
-                                                        VideoDetailController
-                                                      >();
-                                              final plController =
-                                                  controller
-                                                      ?.plPlayerController;
-                                              final isPlaying =
-                                                  plController?.playerStatus ==
-                                                      PlayerStatus.playing;
-                                              return PipControlButton(
-                                                targetSize: bottomControl,
-                                                onTap: () {
-                                                  _resetHideTimer();
-                                                  if (isPlaying) {
-                                                    plController?.pause();
-                                                  } else {
-                                                    plController?.play();
-                                                  }
-                                                },
-                                                icon: Icon(
-                                                  isPlaying
-                                                      ? Icons.pause
-                                                      : Icons.play_arrow,
-                                                  color: Colors.white,
-                                                  size: 30,
-                                                ),
+                                        GestureDetector(
+                                          onTap: () {
+                                            _resetHideTimer();
+                                            final controller =
+                                                PipOverlayService.getSavedController<
+                                                  VideoDetailController
+                                                >();
+                                            final plController =
+                                                controller?.plPlayerController;
+                                            if (plController != null) {
+                                              final current = Duration(
+                                                seconds:
+                                                    plController.position.value,
                                               );
-                                            }),
+                                              plController.seekTo(
+                                                current -
+                                                    const Duration(seconds: 10),
+                                              );
+                                            }
+                                          },
+                                          child: const Icon(
+                                            Icons.replay_10,
+                                            color: Colors.white,
+                                            size: 22,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        // 前进10秒
-                                        Expanded(
-                                          child: Center(
-                                            child: PipControlButton(
-                                              targetSize: bottomControl,
-                                              onTap: () {
-                                                _resetHideTimer();
-                                                final controller =
-                                                    PipOverlayService
-                                                        .getSavedController<
-                                                          VideoDetailController
-                                                        >();
-                                                final plController =
-                                                    controller
-                                                        ?.plPlayerController;
-                                                if (plController != null) {
-                                                  final current = Duration(
-                                                    seconds: plController
-                                                        .position.value,
-                                                  );
-                                                  plController.seekTo(
-                                                    current +
-                                                        const Duration(
-                                                          seconds: 10,
-                                                        ),
-                                                  );
-                                                }
-                                              },
-                                              icon: const Icon(
-                                                Icons.forward_10,
-                                                color: Colors.white,
-                                                size: 22,
-                                              ),
+                                        // 播放/暂停
+                                        Obx(() {
+                                          final controller =
+                                              PipOverlayService.getSavedController<
+                                                VideoDetailController
+                                              >();
+                                          final plController =
+                                              controller?.plPlayerController;
+                                          final isPlaying =
+                                              plController
+                                                  ?.playerStatus
+                                                  .value ==
+                                              PlayerStatus.playing;
+                                          return GestureDetector(
+                                            onTap: () {
+                                              _resetHideTimer();
+                                              if (isPlaying) {
+                                                plController?.pause();
+                                              } else {
+                                                plController?.play();
+                                              }
+                                            },
+                                            child: Icon(
+                                              isPlaying
+                                                  ? Icons.pause
+                                                  : Icons.play_arrow,
+                                              color: Colors.white,
+                                              size: 30,
                                             ),
+                                          );
+                                        }),
+                                        // 前进10秒
+                                        GestureDetector(
+                                          onTap: () {
+                                            _resetHideTimer();
+                                            final controller =
+                                                PipOverlayService.getSavedController<
+                                                  VideoDetailController
+                                                >();
+                                            final plController =
+                                                controller?.plPlayerController;
+                                            if (plController != null) {
+                                              final current = Duration(
+                                                seconds:
+                                                    plController.position.value,
+                                              );
+                                              plController.seekTo(
+                                                current +
+                                                    const Duration(seconds: 10),
+                                              );
+                                            }
+                                          },
+                                          child: const Icon(
+                                            Icons.forward_10,
+                                            color: Colors.white,
+                                            size: 22,
                                           ),
                                         ),
                                       ],
@@ -1097,6 +1052,7 @@ class _PipWidgetState extends State<PipWidget>
                       ),
                     ),
                   ),
+                ),
               ),
             ),
           );

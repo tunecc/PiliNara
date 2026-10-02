@@ -1184,6 +1184,31 @@ abstract final class Pref {
     defaultValue: false,
   );
 
+  // 今日推荐单设置
+  static bool get todayWatchEnabled => _setting.get(
+    SettingBoxKey.todayWatchEnabled,
+    defaultValue: false,
+  );
+
+  static set todayWatchEnabled(bool value) =>
+      _setting.put(SettingBoxKey.todayWatchEnabled, value);
+
+  static int get todayWatchMode => _setting.get(
+    SettingBoxKey.todayWatchMode,
+    defaultValue: 0,
+  );
+
+  static set todayWatchMode(int value) =>
+      _setting.put(SettingBoxKey.todayWatchMode, value);
+
+  static int get todayWatchStrategy => _setting.get(
+    SettingBoxKey.todayWatchStrategy,
+    defaultValue: 0,
+  );
+
+  static set todayWatchStrategy(int value) =>
+      _setting.put(SettingBoxKey.todayWatchStrategy, value);
+
   static bool get enableBackgroundPlay =>
       _setting.get(SettingBoxKey.enableBackgroundPlay, defaultValue: true);
 
@@ -1329,6 +1354,40 @@ abstract final class Pref {
   static bool get enableSponsorBlock =>
       _setting.get(SettingBoxKey.enableSponsorBlock, defaultValue: false);
 
+  static bool get enableHdrRenderAndroid =>
+      Platform.isAndroid &&
+      _setting.get(SettingBoxKey.enableHdrRenderAndroid, defaultValue: false);
+
+  static bool get enableHdrToneMapCustom =>
+      _setting.get(SettingBoxKey.enableHdrToneMapCustom, defaultValue: false);
+
+  static double get hdrToneMapPeakNits => (_setting.get(
+    SettingBoxKey.hdrToneMapPeakNits,
+    defaultValue: 1000.0,
+  ) as num).toDouble();
+
+  static double get hdrToneMapStrength =>
+      (_setting.get(SettingBoxKey.hdrToneMapStrength, defaultValue: 1.0) as num)
+          .toDouble();
+
+  static double get hdrToneMapSaturation => (_setting.get(
+    SettingBoxKey.hdrToneMapSaturation,
+    defaultValue: 1.0,
+  ) as num).toDouble();
+
+  static double get hdrToneMapHighlightBoost => (_setting.get(
+    SettingBoxKey.hdrToneMapHighlightBoost,
+    defaultValue: 1.0,
+  ) as num).toDouble();
+
+  static double get hdrToneMapDefaultHighlightProtect => ((_setting.get(
+    SettingBoxKey.hdrToneMapDefaultHighlightProtect,
+    defaultValue: 0.65,
+  ) as num).toDouble()).clamp(0.0, 1.0);
+
+  static double get hdrToneMapDefaultDynamicRange =>
+      hdrToneMapDefaultHighlightProtect;
+
   static bool get enableHA =>
       _setting.get(SettingBoxKey.enableHA, defaultValue: true);
 
@@ -1422,6 +1481,22 @@ abstract final class Pref {
 
   static bool get enableAutoLongPressSpeed =>
       _setting.get(SettingBoxKey.enableAutoLongPressSpeed, defaultValue: false);
+
+  static bool get enableLongPressSlideSpeed =>
+      _setting.get(SettingBoxKey.enableLongPressSlideSpeed, defaultValue: true);
+
+  static double get longPressSpeedFactor =>
+      _setting.get(SettingBoxKey.longPressSpeedFactor, defaultValue: 2.0);
+
+  static bool get enableTvMode =>
+      _setting.get(SettingBoxKey.enableTvMode, defaultValue: false);
+
+  static bool get tvFocusEnabled =>
+      _setting.get(SettingBoxKey.tvFocusEnabled, defaultValue: true);
+
+  static int get tvDpadSpeed =>
+      _setting.get(SettingBoxKey.tvDpadSpeed, defaultValue: 10);
+
 
   static double get playSpeedDefault =>
       _video.get(VideoBoxKey.playSpeedDefault, defaultValue: 1.0);
