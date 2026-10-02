@@ -39,6 +39,22 @@ List<SettingsModel> get recommendSettings => [
     },
   ),
   SwitchModel(
+    title: '今日推荐：隐藏已看过',
+    subtitle: '过滤掉已有观看记录的视频',
+    leading: const Icon(Icons.check_circle_outline),
+    setKey: SettingBoxKey.todayRecommendHideWatched,
+    defaultVal: false,
+  ),
+  NormalModel(
+    title: '今日推荐：发布时间',
+    leading: const Icon(Icons.schedule_outlined),
+    getSubtitle: () {
+      final hours = Pref.todayRecommendMaxAgeHours;
+      return hours <= 0 ? '不限' : '仅显示 ${hours} 小时内发布';
+    },
+    onTap: _showTodayRecommendAgeDialog,
+  ),
+  SwitchModel(
     title: '显示上次看到位置提示',
     subtitle: '保留上次推荐时，在上次刷新位置显示提示',
     leading: const Icon(Icons.tips_and_updates_outlined),
@@ -217,6 +233,32 @@ List<SettingsModel> get recommendSettings => [
     ),
   ),
 ];
+
+Future<void> _showTodayRecommendAgeDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  const options = [0, 24, 72, 168, 720];
+  final res = await showDialog<int>(
+    context: context,
+    builder: (context) => SelectDialog<int>(
+      title: '发布时间范围',
+      value: Pref.todayRecommendMaxAgeHours,
+      values: [
+        for (final hours in options)
+          (
+            hours,
+            hours == 0
+                ? '不限'
+                : hours < 168 ? '$hours 小时内' : '${hours ~/ 24} 天内'
+          ),
+      ],
+    ),
+  );
+  if (res == null) return;
+  await GStorage.setting.put(SettingBoxKey.todayRecommendMaxAgeHours, res);
+  setState();
+}
 
 Future<void> _showRcmdModeDialog(
   BuildContext context,

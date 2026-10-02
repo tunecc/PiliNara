@@ -3,6 +3,7 @@ import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
 import 'package:PiliPlus/utils/login_utils.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:hive_ce/hive.dart';
 
 abstract final class Accounts {
@@ -90,5 +91,26 @@ abstract final class Accounts {
   @pragma("vm:prefer-inline")
   static Account get(AccountType key) {
     return accountMode[key.index];
+  }
+
+  /// Applies the user's preferred playback account to [AccountType.video].
+  ///
+  /// Preference values: -1 = guest, 0 = main account, >0 = that user's mid.
+  static Future<void> applyPreferredVideoAccount() async {
+    final mid = Pref.playbackAccountMid;
+    final Account target;
+    if (mid == -1) {
+      target = AnonymousAccount();
+    } else if (mid == 0) {
+      target = main;
+    } else {
+      final match = account.values
+          .where((a) => a.mid == mid)
+          .firstOrNull;
+      if (match == null) return;
+      target = match;
+    }
+    if (accountMode[AccountType.video.index] == target) return;
+    await set(AccountType.video, target);
   }
 }

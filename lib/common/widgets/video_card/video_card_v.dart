@@ -16,6 +16,7 @@ import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/global_data.dart';
+import 'package:get/get.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:intl/intl.dart';
@@ -88,7 +89,7 @@ class VideoCardV extends StatelessWidget {
       cover: videoItem.cover,
       bvid: videoItem.bvid,
     );
-    return Stack(
+    final card = Stack(
       clipBehavior: Clip.none,
       children: [
         Card(
@@ -127,9 +128,10 @@ class VideoCardV extends StatelessWidget {
                             ),
                           if (videoItem case RcmdVideoItemAppModel(
                             :final canPlay,
-                          ) when canPlay != 1)
+                            :final isUgcPay,
+                          ) when canPlay != 1 || isUgcPay)
                             const PBadge(
-                              text: '充电专属',
+                              text: '付费',
                               top: 6,
                               right: 6,
                               size: .small,
@@ -160,13 +162,27 @@ class VideoCardV extends StatelessWidget {
           ),
       ],
     );
+    if (!Pref.experimentalCardAnimation) return card;
+    // Fade + slight scale entrance so cards settle in instead of popping.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.scale(scale: 0.97 + 0.03 * value, child: child),
+      ),
+      child: card,
+    );
   }
 
   Widget content(BuildContext context) {
     final theme = Theme.of(context);
     return Expanded(
       child: Padding(
-        padding: const .fromLTRB(6, 5, 6, 5),
+        padding: Pref.experimentalCompactMode
+            ? const .fromLTRB(4, 3, 4, 3)
+            : const .fromLTRB(6, 5, 6, 5),
         child: Column(
           crossAxisAlignment: .start,
           children: [
@@ -214,21 +230,36 @@ class VideoCardV extends StatelessWidget {
                   ),
                 Expanded(
                   flex: 1,
-                  child: Text(
-                    remarkedName(
-                      videoItem.owner.mid,
-                      videoItem.owner.name.toString(),
-                    ),
-                    maxLines: 1,
-                    overflow: .clip,
-                    semanticsLabel: 'UP：${remarkedName(
-                      videoItem.owner.mid,
-                      videoItem.owner.name.toString(),
-                    )}',
-                    style: TextStyle(
-                      height: 1.5,
-                      fontSize: theme.textTheme.labelMedium!.fontSize,
-                      color: theme.colorScheme.outline,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: videoItem.goto == 'av' &&
+                            (videoItem.owner.mid ?? 0) > 0
+                        ? () => Get.toNamed(
+                            '/member?mid=${videoItem.owner.mid}',
+                          )
+                        : null,
+                    child: Text(
+                      remarkedName(
+                        videoItem.owner.mid,
+                        videoItem.owner.name.toString(),
+                      ),
+                      maxLines: 1,
+                      overflow: .clip,
+                      semanticsLabel: 'UP：${remarkedName(
+                        videoItem.owner.mid,
+                        videoItem.owner.name.toString(),
+                      )}',
+                      style: TextStyle(
+                        height: 1.5,
+                        fontSize: theme.textTheme.labelMedium!.fontSize,
+                        color: videoItem.goto == 'av' &&
+                                (videoItem.owner.mid ?? 0) > 0
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline,
+                        fontWeight: videoItem.goto == 'av'
+                            ? FontWeight.w600
+                            : null,
+                      ),
                     ),
                   ),
                 ),
@@ -251,32 +282,28 @@ class VideoCardV extends StatelessWidget {
           type: .play,
           value: videoItem.stat.view,
         ),
-        if (videoItem.goto != 'picture') ...[
-          const SizedBox(width: 4),
-          StatWidget(
-            type: .danmaku,
-            value: videoItem.stat.danmu,
-          ),
-        ],
-        if (videoItem is RcmdVideoItemModel) ...[
-          const Spacer(),
-          Text.rich(
-            maxLines: 1,
-            TextSpan(
-              style: TextStyle(
-                fontSize: theme.textTheme.labelSmall!.fontSize,
-                color: theme.colorScheme.outline.withValues(alpha: 0.8),
-              ),
-              text: DateFormatUtils.dateFormat(
-                videoItem.pubdate,
-                short: shortFormat,
-                long: longFormat,
-                showYesterdayTime: false,
-              ),
+        const SizedBox(width: 4),
+        StatWidget(
+          type: .reply,
+          value: videoItem.stat.reply,
+        ),
+        const Spacer(),
+        Text.rich(
+          maxLines: 1,
+          TextSpan(
+            style: TextStyle(
+              fontSize: theme.textTheme.labelSmall!.fontSize,
+              color: theme.colorScheme.outline.withValues(alpha: 0.8),
+            ),
+            text: DateFormatUtils.dateFormat(
+              videoItem.pubdate,
+              short: shortFormat,
+              long: longFormat,
+              showYesterdayTime: false,
             ),
           ),
-          const SizedBox(width: 2),
-        ],
+        ),
+        const SizedBox(width: 2),
       ],
     );
   }

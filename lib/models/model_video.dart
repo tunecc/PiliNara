@@ -24,6 +24,7 @@ abstract class BaseStat {
   int? view;
   int? like;
   int? danmu;
+  int? reply;
 }
 
 class Stat extends BaseStat {
@@ -31,6 +32,7 @@ class Stat extends BaseStat {
     view = json["view"];
     like = json["like"];
     danmu = json['danmaku'];
+    reply = json['reply'];
   }
 }
 

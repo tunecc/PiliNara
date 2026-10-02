@@ -1,3 +1,4 @@
+import 'package:PiliPlus/pages/media_source/search_view.dart';
 import 'dart:io' show Platform;
 import 'dart:math';
 
@@ -1899,6 +1900,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         ),
       PopupMenuItem(
         onTap: () {
+          final title = videoDetailController.args['title']?.toString() ?? '';
+          if (title.isEmpty) {
+            SmartDialog.showToast('无法获取标题');
+          } else {
+            Get.to(() => MediaSourceSearchPage(keyword: title));
+          }
+        },
+        child: const Text('搜索外部源'),
+      ),
+      PopupMenuItem(
+        onTap: () {
           if (!Accounts.main.isLogin) {
             SmartDialog.showToast('账号未登录');
           } else {
@@ -1952,6 +1964,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                           isFullScreen: plPlayerController!.isFullScreen.value,
                           isFileSource: videoDetailController.isFileSource,
                           size: Size(width, height),
+                          title: videoDetailController.args['title'],
                         ),
                       ),
                 showEpisodes: showEpisodes,

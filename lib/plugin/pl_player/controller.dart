@@ -22,6 +22,7 @@ import 'package:PiliPlus/pages/setting/models/play_settings.dart'
     show kMaxVolume;
 import 'package:PiliPlus/pages/sponsor_block/block_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
+import 'package:PiliPlus/plugin/pl_player/models/video_output_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_seek_layout.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
@@ -73,6 +74,7 @@ import 'package:screen_brightness_platform_interface/screen_brightness_platform_
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:PiliPlus/plugin/pl_player/models/auto_audio_only_state.dart';
+import 'package:PiliPlus/services/playback_stats_service.dart';
 
 typedef PlayCallback = Future<void>? Function();
 typedef PlayerInitCallback = Future<void> Function();
@@ -999,7 +1001,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         }
         _removeListeners();
         _videoPlayerController?.dispose();
-        _videoPlayerController = null;
+    _videoPlayerController = null;
         _videoController = null;
         return;
       }
@@ -1037,7 +1039,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     return shadersDirPath = await AssetUtils.getOrCopy(
       'assets/shaders',
-      Assets.mpvAnime4KShaders.followedBy(Assets.mpvAnime4KShadersLite),
+      Assets.mpvAnime4KShaders
+          .followedBy(Assets.mpvAnime4KShadersLite)
+          .followedBy(Assets.sdr2HdrShaders),
       path.join(appSupportDirPath, 'anime_shaders'),
     );
   }
@@ -1055,34 +1059,39 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       }
     }
     pp ??= _videoPlayerController!;
-    switch (type) {
-      case SuperResolutionType.disable:
-        return pp.command(const ['change-list', 'glsl-shaders', 'clr', '']);
-      case SuperResolutionType.efficiency:
-        return pp.command([
-          'change-list',
-          'glsl-shaders',
-          'set',
-          PathUtils.buildShadersAbsolutePath(
-            await copyShadersToExternalDirectory,
-            Assets.mpvAnime4KShadersLite,
-          ),
-        ]);
-      case SuperResolutionType.quality:
-        return pp.command([
-          'change-list',
-          'glsl-shaders',
-          'set',
-          PathUtils.buildShadersAbsolutePath(
-            await copyShadersToExternalDirectory,
-            Assets.mpvAnime4KShaders,
-          ),
-        ]);
+    final dir = await copyShadersToExternalDirectory;
+    // mediacodec-embed renders inside the decoder surface, so mpv shaders
+    // cannot be applied on top of it.
+    final shaders = <String>[
+      if (Pref.videoOutput != VideoOutputType.mediacodecEmbed) ...switch (type) {
+        SuperResolutionType.disable => const <String>[],
+        SuperResolutionType.efficiency => Assets.mpvAnime4KShadersLite,
+        SuperResolutionType.quality => Assets.mpvAnime4KShaders,
+      },
+      if (Pref.enableSdr2Hdr) ...Assets.sdr2HdrShaders,
+    ];
+    if (shaders.isEmpty) {
+      return pp.command(const ['change-list', 'glsl-shaders', 'clr', '']);
     }
+    return pp.command([
+      'change-list',
+      'glsl-shaders',
+      'set',
+      PathUtils.buildShadersAbsolutePath(dir, shaders),
+    ]);
   }
+
 
   Future<Player> _initPlayer() async {
     assert(_videoPlayerController == null);
+
+    // Initialize playback stats tracking
+    try {
+      PlaybackStatsService.init();
+    } catch (e) {
+      debugPrint('[PlPlayer] PlaybackStatsService init failed: $e');
+    }
+
     if (PlatformUtils.isMobile && Pref.enableAppVolume) {
       // 移动平台应用内音量模式：初始化系统音量
       systemVolume.value = (await FlutterVolumeController.getVolume()) ?? 1.0;
@@ -1118,12 +1127,23 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         enableHardwareAcceleration: hwdec != null,
         androidAttachSurfaceAfterVideoParameters: false,
         hwdec: hwdec,
+        vo: Pref.videoOutput.value,
       ),
     );
 
     player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
 
     _startListeners(player);
+
+    // Track playback state changes for stats
+    try {
+      if (_videoPlayerController?.state.playing == true) {
+        PlaybackStatsService.onPlay();
+      } else {
+        PlaybackStatsService.onPause();
+      }
+    } catch (_) {}
+
 
     return player;
   }

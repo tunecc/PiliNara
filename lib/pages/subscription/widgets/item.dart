@@ -10,14 +10,11 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// 订阅列表卡片，对齐 PiliPlusPlus 横版行卡片风格。
 class SubItem extends StatelessWidget {
   final SubItemModel item;
   final VoidCallback cancelSub;
-  const SubItem({
-    super.key,
-    required this.item,
-    required this.cancelSub,
-  });
+  const SubItem({super.key, required this.item, required this.cancelSub});
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +59,7 @@ class SubItem extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 封面 (16:9)
               AspectRatio(
                 aspectRatio: Style.aspectRatio,
                 child: LayoutBuilder(
@@ -84,13 +82,24 @@ class SubItem extends StatelessWidget {
                           top: 6,
                           text: type,
                         ),
+                        if (item.state == 1)
+                          Container(
+                            color: Colors.black54,
+                            width: maxWidth,
+                            height: maxHeight,
+                            child: const Center(
+                              child: Text('已失效',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 11)),
+                            ),
+                          ),
                       ],
                     );
                   },
                 ),
               ),
               const SizedBox(width: 10),
-              content(context),
+              _content(context),
             ],
           ),
         ),
@@ -98,7 +107,7 @@ class SubItem extends StatelessWidget {
     );
   }
 
-  Widget content(BuildContext context) {
+  Widget _content(BuildContext context) {
     final theme = Theme.of(context);
     final style = TextStyle(
       fontSize: 13,
@@ -117,13 +126,11 @@ class SubItem extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.start,
-                  style: const TextStyle(
-                    letterSpacing: 0.3,
-                  ),
+                  style: const TextStyle(letterSpacing: 0.3),
                 ),
               ),
               Text(
-                'UP主: ${item.upper!.name!}',
+                'UP主: ${item.upper?.name ?? '?'}',
                 textAlign: TextAlign.start,
                 style: style,
                 maxLines: 1,
@@ -131,7 +138,7 @@ class SubItem extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${item.mediaCount}个视频',
+                '${item.mediaCount ?? 0}个视频',
                 textAlign: TextAlign.start,
                 style: style,
               ),

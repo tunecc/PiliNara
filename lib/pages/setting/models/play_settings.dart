@@ -1,12 +1,14 @@
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
+import 'package:PiliPlus/models/common/danmaku_source.dart';
 import 'package:PiliPlus/models/common/super_chat_time_type.dart';
 import 'package:PiliPlus/models/common/super_chat_type.dart';
 import 'package:PiliPlus/models/common/video/subtitle_pref_type.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/pages/fullscreen_sc_size.dart';
+import 'package:PiliPlus/pages/setting/widgets/multi_select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
@@ -372,6 +374,28 @@ List<SettingsModel> get playSettings => [
     defaultVal: false,
   ),
   NormalModel(
+    title: '弹幕来源',
+    leading: const Icon(Icons.subtitles_outlined),
+    getSubtitle: () {
+      final sources = Pref.danmakuSources;
+      if (sources.isEmpty) return '未启用任何来源';
+      return DanmakuSource.labels.entries
+          .where((e) => sources.contains(e.key))
+          .map((e) => e.value)
+          .join('、');
+    },
+    onTap: _showDanmakuSourceDialog,
+  ),
+  if (Pref.danmakuSources.contains(DanmakuSource.dandanplay))
+    NormalModel(
+      title: '弹弹play 凭据',
+      leading: const Icon(Icons.key_outlined),
+      getSubtitle: () => Pref.dandanplayAppId.isEmpty
+          ? '未配置（弹弹play 需要 AppId / Secret）'
+          : '已配置 AppId: ${Pref.dandanplayAppId}',
+      onTap: _showDandanplayCredentialDialog,
+    ),
+  NormalModel(
     title: '默认全屏方向',
     leading: const Icon(Icons.open_with_outlined),
     getSubtitle: () => '当前全屏方向：${Pref.fullScreenMode.desc}',
@@ -404,6 +428,30 @@ List<SettingsModel> get playSettings => [
     onSelected: (value, setState) => GStorage.video
         .put(VideoBoxKey.playRepeat, value.index)
         .whenComplete(setState),
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/mediaSource'),
+    leading: const Icon(Icons.rss_feed_outlined),
+    title: '订阅源管理',
+    subtitle: '动漫花园/蜜柑计划/Nyaa 等外部数据源',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/accountUsage'),
+    leading: const Icon(Icons.manage_accounts_outlined),
+    title: '账号使用设置',
+    subtitle: '播放/评论账号、1080P+ 试看',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/cdnDiagnostics'),
+    leading: const Icon(Icons.speed_outlined),
+    title: 'CDN 测速诊断',
+    subtitle: '真实视频段测速、DNS/TTFB/吞吐/抖动分析',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/trafficStats'),
+    leading: const Icon(Icons.data_usage_outlined),
+    title: '流量统计',
+    subtitle: '按小时/Wi-Fi/蜂窝分类的上下行统计',
   ),
   const SwitchModel(
     title: '播放器设置仅对当前生效',
@@ -448,6 +496,76 @@ Future<void> _showSuperChatTimeDialog(
     await GStorage.setting.put(SettingBoxKey.superChatTimeType, res.index);
     setState();
   }
+}
+
+Future<void> _showDandanplayCredentialDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final idController = TextEditingController(text: Pref.dandanplayAppId);
+  final secretController = TextEditingController(
+    text: Pref.dandanplayAppSecret,
+  );
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('弹弹play 凭据'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: idController,
+            decoration: const InputDecoration(labelText: 'AppId'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: secretController,
+            decoration: const InputDecoration(labelText: 'AppSecret'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('保存'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  await GStorage.setting.put(
+    SettingBoxKey.dandanplayAppId,
+    idController.text.trim(),
+  );
+  await GStorage.setting.put(
+    SettingBoxKey.dandanplayAppSecret,
+    secretController.text.trim(),
+  );
+  setState();
+}
+
+Future<void> _showDanmakuSourceDialog(
+  BuildContext context,
+  VoidCallback setState,
+) async {
+  final res = await showDialog<Set<String>>(
+    context: context,
+    builder: (context) => MultiSelectDialog<String>(
+      title: '弹幕来源',
+      initValues: Pref.danmakuSources.toList(),
+      values: DanmakuSource.labels,
+    ),
+  );
+  if (res == null) return;
+  await GStorage.setting.put(
+    SettingBoxKey.danmakuSources,
+    res.toList(),
+  );
+  setState();
 }
 
 Future<void> _showFullScreenModeDialog(

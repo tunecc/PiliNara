@@ -123,6 +123,16 @@ abstract final class SettingBoxKey {
       audioNormalization = 'audioNormalization',
       fallbackNormalization = 'fallbackNormalization',
       superResolutionType = 'superResolutionType',
+      playerEngine = 'playerEngine',
+      media3AudioGainDb = 'media3AudioGainDb',
+      media3AudioDynamic = 'media3AudioDynamic',
+      media3AudioTargetRmsDb = 'media3AudioTargetRmsDb',
+      media3AudioEqEnabled = 'media3AudioEqEnabled',
+      media3AudioEqFreqHz = 'media3AudioEqFreqHz',
+      media3AudioEqGainDb = 'media3AudioEqGainDb',
+      media3AudioEqQ = 'media3AudioEqQ',
+      media3SuperResolution = 'media3SuperResolution',
+      mediaSourceEnabled = 'mediaSourceEnabled',
       preInitPlayer = 'preInitPlayer',
       mainTabBarView = 'mainTabBarView',
       searchSuggestion = 'searchSuggestion',
@@ -336,7 +346,43 @@ abstract final class SettingBoxKey {
       remarkReplaceName = 'remarkReplaceName',
       appFont = 'appFont',
       customAppFont = 'customAppFont',
-      customAppFontNames = 'customAppFontNames';
+      customAppFontNames = 'customAppFontNames',
+      cdnAutoSelect = 'cdnAutoSelect',
+      cdnPreferredNode = 'cdnPreferredNode',
+      commentAccountMid = 'commentAccountMid',
+      customDohUrl = 'customDohUrl',
+      dohProvider = 'dohProvider',
+      enableDoh = 'enableDoh',
+      enableHighQualityTrial = 'enableHighQualityTrial',
+      experimentalAmoledBlack = 'experimentalAmoledBlack',
+
+  // 第三方弹幕源
+  enableDandanplay = 'enableDandanplay',
+  enableGamerDanmaku = 'enableGamerDanmaku',
+
+      experimentalBlurBackdrop = 'experimentalBlurBackdrop',
+      experimentalCardAnimation = 'experimentalCardAnimation',
+      experimentalCompactMode = 'experimentalCompactMode',
+      experimentalDynamicColor = 'experimentalDynamicColor',
+      experimentalLiquidGlass = 'experimentalLiquidGlass',
+      playbackAccountMid = 'playbackAccountMid',
+      playbackArchiveDue = 'playbackArchiveDue',
+      playbackArchiveId = 'playbackArchiveId',
+      playbackStatsReady = 'playbackStatsReady',
+      trafficStats = 'trafficStats',
+      videoQualityMode = 'videoQualityMode',
+      mediaSourceCustom = 'mediaSourceCustom',
+      mediaSourceDisabled = 'mediaSourceDisabled',
+      videoOutput = 'videoOutput',
+      enableSdr2Hdr = 'enableSdr2Hdr',
+      sdr2HdrIntensity = 'sdr2HdrIntensity',
+      danmakuSources = 'danmakuSources',
+      todayRecommendHideWatched = 'todayRecommendHideWatched',
+      todayRecommendMaxAgeHours = 'todayRecommendMaxAgeHours',
+      kazumiPlugins = 'kazumiPlugins',
+      dandanplayAppId = 'dandanplayAppId',
+      dandanplayAppSecret = 'dandanplayAppSecret',
+      todayRecommendSaved = 'todayRecommendSaved';
 }
 
 abstract final class LocalCacheKey {
@@ -365,4 +411,14 @@ abstract final class VideoBoxKey {
       speedsList = 'speedsList',
       authorPlaySpeeds = 'authorPlaySpeeds',
       cacheVideoFit = 'cacheVideoFit';
+
+  static const playbackAccountMid = 'playbackAccountMid';
+  static const commentAccountMid = 'commentAccountMid';
+  static const enableHighQualityTrial = 'enableHighQualityTrial';
+  static const cdnAutoSelect = 'cdnAutoSelect';
+  static const cdnPreferredNode = 'cdnPreferredNode';
+
+  static const playbackStatsReady = 'playbackStatsReady';
+  static const playbackArchiveDue = 'playbackArchiveDue';
+  static const playbackArchiveId = 'playbackArchiveId';
 }

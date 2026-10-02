@@ -71,6 +71,12 @@ List<SettingsModel> get videoSettings => [
     getSubtitle: () => '当前使用：${Pref.liveCdnUrl ?? "默认"}',
     onTap: _showLiveCDNDialog,
   ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/cdnSetting'),
+    leading: const Icon(Icons.dns_outlined),
+    title: 'CDN 节点管理',
+    subtitle: '查看节点列表并批量测速',
+  ),
   const SwitchModel(
     title: 'CDN 测速',
     leading: Icon(Icons.speed),
@@ -230,6 +236,24 @@ List<SettingsModel> get videoSettings => [
     leading: const Icon(Icons.memory_outlined),
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: _showHwDecDialog,
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/pictureEnhance'),
+    leading: const Icon(Icons.hdr_auto_outlined),
+    title: '画质增强',
+    subtitle: '渲染器、超分辨率、SDR 转 HDR',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/qualityRecommend'),
+    leading: const Icon(Icons.auto_fix_high_outlined),
+    title: '智能画质推荐',
+    subtitle: '根据网络和设备自动推荐最佳画质',
+  ),
+  NormalModel(
+    onTap: (context, setState) => Get.toNamed('/videoBookmark'),
+    leading: const Icon(Icons.bookmark_outline),
+    title: '视频书签管理',
+    subtitle: '查看和管理已收藏的视频时间点',
   ),
 ];
 
@@ -558,6 +582,7 @@ Future<void> _showVideoSyncDialog(
     setState();
   }
 }
+
 
 Future<void> _showHwDecDialog(
   BuildContext context,

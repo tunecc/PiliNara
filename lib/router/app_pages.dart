@@ -1,3 +1,9 @@
+import 'package:PiliPlus/pages/setting/pages/video_bookmark_setting.dart';
+import 'package:PiliPlus/pages/setting/pages/quality_recommend_setting.dart';
+import 'package:PiliPlus/pages/setting/pages/account_usage_setting.dart';
+import 'package:PiliPlus/pages/setting/pages/picture_enhance_setting.dart';
+import 'package:PiliPlus/pages/setting/pages/cdn_setting.dart';
+import 'package:PiliPlus/pages/coin_log/view.dart';
 import 'package:PiliPlus/pages/about/view.dart';
 import 'package:PiliPlus/pages/setting/ai_setting/view.dart';
 import 'package:PiliPlus/pages/article/view.dart';
@@ -35,6 +41,7 @@ import 'package:PiliPlus/pages/main/view.dart';
 import 'package:PiliPlus/pages/main_reply/view.dart';
 import 'package:PiliPlus/pages/match_info/view.dart';
 import 'package:PiliPlus/pages/member/view.dart';
+import 'package:PiliPlus/pages/member/danmaku_query/view.dart';
 import 'package:PiliPlus/pages/member_dynamics/view.dart';
 import 'package:PiliPlus/pages/member_guard/view.dart';
 import 'package:PiliPlus/pages/member_profile/view.dart';
@@ -71,12 +78,26 @@ import 'package:PiliPlus/pages/video/view.dart';
 import 'package:PiliPlus/pages/webdav/view.dart';
 import 'package:PiliPlus/pages/webview/view.dart';
 import 'package:PiliPlus/pages/whisper/view.dart';
+import 'package:PiliPlus/pages/media_source/view.dart';
+import 'package:PiliPlus/pages/cdn_diagnostics/view.dart';
+import 'package:PiliPlus/pages/traffic_stats/view.dart';
+import 'package:PiliPlus/pages/offline_decode_lab/view.dart';
+import 'package:PiliPlus/services/playback_stats_service.dart';
+import 'package:PiliPlus/services/cdn_diagnostics_service.dart';
+import 'package:PiliPlus/services/traffic_stats_service.dart';
+import 'package:PiliPlus/pages/today_recommend/view.dart';
 import 'package:PiliPlus/pages/whisper_detail/view.dart';
 import 'package:get/get.dart';
 
 class Routes {
   static final List<GetPage<dynamic>> getPages = [
-    GetPage(name: '/', page: () => const MainApp()),
+                                        GetPage(name: '/videoBookmark', page: () => const VideoBookmarkSettingPage()),
+GetPage(name: '/qualityRecommend', page: () => const QualityRecommendSettingPage()),
+GetPage(name: '/accountUsage', page: () => const AccountUsageSettingPage()),
+GetPage(name: '/pictureEnhance', page: () => const PictureEnhanceSettingPage()),
+GetPage(name: '/cdnSetting', page: () => const CdnSettingPage()),
+GetPage(name: '/coinLog', page: () => const CoinLogPage()),
+GetPage(name: '/', page: () => const MainApp()),
     // 首页(推荐)
     GetPage(name: '/home', page: () => const HomePage()),
     // 热门
@@ -111,7 +132,8 @@ class Routes {
     GetPage(name: '/liveRoom', page: () => const LiveRoomPage()),
     // 用户中心
     GetPage(name: '/member', page: () => const MemberPage()),
-    GetPage(name: '/memberSearch', page: () => const MemberSearchPage()),
+    GetPage(name: '/danmakuQuery', page: () => const MemberDanmakuQueryPage(mid: 0)),
+GetPage(name: '/memberSearch', page: () => const MemberSearchPage()),
     //
     GetPage(name: '/blackListPage', page: () => const BlackListPage()),
     GetPage(name: '/colorSetting', page: () => const ColorSelectPage()),
@@ -131,6 +153,11 @@ class Routes {
     // 收藏搜索
     GetPage(name: '/favSearch', page: () => const FavSearchPage()),
     GetPage(name: '/historySearch', page: () => const HistorySearchPage()),
+    GetPage(name: '/todayRecommend', page: () => const TodayRecommendPage()),
+    GetPage(name: '/mediaSource', page: () => const MediaSourcePage()),
+    GetPage(name: '/cdnDiagnostics', page: () => const CdnDiagnosticsPage()),
+    GetPage(name: '/trafficStats', page: () => const TrafficStatsPage()),
+    GetPage(name: '/offlineDecodeLab', page: () => const OfflineDecodeLabPage()),
     GetPage(name: '/laterSearch', page: () => const LaterSearchPage()),
     GetPage(name: '/followSearch', page: () => const FollowSearchPage()),
     // 消息页面

@@ -1159,7 +1159,12 @@ class VideoDetailController extends GetxController
       preferCodecs = isWiFi ? Pref.preferCodecs : Pref.preferCodecsCellular;
     }
 
-    final result = await _getVideoUrl(VideoQuality.hdrVivid.code);
+    // Visitors can only trial 1080P unless the high-quality trial is on, in
+    // which case ask for the higher bitrate 1080P+ profile as well.
+    final trialQn = plPlayerController.tryLook && Pref.enableHighQualityTrial
+        ? VideoQuality.high1080plus.code
+        : VideoQuality.hdrVivid.code;
+    final result = await _getVideoUrl(trialQn);
 
     if (result case Success(:final response)) {
       data = response;

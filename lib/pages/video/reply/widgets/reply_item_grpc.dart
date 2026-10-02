@@ -406,6 +406,22 @@ class ReplyItemGrpc extends StatelessWidget {
     );
   }
 
+  /// True when the text contains characters outside the CJK range, i.e. the
+  /// reader may not understand it without a translation.
+  static bool _looksNonChinese(String? text) {
+    if (text == null || text.trim().isEmpty) return false;
+    final cjkCount = _cjkPattern.allMatches(text).length;
+    final letters = _letterPattern.allMatches(text).length;
+    // Latin/Cyrillic/etc. letters outnumbering CJK means the comment is
+    // probably in another language.
+    return letters > 3 && letters > cjkCount;
+  }
+
+  static final RegExp _cjkPattern =
+      RegExp(r'[\u4e00-\u9fff\u3400-\u4dbf\u3040-\u30ff]');
+  static final RegExp _letterPattern =
+      RegExp(r'[A-Za-z\u00c0-\u024f\u0370-\u03ff\u0400-\u04ff]');
+
   Widget _buildTranslateBtn(
     BuildContext context,
     ColorScheme colorScheme,
@@ -536,7 +552,8 @@ class ReplyItemGrpc extends StatelessWidget {
         ),
         const SizedBox(width: 2),
         if (replyControl.translationSwitch ==
-            .TRANSLATION_SWITCH_SHOW_TRANSLATION) ...[
+                .TRANSLATION_SWITCH_SHOW_TRANSLATION ||
+            _looksNonChinese(replyItem.content.message)) ...[
           _buildTranslateBtn(
             context,
             colorScheme,

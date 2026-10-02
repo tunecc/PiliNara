@@ -47,6 +47,7 @@ import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/login_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/plugin/pl_player/models/video_output_type.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:crypto/crypto.dart';
@@ -810,6 +811,37 @@ abstract final class Pref {
     }
     return superResolutionType ?? SuperResolutionType.disable;
   }
+
+  // --- Media3 Engine Settings ---
+  static String get playerEngine =>
+      _setting.get(SettingBoxKey.playerEngine, defaultValue: 'mediaKit');
+
+  static double get media3AudioGainDb =>
+      (_setting.get(SettingBoxKey.media3AudioGainDb) as num?)?.toDouble() ?? 0.0;
+
+  static bool get media3AudioDynamic =>
+      _setting.get(SettingBoxKey.media3AudioDynamic, defaultValue: false);
+
+  static double get media3AudioTargetRmsDb =>
+      (_setting.get(SettingBoxKey.media3AudioTargetRmsDb) as num?)?.toDouble() ?? -16.0;
+
+  static bool get media3AudioEqEnabled =>
+      _setting.get(SettingBoxKey.media3AudioEqEnabled, defaultValue: false);
+
+  static double get media3AudioEqFreqHz =>
+      (_setting.get(SettingBoxKey.media3AudioEqFreqHz) as num?)?.toDouble() ?? 1000.0;
+
+  static double get media3AudioEqGainDb =>
+      (_setting.get(SettingBoxKey.media3AudioEqGainDb) as num?)?.toDouble() ?? 0.0;
+
+  static double get media3AudioEqQ =>
+      (_setting.get(SettingBoxKey.media3AudioEqQ) as num?)?.toDouble() ?? 1.0;
+
+  static String get media3SuperResolution =>
+      _setting.get(SettingBoxKey.media3SuperResolution, defaultValue: 'disable');
+
+  static bool get mediaSourceEnabled =>
+      _setting.get(SettingBoxKey.mediaSourceEnabled, defaultValue: true);
 
   static bool get preInitPlayer =>
       _setting.get(SettingBoxKey.preInitPlayer, defaultValue: false);
@@ -1779,4 +1811,103 @@ abstract final class Pref {
 
   static bool get enableEmoteTooltip =>
       _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
+
+  static int get playbackAccountMid =>
+      _setting.get(SettingBoxKey.playbackAccountMid, defaultValue: 0);
+  static int get commentAccountMid =>
+      _setting.get(SettingBoxKey.commentAccountMid, defaultValue: 0);
+  static bool get enableHighQualityTrial => _setting.get(
+    SettingBoxKey.enableHighQualityTrial,
+    defaultValue: true,
+  );
+  static bool get cdnAutoSelect =>
+      _setting.get(SettingBoxKey.cdnAutoSelect, defaultValue: true);
+  static String get cdnPreferredNode =>
+      _setting.get(SettingBoxKey.cdnPreferredNode, defaultValue: '');
+
+  static String get dohProvider =>
+      _setting.get(SettingBoxKey.dohProvider, defaultValue: 'cloudflare');
+  static String get customDohUrl =>
+      _setting.get(SettingBoxKey.customDohUrl, defaultValue: '');
+
+  // === Experimental (visual effects + network) ===
+  static bool get enableDoh =>
+      _setting.get(SettingBoxKey.enableDoh, defaultValue: false);
+
+  static bool get enableDandanplay =>
+      _setting.get(SettingBoxKey.enableDandanplay, defaultValue: false);
+  static bool get enableGamerDanmaku =>
+      _setting.get(SettingBoxKey.enableGamerDanmaku, defaultValue: false);
+
+  static bool get experimentalLiquidGlass => _setting.get(
+    SettingBoxKey.experimentalLiquidGlass,
+    defaultValue: false,
+  );
+  static bool get experimentalBlurBackdrop => _setting.get(
+    SettingBoxKey.experimentalBlurBackdrop,
+    defaultValue: false,
+  );
+  static bool get experimentalAmoledBlack => _setting.get(
+    SettingBoxKey.experimentalAmoledBlack,
+    defaultValue: false,
+  );
+  static bool get experimentalCardAnimation => _setting.get(
+    SettingBoxKey.experimentalCardAnimation,
+    defaultValue: false,
+  );
+  static bool get experimentalDynamicColor => _setting.get(
+    SettingBoxKey.experimentalDynamicColor,
+    defaultValue: false,
+  );
+  static bool get experimentalCompactMode => _setting.get(
+    SettingBoxKey.experimentalCompactMode,
+    defaultValue: false,
+  );
+
+  static VideoOutputType get videoOutput => VideoOutputType.fromValue(
+    _setting.get(SettingBoxKey.videoOutput),
+  );
+
+  static set videoOutput(VideoOutputType value) =>
+      _setting.put(SettingBoxKey.videoOutput, value.value);
+
+  static bool get enableSdr2Hdr =>
+      _setting.get(SettingBoxKey.enableSdr2Hdr, defaultValue: false);
+
+  static set enableSdr2Hdr(bool value) =>
+      _setting.put(SettingBoxKey.enableSdr2Hdr, value);
+
+  static int get sdr2HdrIntensity =>
+      _setting.get(SettingBoxKey.sdr2HdrIntensity, defaultValue: 0);
+
+  static set sdr2HdrIntensity(int value) =>
+      _setting.put(SettingBoxKey.sdr2HdrIntensity, value);
+
+  /// Enabled danmaku sources; bilibili is included by default.
+  static Set<String> get danmakuSources {
+    final raw = _setting.get(SettingBoxKey.danmakuSources);
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toSet();
+    }
+    return const <String>{'bilibili'};
+  }
+
+  static set danmakuSources(Set<String> value) =>
+      _setting.put(SettingBoxKey.danmakuSources, value.toList());
+
+  /// 弹弹play 开放平台凭据（第三方弹幕来源需要）。
+  static String get dandanplayAppId =>
+      _setting.get(SettingBoxKey.dandanplayAppId, defaultValue: '');
+  static String get dandanplayAppSecret =>
+      _setting.get(SettingBoxKey.dandanplayAppSecret, defaultValue: '');
+
+  static bool get todayRecommendHideWatched => _setting.get(
+    SettingBoxKey.todayRecommendHideWatched,
+    defaultValue: false,
+  );
+
+  static int get todayRecommendMaxAgeHours => _setting.get(
+    SettingBoxKey.todayRecommendMaxAgeHours,
+    defaultValue: 0,
+  );
 }
