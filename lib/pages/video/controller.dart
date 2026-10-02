@@ -47,6 +47,8 @@ import 'package:PiliPlus/models_new/video/video_stein_edgeinfo/data.dart';
 import 'package:PiliPlus/pages/ai_chat/controller.dart';
 import 'package:PiliPlus/pages/audio/view.dart';
 import 'package:PiliPlus/pages/common/publish/publish_route.dart';
+import 'package:PiliPlus/pages/danmaku/controller.dart' show PlDanmakuController;
+import 'package:PiliPlus/pages/danmaku/danmaku_pool_sheet.dart';
 import 'package:PiliPlus/pages/danmaku/mask/controller.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/pages/sponsor_block/block_mixin.dart';
@@ -822,6 +824,25 @@ class VideoDetailController extends GetxController
 
   ({int mode, int fontSize, Color color})? dmConfig;
   String? savedDanmaku;
+  /// 当前视频弹幕控制器引用（由 PlDanmaku widget 创建后回调设置）
+  PlDanmakuController? _plDanmakuControllerRef;
+
+  /// 打开弹幕池搜索面板
+  void showDanmakuPoolSheet({required BuildContext context}) {
+    if (_plDanmakuControllerRef == null) return;
+    final controller = _plDanmakuControllerRef!;
+    PageUtils.showVideoBottomSheet(
+      context,
+      child: DanmakuPoolSheet(
+        danmakuController: controller,
+        currentPositionMs: plPlayerController.positionInMilliseconds.toDouble(),
+        onSeekTo: (ms) {
+          plPlayerController.seekTo(Duration(milliseconds: ms.toInt()));
+        },
+        onDismiss: () => Get.back(),
+      ),
+    );
+  }
 
   /// 发送弹幕
   Future<void> showShootDanmakuSheet() async {
