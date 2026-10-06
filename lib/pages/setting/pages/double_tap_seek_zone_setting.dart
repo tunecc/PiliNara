@@ -17,9 +17,16 @@ class DoubleTapSeekZoneSettingPage extends StatefulWidget {
 class _DoubleTapSeekZoneSettingPageState
     extends State<DoubleTapSeekZoneSettingPage> {
   static const double _handleWidth = 28;
+  /// 竖屏预览模仿竖屏播放页画布，横屏预览模仿横屏播放器画布
+  static const double _portraitAspect = 9 / 16;
+  static const double _landscapeAspect = 16 / 9;
+  /// 区域内动作提示的最小显示宽度：低于阈值时只显示色带
+  static const double _zoneIconMinWidth = 32;
+  static const double _zoneTextMinWidth = 84;
 
   late double _backwardPercent;
   late double _forwardPercent;
+  bool _isLandscape = false;
   final ValueNotifier<int> _dragRefresh = ValueNotifier<int>(0);
 
   DoubleTapSeekLayout get _layout => DoubleTapSeekLayout.normalize(
@@ -94,6 +101,12 @@ class _DoubleTapSeekZoneSettingPageState
             child: Column(
               children: [
                 const SizedBox(height: 56),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Center(
+                    child: _buildModeToggle(),
+                  ),
+                ),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) => ValueListenableBuilder(
@@ -145,99 +158,236 @@ class _DoubleTapSeekZoneSettingPageState
     );
   }
 
-  Widget _buildPreview(double width, double height) {
+  Widget _buildModeToggle() {
+    return SegmentedButton<bool>(
+      segments: const [
+        ButtonSegment(
+          value: false,
+          label: Text('竖屏预览'),
+          icon: Icon(Icons.stay_current_portrait, size: 18),
+        ),
+        ButtonSegment(
+          value: true,
+          label: Text('横屏预览'),
+          icon: Icon(Icons.stay_current_landscape, size: 18),
+        ),
+      ],
+      selected: {_isLandscape},
+      showSelectedIcon: false,
+      onSelectionChanged: (selection) =>
+          setState(() => _isLandscape = selection.first),
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Color(0x331A73E8)
+              : const Color(0x14FFFFFF),
+        ),
+        foregroundColor: const WidgetStatePropertyAll(Colors.white),
+        side: const WidgetStatePropertyAll(
+          BorderSide(color: Color(0x33FFFFFF)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreview(double maxWidth, double maxHeight) {
+    if (maxWidth <= 0 || maxHeight <= 0) {
+      return const SizedBox.shrink();
+    }
+    const hPadding = 16.0;
+    const vPadding = 8.0;
+    final availableWidth = maxWidth - hPadding * 2;
+    final availableHeight = maxHeight - vPadding * 2;
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      return const SizedBox.shrink();
+    }
+    final aspect = _isLandscape ? _landscapeAspect : _portraitAspect;
+    double canvasWidth;
+    double canvasHeight;
+    if (availableWidth / availableHeight > aspect) {
+      canvasHeight = availableHeight;
+      canvasWidth = canvasHeight * aspect;
+    } else {
+      canvasWidth = availableWidth;
+      canvasHeight = canvasWidth / aspect;
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: hPadding,
+          vertical: vPadding,
+        ),
+        child: SizedBox(
+          width: canvasWidth,
+          height: canvasHeight,
+          child: _buildCanvas(canvasWidth, canvasHeight),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCanvas(double width, double height) {
     final layout = _layout;
     final backwardWidth = width * _backwardFraction;
     final centerWidth = width * _centerFraction;
     final forwardWidth = width * _forwardFraction;
     final backwardHandleLeft = backwardWidth - _handleWidth / 2;
     final forwardHandleLeft = backwardWidth + centerWidth - _handleWidth / 2;
-    return Stack(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF070707),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x33FFFFFF)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: backwardWidth,
+              child: _PreviewSection(
+                color: const Color(0x332968ff),
+                width: backwardWidth,
+                child: _buildZoneContent(
+                  width: backwardWidth,
+                  icon: Icons.fast_rewind_rounded,
+                  text:
+                      '快退 ${Pref.doubleTapBackwardDuration} 秒',
+                  percent: layout.backwardPercent,
+                ),
+              ),
+            ),
+            Positioned(
+              left: backwardWidth,
+              top: 0,
+              bottom: 0,
+              width: centerWidth,
+              child: _PreviewSection(
+                color: const Color(0x22111111),
+                width: centerWidth,
+                child: _buildCenterContent(
+                  width: centerWidth,
+                  percent: layout.centerPercent,
+                ),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: forwardWidth,
+              child: _PreviewSection(
+                color: const Color(0x33ff7a00),
+                width: forwardWidth,
+                child: _buildZoneContent(
+                  width: forwardWidth,
+                  icon: Icons.fast_forward_rounded,
+                  text:
+                      '快进 ${Pref.doubleTapForwardDuration} 秒',
+                  percent: layout.forwardPercent,
+                ),
+              ),
+            ),
+            Positioned(
+              left: backwardHandleLeft,
+              top: 0,
+              bottom: 0,
+              child: _PreviewHandle(
+                label: '快退',
+                onHorizontalDragUpdate: (details) {
+                  if (width <= 0) {
+                    return;
+                  }
+                  _updateBackward(
+                    _backwardPercent + details.delta.dx / width * 100,
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              left: forwardHandleLeft,
+              top: 0,
+              bottom: 0,
+              child: _PreviewHandle(
+                label: '快进',
+                onHorizontalDragUpdate: (details) {
+                  if (width <= 0) {
+                    return;
+                  }
+                  _updateForward(
+                    _forwardPercent - details.delta.dx / width * 100,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 区域内容随宽度自适应：窄到一定程度只显示色带，模仿真实播放器中
+  /// 过窄区域不足以承载双击提示的情况
+  Widget? _buildZoneContent({
+    required double width,
+    required IconData icon,
+    required String text,
+    required int percent,
+  }) {
+    if (width < _zoneIconMinWidth) {
+      return null;
+    }
+    final showText = width >= _zoneTextMinWidth;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Positioned(
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: backwardWidth,
-          child: _PreviewSection(
-            color: const Color(0x332968ff),
-            title: '左侧双击快退',
-            subtitle: '${layout.backwardPercent}%',
-            alignment: Alignment.centerLeft,
+        Icon(icon, color: Colors.white70, size: showText ? 24 : 18),
+        if (showText) ...[
+          const SizedBox(height: 6),
+          Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        Positioned(
-          left: backwardWidth,
-          top: 0,
-          bottom: 0,
-          width: centerWidth,
-          child: _PreviewSection(
-            color: const Color(0x22111111),
-            title: '中间播放/暂停',
-            subtitle: '${layout.centerPercent}%',
-            alignment: Alignment.center,
+          const SizedBox(height: 2),
+          Text(
+            '$percent%',
+            style: const TextStyle(color: Colors.white54, fontSize: 10),
           ),
+        ],
+      ],
+    );
+  }
+
+  Widget? _buildCenterContent({required double width, required int percent}) {
+    if (width < _zoneIconMinWidth) {
+      return null;
+    }
+    final showText = width >= _zoneTextMinWidth;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.play_arrow_rounded,
+          color: Colors.white.withValues(alpha: 0.7),
+          size: showText ? 40 : 24,
         ),
-        Positioned(
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: forwardWidth,
-          child: _PreviewSection(
-            color: const Color(0x33ff7a00),
-            title: '右侧双击快进',
-            subtitle: '${layout.forwardPercent}%',
-            alignment: Alignment.centerRight,
+        if (showText) ...[
+          const SizedBox(height: 4),
+          Text(
+            '$percent%',
+            style: const TextStyle(color: Colors.white54, fontSize: 10),
           ),
-        ),
-        Positioned(
-          left: backwardHandleLeft,
-          top: 0,
-          bottom: 0,
-          child: _PreviewHandle(
-            label: '快退',
-            onHorizontalDragUpdate: (details) {
-              if (width <= 0) {
-                return;
-              }
-              _updateBackward(
-                _backwardPercent + details.delta.dx / width * 100,
-              );
-            },
-          ),
-        ),
-        Positioned(
-          left: forwardHandleLeft,
-          top: 0,
-          bottom: 0,
-          child: _PreviewHandle(
-            label: '快进',
-            onHorizontalDragUpdate: (details) {
-              if (width <= 0) {
-                return;
-              }
-              _updateForward(_forwardPercent - details.delta.dx / width * 100);
-            },
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 24,
-          child: Column(
-            children: [
-              const Text(
-                '拖动两条分隔线，实时预览双击命中范围',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '当前预览区域高度：${height.round()} px',
-                style: const TextStyle(color: Colors.white38, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
+        ],
       ],
     );
   }
@@ -263,7 +413,7 @@ class _DoubleTapSeekZoneSettingPageState
           ),
           const SizedBox(height: 8),
           const Text(
-            '左侧分隔线控制“快退区”宽度，右侧分隔线控制“快进区”宽度；左右侧支持 1%~40%，中间区域自动保留为播放/暂停。',
+            '拖动两条分隔线，实时预览双击命中范围；左侧分隔线控制“快退区”宽度，右侧分隔线控制“快进区”宽度；左右侧支持 1%~40%，中间区域自动保留为播放/暂停。横屏与竖屏预览共用同一份区域配置。',
             style: TextStyle(color: Colors.white70, height: 1.45),
           ),
           const SizedBox(height: 12),
@@ -291,48 +441,25 @@ class _DoubleTapSeekZoneSettingPageState
 class _PreviewSection extends StatelessWidget {
   const _PreviewSection({
     required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.alignment,
+    required this.width,
+    required this.child,
   });
 
   final Color color;
-  final String title;
-  final String subtitle;
-  final Alignment alignment;
+  final double width;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
       color: color,
-      child: Align(
-        alignment: alignment,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: alignment == Alignment.centerLeft
-                ? CrossAxisAlignment.start
-                : alignment == Alignment.centerRight
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+      child: Center(
+        child: child == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: child,
               ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

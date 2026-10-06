@@ -17,8 +17,10 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/audio_quality.dart';
+import 'package:PiliPlus/models/common/video/author_play_speed.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
 import 'package:PiliPlus/models/common/video/video_quality.dart';
+import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/subtitle.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
@@ -448,6 +450,7 @@ class HeaderControlState extends State<HeaderControl>
     showBottomSheet(
       (context, setState) {
         final theme = Theme.of(context);
+        final owner = introController.videoDetail.value.owner;
 
         return Padding(
           padding: const EdgeInsets.all(12),
@@ -567,6 +570,27 @@ class HeaderControlState extends State<HeaderControl>
                     title: const Text('重载视频', style: titleStyle),
                   ),
                 ],
+                if (owner?.mid != null)
+                  ListTile(
+                    dense: true,
+                    onTap: () {
+                      Get.back();
+                      _showAuthorSpeedDialog(owner!);
+                    },
+                    leading: const Icon(Icons.speed_outlined, size: 20),
+                    title: const Text('作者专属倍速', style: titleStyle),
+                    subtitle: () {
+                      final existing =
+                          Pref.authorPlaySpeeds[owner!.mid!];
+                      final authorName = owner.name ?? '当前作者';
+                      return Text(
+                        existing != null
+                            ? '$authorName · 已设置 ${existing.speed}x'
+                            : '$authorName · 未设置',
+                        style: subTitleStyle,
+                      );
+                    }(),
+                  ),
                 PopupListTile<SuperResolutionType>(
                   dense: true,
                   leading: const Icon(
@@ -920,6 +944,86 @@ class HeaderControlState extends State<HeaderControl>
         );
       },
     );
+  }
+
+  /// 为当前作者快捷设置专属倍速（与倍速设置页的作者专属倍速同一存储）
+  Future<void> _showAuthorSpeedDialog(Owner owner) async {
+    final mid = owner.mid;
+    if (mid == null) {
+      return;
+    }
+    final authorName = owner.name ?? '当前作者';
+    final speedList = Pref.speedList;
+    if (speedList.isEmpty) {
+      SmartDialog.showToast('请先在「倍速设置」的倍速列表中添加倍速');
+      return;
+    }
+    final existing = Pref.authorPlaySpeeds[mid];
+    var selected = existing?.speed ?? Pref.playSpeedDefault;
+    if (!speedList.contains(selected)) {
+      selected = speedList.first;
+    }
+    const removeFlag = 'removeAuthorSpeed';
+    final res = await showDialog<Object>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('作者专属倍速'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(authorName, style: const TextStyle(fontSize: 13)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: speedList
+                        .map(
+                          (s) => ChoiceChip(
+                            label: Text(s.toString()),
+                            selected: selected == s,
+                            onSelected: (_) =>
+                                setDialogState(() => selected = s),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ),
+              actions: [
+                if (existing != null)
+                  TextButton(
+                    onPressed: () => Get.back(result: removeFlag),
+                    child: const Text('移除专属倍速'),
+                  ),
+                TextButton(onPressed: Get.back, child: const Text('取消')),
+                TextButton(
+                  onPressed: () => Get.back(result: selected),
+                  child: const Text('保存并应用'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (res == removeFlag) {
+      Pref.removeAuthorPlaySpeed(mid);
+      plPlayerController.resetAuthorDefaultSpeedToGlobal(force: true);
+      SmartDialog.showToast('已移除 $authorName 的专属倍速');
+      return;
+    }
+    if (res is! double) {
+      return;
+    }
+    Pref.upsertAuthorPlaySpeed(
+      AuthorPlaySpeed(mid: mid, name: authorName, speed: res),
+    );
+    await plPlayerController.applyAuthorDefaultSpeed(mid, force: true);
+    SmartDialog.showToast('已为 $authorName 设置 ${res}x 倍速');
   }
 
   static void showPlayerInfo(
