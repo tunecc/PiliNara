@@ -1,0 +1,264 @@
+schema: comet.native.v4
+name: double-tap-zone-realistic-preview
+language: zh-CN
+phase: archive
+status: done
+state_version: 8
+brief: brief.md
+document_constraints_version: 2
+shape_confirmation_hash: 8b49bd9c51809ef00a0da9e5c1d3779aa5be28afe37a7d5985934fd63de9fe36
+spec_changes:
+  - capability: double-tap-zone-realistic-preview
+    operation: create
+    source: specs/double-tap-zone-realistic-preview/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：在竖屏预览下进入页面，预览模拟真实半屏播放：顶部为 16:9
+      黑色视频区（含三区色带、分隔线、中央播放图标、快退/快进秒数提示），下方为模拟视频页内容；拖拽分隔线在视频区内生效，百分比实时更新并遵守约束。
+    result: passed
+    reason:
+      text: _buildPortraitPreview 视频区高=宽×9/16（含极矮屏压缩 max(120,maxHeight-24)），黑色
+        _buildCanvas 含三区色带/双分隔线/中央播放图标/快退快进秒数提示，下方 _buildMockVideoPage 静态占位；拖拽经
+        clampBackward/ForwardPercentDouble 且 _dragRefresh 驱动百分比实时刷新。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：切换到「横屏预览」后，手机真实旋转为横屏（移动端系统栏隐藏），三区铺满整个屏幕，可全屏宽度拖拽分隔线；顶部悬浮操作与底部百分比提示可正常交互。
+    result: passed
+    reason:
+      text: _setLandscape(true)→_enterLandscape 在移动端调用 hideSystemBar()+Android
+        landscapeLeftMode()/iOS landscapeRightMode()（与 controller.dart
+        changeOrientation 默认一致），_buildLandscapeBody 以 Positioned.fill
+        铺满整屏并支持全屏宽度拖拽，顶部悬浮返回/竖屏预览/重置/保存与底部百分比提示齐备。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：横屏预览下切回「竖屏预览」，或在该状态下直接按返回键离开页面，屏幕方向与系统栏均正确恢复，无横屏残留；恢复正常后页面功能不受影响。
+    result: passed
+    reason:
+      text: 切回竖屏 _setLandscape(false)→_restorePortrait 执行
+        showSystemBar()+Pref.horizontalScreen?fullMode():portraitUpMode()（与
+        resetScreenRotation 语义一致）；dispose 中 if(_isLandscape)_restorePortrait()
+        覆盖系统返回键与保存后 Get.back 的退出路径。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：两种模式调整的是同一份配置：竖屏预览调整后切到横屏预览，分隔线位置同步；保存后播放器双击按配置生效（回归上一 change 的 A2/A4
+      语义）。
+    result: passed
+    reason:
+      text: 竖屏与横屏共用 _buildCanvas 读取同一份 _backwardPercent/_forwardPercent
+        实例状态，模式切换不重置；_save/_reset 与 HEAD 逐字一致，仍写
+        SettingBoxKey.doubleTapBackwardZone/ForwardZone。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：恢复默认仍为 25% / 50% / 25%；保存 / 重置 / 返回流程不回归。
+    result: passed
+    reason:
+      text: _reset 未改动，使用
+        DoubleTapSeekLayout.defaultBackwardPercent/defaultForwardPercent=25（25/50/25）；_save
+        仍为写入配置+toast+Get.back(result:true)，流程无回归。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：桌面端进入横屏预览不调用设备旋转（不报错、不闪屏），以全屏宽度画布呈现并可拖拽。
+    result: passed
+    reason:
+      text: _enterLandscape 与 _restorePortrait 均以 !PlatformUtils.isMobile
+        提前返回，桌面端不触碰任何 SystemChrome 接口；横屏模式仅渲染 Positioned.fill 全屏宽度画布，分隔线可拖拽。
+      truncated: false
+builder_handoff:
+  candidate_id: 54ad8f28-50e8-4353-9ad5-a873bff4c2f3
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:ec9c2305-2333-49e2-8b1a-e2f86d5c276b
+  iteration: 1
+  summary:
+    text: "本轮按已确认 Shape 重构「双击区域调整」页预览，模拟真实播放状态。(1) 竖屏预览（默认）：_buildPortraitPreview 用
+      LayoutBuilder 计算顶部 16:9 黑色视频区（宽度撑满，极矮屏幕下限 120px 防溢出），区内为三区色带 + 可拖拽分隔线 +
+      中央播放图标 + 快退/快进秒数提示；下方 _buildMockVideoPage 静态模拟视频页（标题行、作者行、操作占位、简介条、两张 16:9
+      推荐卡占位），可滚动；底部拖拽提示 + 百分比 chip 面板保留。(2) 横屏预览：_setLandscape(true) 后移动端复用
+      lib/plugin/pl_player/utils/fullscreen.dart——hideSystemBar() 沉浸 + Android
+      landscapeLeftMode()/iOS landscapeRightMode()（与播放器 changeOrientation
+      默认一致）；页面切换为
+      _buildLandscapeBody：三区铺满整屏、全屏宽度拖拽，顶部悬浮返回按钮与「竖屏预览/重置/保存」胶囊操作，底部悬浮
+      左x%·中y%·右z% 提示；桌面端 PlatformUtils.isMobile 判断跳过旋转。(3) 状态恢复：_restorePortrait
+      调 showSystemBar() + Pref.horizontalScreen ? fullMode() :
+      portraitUpMode()（与播放器 resetScreenRotation 语义一致）；切回竖屏预览、以及
+      dispose（覆盖系统返回键退出）时都会恢复。(4) 两模式共用同一份 _backwardPercent/_forwardPercent 与
+      _buildCanvas，保存/重置逻辑未动。(5) README.md 双击区域条目措辞已同步。开发期检查：改动文件 dart analyze
+      无问题；全量 flutter test 104 个通过。已知限制：预览不自动跟随物理横竖屏（仅模式切换主动旋转）；模拟视频页为纯静态占位。"
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+  acceptance_review:
+    - id: A1
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: _buildPortraitPreview 顶部为宽×9/16 的黑色视频区（三区+分隔线+中央图标+秒数提示+拖拽 clamp），下方
+        _buildMockVideoPage 静态占位模拟视频页；百分比实时更新走 _dragRefresh。
+    - id: A2
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: _setLandscape(true) 调
+        hideSystemBar()+landscapeLeft/RightMode()（移动端）；_buildLandscapeBody
+        Positioned.fill 铺满整屏可拖拽，顶部悬浮返回/竖屏预览/重置/保存可交互，底部悬浮百分比提示。
+    - id: A3
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: "切回竖屏走 _restorePortrait（showSystemBar + Pref.horizontalScreen ? fullMode :
+        portraitUpMode）；dispose 在 _isLandscape 时同样恢复，覆盖系统返回键直接退出。"
+    - id: A4
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: 两模式渲染同一个 _buildCanvas、共用 _backwardPercent/_forwardPercent
+        状态，切换即时同步；保存写同一对配置键，播放器判定沿用上一 change 已接通的 resolveType。
+    - id: A5
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: 重置/保存/返回逻辑未改动（_reset 置 25/25、_save 写键并 Get.back），横竖屏下均可触发。
+    - id: A6
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: _enterLandscape/_restorePortrait 首行 PlatformUtils.isMobile 判断，桌面端跳过全部
+        SystemChrome 调用，横屏预览仍以 _buildLandscapeBody 全屏宽度画布呈现。
+  checks:
+    - name:
+        text: dart analyze 改动文件
+        truncated: false
+      result: passed
+      note:
+        text: lib/pages/setting/pages/double_tap_seek_zone_setting.dart 无问题。
+        truncated: false
+    - name:
+        text: 全量 flutter test
+        truncated: false
+      result: passed
+      note:
+        text: 104 个测试全部通过（Flutter 3.47.0）。
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 预览不自动跟随物理横竖屏：仅模式切换时主动旋转/恢复，与确认的 非目标 一致。
+      truncated: false
+    - text: 模拟视频页为纯静态占位，不承载功能；预览不响应双击手势。
+      truncated: false
+    - text: 真机旋转/沉浸/恢复的实际观感需真机或模拟器人工核对；代码链路以定向 analyze 与全量测试佐证。
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-06T09:33:01.579Z
+blockers: []
+verification:
+  candidate_id: 54ad8f28-50e8-4353-9ad5-a873bff4c2f3
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:7965b77f-9b2c-4cdf-a346-ad6bb303afbc
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: dart-analyze-changed-files
+      name:
+        text: dart analyze 改动文件
+        truncated: false
+      argv_display:
+        - text: analyze
+          truncated: false
+        - text: lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 4428
+    - id: flutter-test-full
+      name:
+        text: 全量 flutter test
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 23421
+  summary:
+    text: 候选实现完整达成「双击区域真实预览」：竖屏预览为顶部 16:9 黑色视频区（三区色带、可拖拽分隔线、中央播放图标、秒数提示）+
+      下方静态模拟视频页；横屏预览在移动端复用 fullscreen.dart 的 hideSystemBar 与
+      landscapeLeft/RightMode 真实旋转（与播放器 changeOrientation 默认一致），切回/返回/保存退出均经
+      _restorePortrait 按 resetScreenRotation 语义恢复；桌面端全程跳过
+      SystemChrome。两模式共用同一画布与配置，_save/_reset 与默认 25/50/25 无回归；README
+      措辞与实际行为一致。Runtime dart-analyze-changed-files 与 flutter-test-full 均 passed。
+    truncated: false
+  risks:
+    - text: 真机旋转、系统栏隐藏/恢复（A2/A3 的一部分）无法在只读核查中实际执行，结论基于实现链路完整且与规格/播放器机制逐点一致，辅以 Runtime
+        dart analyze 与全量 flutter test 均 passed（exitCode 0）。
+      truncated: false
+    - text: dispose 中恢复为 unawaited 异步调用（与播放器 resetScreenRotation 调用方式相同的
+        fire-and-forget 模式），无 context 依赖，风险低。
+      truncated: false
+    - text: 工作区另有 .gitignore 微调（Comet 管理块内 docs/comet/.DS_Store 行位置移动），与本 change
+        功能语义无关。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-06T09:39:57.786Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 候选实现完整达成「双击区域真实预览」：竖屏预览为顶部 16:9 黑色视频区（三区色带、可拖拽分隔线、中央播放图标、秒数提示）+
+        下方静态模拟视频页；横屏预览在移动端复用 fullscreen.dart 的 hideSystemBar 与
+        landscapeLeft/RightMode 真实旋转（与播放器 changeOrientation 默认一致），切回/返回/保存退出均经
+        _restorePortrait 按 resetScreenRotation 语义恢复；桌面端全程跳过
+        SystemChrome。两模式共用同一画布与配置，_save/_reset 与默认 25/50/25 无回归；README
+        措辞与实际行为一致。Runtime dart-analyze-changed-files 与 flutter-test-full 均
+        passed。
+      truncated: false
+    completed_at: 2026-10-06T09:39:57.786Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-06T09:00:03.343Z
