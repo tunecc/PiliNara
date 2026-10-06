@@ -1,0 +1,379 @@
+schema: comet.native.v4
+name: double-tap-zone-preview-author-speed
+language: zh-CN
+phase: archive
+status: done
+state_version: 8
+brief: brief.md
+document_constraints_version: 2
+shape_confirmation_hash: ea8d6ab5a439f0e8f4c6cb1fc600b0345e7ef345840cd89729e2a2a63b2e326f
+spec_changes:
+  - capability: author-speed-quick-entry
+    operation: create
+    source: specs/author-speed-quick-entry/spec.md
+  - capability: double-tap-zone-preview
+    operation: create
+    source: specs/double-tap-zone-preview/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：进入「双击区域调整」页，可切换 横屏 / 竖屏
+      预览模式；横屏预览呈横屏播放器画布形态（宽幅黑底），竖屏预览呈竖屏播放页画布形态（竖幅）；默认进入竖屏模式。
+    result: passed
+    reason:
+      text: double_tap_seek_zone_setting.dart 的 SegmentedButton 提供竖屏/横屏切换，_isLandscape
+        默认 false（默认竖屏），画布按 9:16/16:9 等比适配且黑底（0xFF070707）。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：两种模式下均可拖拽左右分隔线调整区域宽度，拖拽过程中百分比实时更新，且遵守 1%~40%（左右）与中间 ≥20%
+      的约束；任一模式下的调整保存后另一模式的预览同步反映同一份配置。
+    result: passed
+    reason:
+      text: 两种模式共用 _backwardPercent/_forwardPercent 同一状态，拖拽经
+        clampBackward/ForwardPercentDouble（左右1~40%、中间≥20%）实时经 _dragRefresh
+        刷新预览与百分比 chip，保存写同一份 setting box。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：预览画布包含中央播放/暂停图标与左右区域的双击动作提示（快退/快进图标 + 当前配置的秒数）；修改快进/快退时长设置后，提示中的秒数随之变化。
+    result: passed
+    reason:
+      text: 画布中央为 play_arrow 图标，左右区显示「快退/快进 X 秒」且 X 在构建时读取
+        Pref.doubleTapBackwardDuration/doubleTapForwardDuration，重新进入即反映最新时长配置。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：保存后双击播放器按配置区域实际触发：例如左区设为 10% 时，双击画布左侧 10% 以内为快退、中间为播放暂停、右侧对应区域为快进；重启
+      App 后配置保留。
+    result: passed
+    reason:
+      text: view.dart onDoubleTapDownMobile 已改为
+        plPlayerController.doubleTapSeekLayout.resolveType（getter 实时读
+        Pref），保存即对下次双击生效并持久化于 Hive setting box；单测覆盖 10%/15% 边界与 width<=0 回退。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：恢复默认操作可将区域重置为 25% / 50% / 25%（现状能力保留）。
+    result: passed
+    reason:
+      text: 重置按钮将两值恢复为 defaultBackwardPercent/defaultForwardPercent=25（即
+        25/50/25）并刷新预览，保存后持久化，符合规格保留现状。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：直播播放与控制栏锁定状态下双击行为不变（忽略）。 功能二：
+    result: passed
+    reason:
+      text: onDoubleTapDownMobile 首行保留 isLive || controlsLock.value 时直接 return 的现状分支。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：播放 UGC 视频时，「更多设置」面板出现作者倍速入口，subtitle 显示作者名与设置状态（未设置 / 已设置 X.Xx）。
+    result: passed
+    reason:
+      text: showSettingSheet 在 owner?.mid != null 时于「重载视频」组后显示「作者专属倍速」条目，subtitle
+        为「作者名 · 未设置 / 已设置 X.Xx」。
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：点击入口就地弹出倍速选择弹窗，选择并保存后：作者倍速存储新增该作者记录，当前播放立即应用该倍速，面板关闭。
+    result: passed
+    reason:
+      text: 点击先 Get.back() 关面板再弹 ChoiceChip 弹窗（选项 Pref.speedList），保存调用
+        Pref.upsertAuthorPlaySpeed 并 await applyAuthorDefaultSpeed(mid,
+        force:true) 立即生效，附 toast。
+      truncated: false
+  - id: A9
+    source: brief.md
+    text: A9：已设置专属倍速的作者再次打开入口，可看到当前倍速并可就地更换或移除；移除后当前播放回退全局默认倍速，存储中该作者记录删除。
+    result: passed
+    reason:
+      text: 已设置作者打开时预选当前倍速并提供「移除专属倍速」，移除调用 Pref.removeAuthorPlaySpeed +
+        resetAuthorDefaultSpeedToGlobal(force:true) 回退全局默认并删除存储记录。
+      truncated: false
+  - id: A10
+    source: brief.md
+    text: A10：播放番剧/影视（无作者）或本地文件时，不显示该入口。
+    result: passed
+    reason:
+      text: PgcIntroController/LocalIntroController 仅写 videoDetail.title，owner 保持
+        null，入口条件 owner?.mid != null 使番剧/影视与本地文件均不显示。
+      truncated: false
+  - id: A11
+    source: brief.md
+    text: A11：在倍速设置页的作者专属倍速列表中可以看到通过快捷入口添加/修改/删除的结果（同一存储，双向一致）。
+    result: passed
+    reason:
+      text: 快捷入口与倍速设置页均经 Pref.authorPlaySpeeds 读写 Hive video box 的 authorPlaySpeeds
+        键（play_speed_set.dart _persistAuthorSpeeds 亦写
+        Pref.authorPlaySpeeds），双向一致；新增 Pref 存储单测覆盖增删改与回退。
+      truncated: false
+builder_handoff:
+  candidate_id: a1ba3cb1-395c-4e88-b3d5-132e31d68c72
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:72336a08-8f16-42f0-8f63-260a6e390358
+  iteration: 1
+  summary:
+    text: 本轮实现两部分需求并全部完成。(1) 双击区域调整页横竖屏模仿预览：重写
+      lib/pages/setting/pages/double_tap_seek_zone_setting.dart，新增竖屏/横屏
+      SegmentedButton 切换（默认竖屏、页面内生效不持久化）；竖屏预览为 9:16 黑底画布、横屏为 16:9
+      黑底画布，均含中央播放图标与左右区域「快退/快进 X 秒」动作提示（X 读取
+      Pref.doubleTapBackwardDuration/ForwardDuration，每次构建实时读取）；三区色带 +
+      可拖拽分隔线保留，区域内容按宽度自适应（<32px 只显示色带、<84px 只显示图标）；拖拽约束与百分比 chip
+      不变；底部提示补充「横屏与竖屏预览共用同一份区域配置」。(2)
+      接通播放器判定：lib/plugin/pl_player/view/view.dart 的 onDoubleTapDownMobile 删除硬编码
+      maxWidth/4 三段判定，改用
+      plPlayerController.doubleTapSeekLayout.resolveType(tapPosition,
+      width)；移除不再使用的 double_tap_type 导入；直播/锁屏忽略逻辑不变。(3)
+      更多设置作者专属倍速入口：lib/pages/video/widgets/header_control.dart 的
+      showSettingSheet 在「重载视频」分组后新增「作者专属倍速」ListTile（owner?.mid 非空才显示，subtitle
+      显示作者名 + 未设置/已设置 X.Xx），点击关闭面板后 _showAuthorSpeedDialog 就地弹窗：ChoiceChip
+      选倍速（Pref.speedList），「保存并应用」写 Pref.upsertAuthorPlaySpeed + await
+      applyAuthorDefaultSpeed(mid, force:true) 立即生效并 toast；已设置时提供「移除专属倍速」→
+      Pref.removeAuthorPlaySpeed +
+      resetAuthorDefaultSpeedToGlobal(force:true)；番剧/影视/本地文件无 owner
+      隐藏。开发期检查：改动文件 dart analyze 无问题；相关单测 12 个通过；全量 flutter test 104 个通过；全仓
+      analyze 改动前后均为 75 个存量 issue（无新增）。已知限制：预览为静态模仿，不含弹幕/进度条等完整控件（符合 Q3
+      确认范围）；A4/A8/A9 的真机交互需人工或代码走查验证，存储与判定逻辑已被单测覆盖。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+    - A11
+  acceptance_review:
+    - id: A1
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: SegmentedButton 竖屏/横屏切换，_isLandscape 默认 false；竖屏 9:16、横屏 16:9
+        黑底画布（_buildPreview 按可用空间等比适配并居中），默认进入竖屏。
+    - id: A2
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+        - test/plugin/pl_player/models/double_tap_seek_layout_test.dart
+      note: 两种模式复用同一 _buildCanvas 与拖拽回调（_updateBackward/_updateForward 经
+        clampBackward/ForwardPercentDouble 约束 1~40%、中间≥20%），实时刷新；两模式读写同一
+        _backwardPercent/_forwardPercent，保存写同一对键。
+    - id: A3
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: 中央 Icons.play_arrow_rounded；左右区域 Icons.fast_rewind/fast_forward_rounded +
+        「快退/快进 X 秒」，X 在 build 时读取
+        Pref.doubleTapBackwardDuration/ForwardDuration，修改时长设置后重进页面即更新。
+    - id: A4
+      status: implemented-with-evidence
+      evidence:
+        - lib/plugin/pl_player/view/view.dart
+        - test/plugin/pl_player/models/double_tap_seek_layout_test.dart
+      note: onDoubleTapDownMobile 改用 doubleTapSeekLayout.resolveType；单测覆盖 backward 10%
+        时 9.9→left、10→center、84.9→center、86→right；保存写 SettingBoxKey 双键，重启后由 Pref
+        读取保留。
+    - id: A5
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+      note: 重置按钮 _reset 置回 defaultBackwardPercent/defaultForwardPercent(25/25)
+        并刷新预览，保存后即 25/50/25。
+    - id: A6
+      status: implemented-with-evidence
+      evidence:
+        - lib/plugin/pl_player/view/view.dart
+      note: onDoubleTapDownMobile 开头的 isLive || controlsLock 忽略分支原样保留，未改动 doubleTapFuc
+        分发。
+    - id: A7
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/video/widgets/header_control.dart
+      note: showSettingSheet 取 introController.videoDetail.value.owner，owner?.mid
+        非空时显示「作者专属倍速」ListTile，subtitle 为「作者名 · 未设置」或「作者名 · 已设置 X.Xx」（读
+        Pref.authorPlaySpeeds[mid]）。
+    - id: A8
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/video/widgets/header_control.dart
+        - test/utils/author_play_speed_pref_test.dart
+      note: 点击先 Get.back 关面板再弹 _showAuthorSpeedDialog；ChoiceChip 选
+        Pref.speedList，「保存并应用」→ Pref.upsertAuthorPlaySpeed + await
+        applyAuthorDefaultSpeed(mid, force:true) 立即生效 + toast；单测覆盖 upsert 写入与更新。
+    - id: A9
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/video/widgets/header_control.dart
+        - test/utils/author_play_speed_pref_test.dart
+      note: 已设置时弹窗含「移除专属倍速」：Pref.removeAuthorPlaySpeed(mid) +
+        resetAuthorDefaultSpeedToGlobal(force:true) 回退全局默认；单测验证 remove
+        仅删目标作者且幂等。
+    - id: A10
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/video/widgets/header_control.dart
+      note: PGC/本地文件 introController.videoDetail.value.owner 为 null，if (owner?.mid !=
+        null) 条件不成立，条目不渲染。
+    - id: A11
+      status: implemented-with-evidence
+      evidence:
+        - lib/pages/video/widgets/header_control.dart
+        - test/utils/author_play_speed_pref_test.dart
+      note: 快捷入口与倍速设置页均读写 Pref.authorPlaySpeeds（Hive video box 的 authorPlaySpeeds
+        键），单测验证同一存储的写入/更新/删除与回退读取。
+  checks:
+    - name:
+        text: dart analyze 改动文件
+        truncated: false
+      result: passed
+      note:
+        text: lib/pages/setting/pages/double_tap_seek_zone_setting.dart、lib/pages/video/widgets/header_control.dart、lib/plugin/pl_player/view/view.dart
+          及两个测试文件均无问题。
+        truncated: false
+    - name:
+        text: 相关单元测试
+        truncated: false
+      result: passed
+      note:
+        text: double_tap_seek_layout_test + author_play_speed_test +
+          author_play_speed_pref_test 共 12 个测试全部通过。
+        truncated: false
+    - name:
+        text: 全量 flutter test
+        truncated: false
+      result: passed
+      note:
+        text: 104 个测试全部通过（Flutter 3.47.0）。
+        truncated: false
+    - name:
+        text: 全仓 analyze 基线对比
+        truncated: false
+      result: passed
+      note:
+        text: 改动前后均为 75 个存量 issue，无新增；plain flutter analyze 因存量告警非零退出属预期。
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 全仓库存在 75 个存量 analyze issue（改动前基线一致），plain flutter analyze
+        非零退出属预期；「无新增告警」以本计划的改动文件定向 analyze 为准。
+      truncated: false
+    - text: 预览页为静态模仿（中央图标、动作提示、三区色带、可拖拽分隔线），不含弹幕/进度条等完整播放器控件，符合已确认的 Q3 范围。
+      truncated: false
+    - text: A4/A8/A9 的实际交互（双击命中、弹窗流程）依赖真机/模拟器人工操作；存储与区域判定逻辑已由单元测试覆盖，UI 链路需 Verifier
+        代码走查。
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-06T05:38:25.115Z
+blockers: []
+verification:
+  candidate_id: a1ba3cb1-395c-4e88-b3d5-132e31d68c72
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:7c5d7cc0-2e05-459d-8e25-6c0e485997c8
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: dart-analyze-changed-files
+      name:
+        text: dart analyze 改动文件
+        truncated: false
+      argv_display:
+        - text: analyze
+          truncated: false
+        - text: lib/pages/setting/pages/double_tap_seek_zone_setting.dart
+          truncated: false
+        - text: lib/pages/video/widgets/header_control.dart
+          truncated: false
+        - text: lib/plugin/pl_player/view/view.dart
+          truncated: false
+        - text: test/plugin/pl_player/models/double_tap_seek_layout_test.dart
+          truncated: false
+        - text: test/utils/author_play_speed_pref_test.dart
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 5796
+    - id: flutter-test-full
+      name:
+        text: 全量 flutter test
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 24208
+  summary:
+    text: 独立代码走查确认 11 项验收全部通过：双击区域调整页具备横/竖屏模仿预览（共用同一份配置、clamp 约束一致、实时刷新），播放器
+      onDoubleTapDownMobile 已接通 doubleTapSeekLayout.resolveType
+      且直播/锁定忽略行为保留；更多设置的作者倍速入口在 owner 为空的 PGC/本地场景正确隐藏，保存/移除走
+      upsertAuthorPlaySpeed/applyAuthorDefaultSpeed(force)/removeAuthorPlaySpeed/resetAuthorDefaultSpeedToGlobal(force)
+      链路，与倍速设置页同一 Hive 存储。Runtime 两项检查（dart analyze 改动文件、全量 flutter test 104 项）均
+      passed。唯一风险：新增测试文件被 .gitignore test* 规则忽略，提交时需强制添加。
+    truncated: false
+  risks:
+    - text: test/utils/author_play_speed_pref_test.dart 为新文件且被仓库既有 .gitignore 的 test*
+        规则忽略（untracked）：提交时需 git add -f，否则该测试不会入库（不影响 flutter test 本地运行与本次
+        Runtime 检查结果）。
+      truncated: false
+    - text: 弹窗初始预选若作者已设倍速不在当前 Pref.speedList 中，会回退预选第一项（合理降级，不影响验收）。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-06T05:50:00.649Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立代码走查确认 11 项验收全部通过：双击区域调整页具备横/竖屏模仿预览（共用同一份配置、clamp 约束一致、实时刷新），播放器
+        onDoubleTapDownMobile 已接通 doubleTapSeekLayout.resolveType
+        且直播/锁定忽略行为保留；更多设置的作者倍速入口在 owner 为空的 PGC/本地场景正确隐藏，保存/移除走
+        upsertAuthorPlaySpeed/applyAuthorDefaultSpeed(force)/removeAuthorPlaySpeed/resetAuthorDefaultSpeedToGlobal(force)
+        链路，与倍速设置页同一 Hive 存储。Runtime 两项检查（dart analyze 改动文件、全量 flutter test 104
+        项）均 passed。唯一风险：新增测试文件被 .gitignore test* 规则忽略，提交时需强制添加。
+      truncated: false
+    completed_at: 2026-10-06T05:50:00.649Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-06T04:56:27.091Z
