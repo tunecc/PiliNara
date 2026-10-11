@@ -78,13 +78,23 @@ class ThreadRipperManager {
         requiredRateOf: (d) => d.bandWidth?.toDouble() ?? 0,
         indexEndOf: (d) => d.indexEnd ?? -1,
       );
+      var effectiveFallback = fallback;
+      var effectiveCandidates = candidateUrls.toList();
+      if (Pref.threadRipperBlockPcdn) {
+        effectiveCandidates = filterPcdnCandidates(effectiveCandidates);
+        if (!effectiveCandidates.contains(effectiveFallback)) {
+          // 兜底地址是 P2P 直连变体被排除：取首个幸存候选（官方镜像换签）
+          effectiveFallback =
+              effectiveCandidates.isNotEmpty ? effectiveCandidates.first : fallback;
+        }
+      }
       final candidates = <MediaCandidate>[
-        MediaCandidate(url: fallback, host: Uri.parse(fallback).host),
-        for (final url in candidateUrls)
-          if (url != fallback) MediaCandidate(url: url, host: Uri.parse(url).host),
+        MediaCandidate(url: effectiveFallback, host: Uri.parse(effectiveFallback).host),
+        for (final url in effectiveCandidates)
+          if (url != effectiveFallback) MediaCandidate(url: url, host: Uri.parse(url).host),
       ];
       final descriptor = MediaDescriptor(
-        originalUrl: fallback,
+        originalUrl: effectiveFallback,
         candidates: candidates,
         isAudio: isAudio,
         totalSize: totalSize,
@@ -93,8 +103,8 @@ class ThreadRipperManager {
         indexEnd: indexEnd,
       );
       final token = _proxy.registry.register(descriptor);
-      _tokenByFile[fallback] = token;
-      _fileByToken[token] = fallback;
+      _tokenByFile[effectiveFallback] = token;
+      _fileByToken[token] = effectiveFallback;
       return buildProxyUrl(_proxy.port!, descriptor, token);
     } catch (e) {
       if (kDebugMode) {
@@ -102,6 +112,57 @@ class ThreadRipperManager {
       }
       return null;
     }
+  }
+
+  static const _pcdnProxyHost = 'proxy-tf-all-ws.bilivideo.com';
+
+  /// 屏蔽 PCDN：upgcxcode 形态的 PCDN 地址丢弃（其签名全镜像通用，换签
+  /// 候选已覆盖）；mcdn 私有传输改写 proxy-tf 代理；szbdyd 改回 xy_usource
+  /// 真实主机。非 P2P 地址原样保留。
+  @visibleForTesting
+  static List<String> filterPcdnCandidates(List<String> urls) {
+    final out = <String>[];
+    final seen = <String>{};
+    for (final url in urls) {
+      final uri = Uri.tryParse(url);
+      if (uri == null) {
+        continue;
+      }
+      final cls = classifyCdnUrl(uri);
+      if (!isP2PCdnDomain(uri.host)) {
+        if (seen.add(uri.toString())) {
+          out.add(url);
+        }
+        continue;
+      }
+      switch (cls) {
+        case CdnUrlClass.mcdnTf:
+          final rewritten = Uri(
+            scheme: 'https',
+            host: _pcdnProxyHost,
+            queryParameters: {'url': url},
+          ).toString();
+          if (seen.add(rewritten)) {
+            out.add(rewritten);
+          }
+        case CdnUrlClass.szbdyd:
+          final source = uri.queryParameters['xy_usource'];
+          if (source != null) {
+            final rewritten = Uri(
+              scheme: 'https',
+              host: source,
+              path: uri.path,
+              query: uri.hasQuery ? uri.query : null,
+            ).toString();
+            if (seen.add(rewritten)) {
+              out.add(rewritten);
+            }
+          }
+        default:
+          break; // upgcxcode 形态 P2P：换签候选已覆盖，直接排除
+      }
+    }
+    return out;
   }
 
   /// 新 playinfo 落地时调用：丢弃上一视频的会话与登记。

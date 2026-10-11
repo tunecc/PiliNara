@@ -46,7 +46,11 @@ const int minPiece = 192 * kKiB;
 const int maxPiece = 4 * kMiB;
 
 /// The longest range one response may serve
-const int maxServedLength = 64 * kMiB;
+/// 开放末端/超长请求的分棒服务长度：小棒让预取有界、跟随播放消费
+const int openEndedLegBytes = 8 * kMiB;
+
+/// 续棒提前量：播放器消费水位逼近下一棒起点不足该值时，下一棒挂起
+const int consumptionLookaheadBytes = 4 * kMiB;
 
 /// 异常响应排水的上限（约 1 MiB）：释放连接即可，不必替异常主机读完整个
 /// 响应体
@@ -486,6 +490,10 @@ class ResponseSink {
   /// The job's contiguous progress advanced.
   void progress() => _emitAvailable();
 
+  /// 冲刷指定 Job 已写入但尚未发射的字节（_complete 的调用点在最后一次
+  /// 写入之后、跳过了末次 progress，续棒/挂起前必须先冲刷）。
+  void flush(Job job) => _emitFromJob(job);
+
   /// 换入开放末端请求的下一棒：先冲刷上一棒尚未发射的尾字节（_complete 的
   /// 调用点在最后一次写入之后、可能已跳过末次 progress），再切换绝对偏移
   /// 基准继续发射。
@@ -575,6 +583,8 @@ class Job {
     required this.length,
     required this.candidates,
     required this.requested,
+    required this.descriptor,
+    this.chainRequestLast,
     this.timeout = 0,
     this.sink,
   })  : deadline = createdAt + deadlineMs[cls],
@@ -593,6 +603,10 @@ class Job {
   final String fileKey;
   final ({int first, int last}) range;
   final int length;
+
+  /// 原始描述符与分棒链的请求末端：续棒（Job 链）重建下一棒参数用
+  final MediaDescriptor descriptor;
+  final int? chainRequestLast;
 
   /// The more urgent, the sooner it is helped (`critical`/`urgent`/`relaxed`).
   /// Upstream promotes a warm-up job to critical when the player asks for its
@@ -759,6 +773,61 @@ class ThreadRipperSession implements MediaAccelerator {
 
   /// 开放末端请求分棒服务的后继参数：本棒完成后由 _complete 续接同一响应流
   final Map<Job, JobParams> _successorParams = {};
+
+  /// 每文件已交付到播放器的绝对偏移（代理回调上报的消费水位）
+  final Map<String, int> _consumedByFile = {};
+  ({JobParams params, ResponseSink sink})? _pendingSuccessor;
+
+  /// 代理上报：某文件已交付到播放器的绝对偏移（消费水位）。
+  @visibleForTesting
+  void noteConsumed(String fileKey, int absoluteOffset) {
+    if (absoluteOffset > (_consumedByFile[fileKey] ?? 0)) {
+      _consumedByFile[fileKey] = absoluteOffset;
+    }
+    _flushPendingSuccessor();
+  }
+
+  /// 消费驱动续棒：水位 + 提前量达到下一棒起点才启动；否则挂起待 tick。
+  /// 启动的棒若未到请求末端，登记再下一棒（完成时继续按水位续接）。
+  void _continueChain(JobParams next, ResponseSink sink) {
+    final consumed = _consumedByFile[next.fileKey] ?? 0;
+    if (consumed + consumptionLookaheadBytes >= next.range.first) {
+      final successor = _start(next, sink);
+      sink.attach(successor);
+      _registerFollowingLeg(successor);
+    } else {
+      _pendingSuccessor = (params: next, sink: sink);
+    }
+  }
+
+  /// 为刚启动的棒登记再下一棒参数（逐棒链式，直到请求末端）
+  void _registerFollowingLeg(Job leg) {
+    final requestLast = leg.chainRequestLast;
+    if (requestLast == null || leg.range.last >= requestLast) {
+      return;
+    }
+    final nextFirst = leg.range.last + 1;
+    final nextLast = math.min(requestLast, nextFirst + openEndedLegBytes - 1);
+    _successorParams[leg] = _jobParams(
+      fileKey: leg.fileKey,
+      descriptor: leg.descriptor,
+      range: (first: nextFirst, last: nextLast),
+      cls: leg.cls,
+      timeout: 0,
+      candidates: leg.descriptor.candidates,
+      requestedUrl: leg.descriptor.originalUrl,
+      chainRequestLast: requestLast,
+    );
+  }
+
+  void _flushPendingSuccessor() {
+    final pending = _pendingSuccessor;
+    if (pending == null || _disposed) {
+      return;
+    }
+    _pendingSuccessor = null;
+    _continueChain(pending.params, pending.sink);
+  }
   final List<int> _recentFailures = [];
   int _offUntil = 0;
   bool _integrityFailed = false;
@@ -831,10 +900,11 @@ class ThreadRipperSession implements MediaAccelerator {
         reason = 'unsatisfiable range';
       } else {
         requestLast = resolved.last;
-        if (resolved.last - resolved.first + 1 > maxServedLength) {
-          // mpv 对点播发的是开放末端/超长 Range：不整单拒绝，按上限分棒
-          // 服务，本棒完成后由 _complete 无缝续棒（spec: 开放末端接管）
-          resolved = (first: resolved.first, last: resolved.first + maxServedLength - 1);
+        if (resolved.last - resolved.first + 1 > openEndedLegBytes) {
+          // mpv 对点播发的是开放末端/超长 Range：不整单拒绝，按棒长分棒
+          // 服务；本棒完成后由 _complete 按播放消费水位无缝续棒
+          // （spec: 消费驱动预取），预取量始终有界
+          resolved = (first: resolved.first, last: resolved.first + openEndedLegBytes - 1);
         }
         if ((_nativeRetry['${descriptor.originalUrl}:${resolved.first}-${resolved.last}'] ?? 0) > now) {
           reason = 'it failed just now';
@@ -876,17 +946,25 @@ class ThreadRipperSession implements MediaAccelerator {
         if (job.state == JobState.running) {
           _stop(job, false);
         }
+        if (_pendingSuccessor?.sink == sink) {
+          _pendingSuccessor = null;
+        }
       };
     if (requestLast != null && requestLast > resolved.last) {
-      // 记录下一棒参数：本棒（钳制区间）完成后由 _complete 续接同一响应流
+      // 记录下一棒参数（一棒长）：本棒完成后由 _complete 按消费水位续接
+      // 同一响应流，逐棒推进到请求末端
       _successorParams[job] = _jobParams(
         fileKey: fileKey,
         descriptor: descriptor,
-        range: (first: resolved.last + 1, last: requestLast),
+        range: (
+          first: resolved.last + 1,
+          last: math.min(requestLast, resolved.last + openEndedLegBytes),
+        ),
         cls: params.cls,
         timeout: 0,
         candidates: descriptor.candidates,
         requestedUrl: descriptor.originalUrl,
+        chainRequestLast: requestLast,
       );
     }
     return AcceleratedResponse(
@@ -894,6 +972,8 @@ class ThreadRipperSession implements MediaAccelerator {
       last: requestLast ?? resolved.last,
       total: total,
       stream: sink.stream,
+      onConsumed: (consumedAbsolute) =>
+          noteConsumed(fileKey, consumedAbsolute),
     );
   }
 
@@ -905,6 +985,7 @@ class ThreadRipperSession implements MediaAccelerator {
     required int timeout,
     required List<MediaCandidate> candidates,
     required String requestedUrl,
+    int? chainRequestLast,
   }) {
     final resolved = <ResolvedCandidate>[];
     final seen = <String>{};
@@ -930,6 +1011,9 @@ class ThreadRipperSession implements MediaAccelerator {
       candidates: _byHost(resolved),
       requested: requested,
       requiredRate: (_requiredRateOf?.call(descriptor) ?? 0) / 8000,
+      descriptor: descriptor,
+      sourceCandidates: candidates,
+      chainRequestLast: chainRequestLast,
     );
   }
 
@@ -948,6 +1032,8 @@ class ThreadRipperSession implements MediaAccelerator {
       timeout: params.timeout,
       candidates: params.candidates,
       requested: params.requested,
+      descriptor: params.descriptor,
+      chainRequestLast: params.chainRequestLast,
       sink: sink,
     );
     final priorTotal = _totals[params.fileKey];
@@ -1013,10 +1099,13 @@ class ThreadRipperSession implements MediaAccelerator {
     _stop(job, true);
     final sink = job.sink;
     if (sink != null) {
+      // 最后一次写入走的是 _complete 分支（跳过 progress），先冲刷尾部字节
+      // 再决定续棒/挂起——否则消费水位永远到不了阈值（挂起死锁）
+      sink.flush(job);
       if (next != null) {
-        // 开放末端请求的下一棒：同一响应流续写，Content-Range 语义不变
-        final successor = _start(next, sink);
-        sink.attach(successor);
+        // 开放末端请求的下一棒：同一响应流续写，Content-Range 语义不变；
+        // 是否立即启动由播放器消费水位决定（消费驱动预取）
+        _continueChain(next, sink);
         return;
       }
       sink.done();
@@ -1058,6 +1147,9 @@ class ThreadRipperSession implements MediaAccelerator {
       _recentFailures.clear();
     }
     _nativeRetry['${job.fileKey}:${job.range.first}-${job.range.last}'] = now + nativeRetryMs;
+    if (_pendingSuccessor?.sink == job.sink) {
+      _pendingSuccessor = null;
+    }
     job.sink!.error();
   }
 
@@ -1079,6 +1171,8 @@ class ThreadRipperSession implements MediaAccelerator {
     }
     _jobs.clear();
     _successorParams.clear();
+    _consumedByFile.clear();
+    _pendingSuccessor = null;
     _pendingWarmups.clear();
     for (final header in _headers.values.toList()) {
       if (header.bytes == null) {
@@ -1512,6 +1606,7 @@ class ThreadRipperSession implements MediaAccelerator {
       }
     }
 
+    _flushPendingSuccessor();
     try {
       for (final job in _jobs.toList()) {
         _tickJob(job, now);
@@ -1978,6 +2073,9 @@ class ThreadRipperSession implements MediaAccelerator {
           timeout: 0,
           candidates: _byHost(resolved),
           requested: requested,
+          descriptor: spec.descriptor,
+          sourceCandidates: resolved.map((r) => r.listed).toList(),
+          chainRequestLast: null,
           requiredRate: (_requiredRateOf?.call(spec.descriptor) ?? 0) / 8000,
         ),
         null,
@@ -2145,6 +2243,9 @@ class JobParams {
     required this.candidates,
     required this.requested,
     required this.requiredRate,
+    required this.descriptor,
+    required this.sourceCandidates,
+    this.chainRequestLast,
   });
 
   final String fileKey;
@@ -2153,6 +2254,13 @@ class JobParams {
   final int timeout;
   final Map<String, List<ResolvedCandidate>> candidates;
   final ResolvedCandidate requested;
+
+  /// 原始描述符与候选地址列表：开放末端请求分棒续链时重建下一棒参数用
+  final MediaDescriptor descriptor;
+  final List<MediaCandidate> sourceCandidates;
+
+  /// 分棒链的请求末端（含）：本棒完成后续下一棒直到该值；null 表示非链式
+  final int? chainRequestLast;
 
   /// What the stream needs, bytes per ms (upstream: `file.bandwidth / 8000`).
   final double requiredRate;

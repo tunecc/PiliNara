@@ -116,6 +116,7 @@ class AcceleratedResponse {
     required this.last,
     required this.total,
     required this.stream,
+    this.onConsumed,
   });
 
   /// Inclusive bounds of the served range (what the proxy echoes in
@@ -123,6 +124,10 @@ class AcceleratedResponse {
   final int first;
   final int last;
   final int total;
+
+  /// 代理每向播放器交付一段后回调（参数为已交付的绝对偏移），调度器据此
+  /// 做消费驱动续棒。
+  final void Function(int consumedAbsolute)? onConsumed;
 
   /// The exact bytes of [first]..[last], in order.
   final Stream<List<int>> stream;

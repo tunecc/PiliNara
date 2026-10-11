@@ -728,6 +728,13 @@ abstract final class Pref {
   static set enableThreadRipper(bool value) =>
       _setting.put(SettingBoxKey.enableThreadRipper, value);
 
+  /// 线程撕裂者屏蔽 PCDN：默认开启（PCDN 边缘/直连地址不参与竞速）
+  static bool get threadRipperBlockPcdn =>
+      _setting.get(SettingBoxKey.threadRipperBlockPcdn, defaultValue: true);
+
+  static set threadRipperBlockPcdn(bool value) =>
+      _setting.put(SettingBoxKey.threadRipperBlockPcdn, value);
+
   static bool get autoUpdate =>
       _setting.get(SettingBoxKey.autoUpdate, defaultValue: true);
 

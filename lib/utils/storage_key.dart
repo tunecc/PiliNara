@@ -114,6 +114,7 @@ abstract final class SettingBoxKey {
       continuePlayingPart = 'continuePlayingPart',
       cdnSpeedTest = 'cdnSpeedTest',
       enableThreadRipper = 'enableThreadRipper',
+      threadRipperBlockPcdn = 'threadRipperBlockPcdn',
       horizontalPreview = 'horizontalPreview',
       banWordForReply = 'banWordForReply',
       banWordForZone = 'banWordForZone',

@@ -225,11 +225,11 @@ void main() {
   });
 
   group('open-ended range takeover', () {
-    test('oversized open-ended requests are clamped and chained (A6)', () async {
+    test('oversized open-ended requests are clamped to 8MiB legs and chained by consumption (A6)', () async {
       final transport = MockMediaTransport();
       final (session, _) = sessionWith(transport);
-      const leg = 64 * 1024 * 1024;
-      final total = leg + 1024 * 1024; // 两棒：64MiB + 1MiB
+      const leg = 8 * 1024 * 1024;
+      final total = leg + 1024 * 1024; // 两棒：8MiB + 1MiB
       final desc = descriptor(hosts: const [hA], total: total);
       final response = session.serve(desc, const RangeRequest(first: 0))!;
 
@@ -266,15 +266,29 @@ void main() {
         await settle();
       }
 
-      // 第一棒完成 → 续棒请求出现，区间紧接第一棒
+      // 第一棒完成；消费水位为 0 → 下一棒挂起（消费驱动预取）
+      expect(
+        transport.requests.where((r) => r.request.start >= leg).length,
+        0,
+        reason: '消费水位为 0 时不得预取下一棒',
+      );
+
+      // 播放器消费推进到 4MiB：水位 + 4MiB 提前量达到第二棒起点 → 续棒
+      session.noteConsumed(desc.originalUrl, 4 * 1024 * 1024);
+      for (var i = 0;
+          i < 200 &&
+              transport.requests
+                  .where((r) => r.request.start >= leg)
+                  .isEmpty;
+          i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
       final leg2 = transport.requests
           .map((r) => '${r.request.start}-${r.request.end}')
-          .where((s) => s.startsWith('$leg-') || s == '$leg-${total - 1}')
+          .where((s) => s.startsWith('$leg-'))
           .toSet();
       expect(leg2, {'$leg-${total - 1}'});
 
-      // ignore: avoid_print
-      print('DBG leg2req total=' + transport.requests.length.toString());
       final leg2Request = requestFor(transport, hA, leg, total - 1);
       leg2Request.respond(status: 206, contentRange: 'bytes $leg-${total - 1}/$total');
       leg2Request.emit(Uint8List(total - leg));
@@ -543,6 +557,7 @@ void main() {
         length: 1000,
         candidates: {},
         requested: rc,
+        descriptor: MediaDescriptor(originalUrl: urlFor(hA), candidates: [MediaCandidate(url: urlFor(hA), host: hA)], isAudio: false),
       );
     }
 
@@ -585,6 +600,7 @@ void main() {
         length: 200,
         candidates: {},
         requested: rc,
+        descriptor: MediaDescriptor(originalUrl: urlFor(hA), candidates: [MediaCandidate(url: urlFor(hA), host: hA)], isAudio: false),
       );
       final seg = Segment(0, 199);
       job.segments.add(seg);

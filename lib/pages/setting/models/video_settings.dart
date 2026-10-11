@@ -102,6 +102,15 @@ List<SettingsModel> get videoSettings => [
     setKey: SettingBoxKey.enableThreadRipper,
     defaultVal: false,
   ),
+  const SwitchModel(
+    title: '线程撕裂者屏蔽 PCDN',
+    leading: Icon(Icons.block),
+    subtitle:
+        '开启后 PCDN 边缘/直连地址不参与竞速（官方镜像换签已全覆盖），'
+        '可降低流量浪费与慢片卡顿；关闭后 PCDN 地址按速度参与竞速',
+    setKey: SettingBoxKey.threadRipperBlockPcdn,
+    defaultVal: true,
+  ),
   if (Platform.isAndroid || Platform.isIOS)
     NormalModel(
       title: '半屏默认画质',

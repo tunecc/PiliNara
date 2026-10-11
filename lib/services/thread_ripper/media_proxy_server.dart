@@ -206,6 +206,7 @@ class ThreadRipperProxy {
   ) async {
     final response = request.response;
     var committed = false;
+    var delivered = accelerated.first;
     try {
       await for (final chunk in accelerated.stream) {
         if (!committed) {
@@ -228,7 +229,10 @@ class ThreadRipperProxy {
             ..contentLength = accelerated.last - accelerated.first + 1;
         }
         response.add(chunk);
-        // flush 提供背压：慢速播放器不会无限积压内存
+        delivered += chunk.length;
+        // flush 提供背压：慢速播放器不会无限积压内存；flush 完成即把消费
+        // 水位上报给调度器，驱动下一棒按需预取
+        accelerated.onConsumed?.call(delivered);
         await response.flush();
       }
       if (committed) {
