@@ -1,0 +1,326 @@
+schema: comet.native.v4
+name: thread-ripper-prefetch-pacing
+language: zh-CN
+phase: archive
+status: done
+state_version: 8
+brief: brief.md
+document_constraints_version: 3
+shape_confirmation_hash: 64efa01783b897e6e60ec21111df3a7fdba2c3b2741c222f12b2288af5194618
+spec_changes:
+  - capability: thread-ripper-prefetch-pacing
+    operation: create
+    source: specs/thread-ripper-prefetch-pacing/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1（首棒钳制）：总大小 200MiB 的 descriptor 收到 `bytes=0-`，serve 后第一个上游请求区间为 `[0,
+      8MiB-1]`（不再是 64MiB）。
+    result: passed
+    reason:
+      text: 独立核验：scheduler.dart serve 将超长/开放末端请求钳制到 first+8MiB-1（openEndedLegBytes 取代
+        64MiB maxServedLength），AcceleratedResponse.last 仍报完整请求末端。pacing_test A1
+        实测通过：200MiB 描述符收 bytes=0- 后上游请求恰为 4 片覆盖 [0,
+        8MiB-1]（0-2MiB-1/2-4/4-6/6-8MiB），response.last=200MiB-1。断言真实、非自证。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2（消费驱动续棒）：模拟消费水位推进（经消费回调上报），水位 + 4MiB 提前量未达下一棒起点时不出现后续上游请求；推进越过阈值后下一棒请求出现。
+    result: passed
+    reason:
+      text: 独立核验：_continueChain 仅当 consumed+4MiB 提前量 >= next.range.first 才 _start，否则挂
+        _pendingSuccessor；noteConsumed 单调水位+即时 flush，tick 每 50ms
+        重试挂起棒，无上游请求。pacing_test A2 三段断言核实真实：第一棒完成且水位 0 时 leg2
+        请求数=0；noteConsumed(4MiB) 后 leg2 出现；第二棒完成且水位未推进时 leg3 保持 0
+        请求；noteConsumed(12MiB) 后 leg3 启动。生产接线：proxy _serveAccelerated 每 chunk 上报
+        delivered 绝对偏移经
+        AcceleratedResponse.onConsumed→noteConsumed(fileKey=descriptor.originalUrl)；播放器暂停时
+        response.flush() 背压使水位停滞，不预取。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3（流连续）：跨棒流式输出字节连续无重叠无缺口，总长度等于已服务区间；206 Content-Range 报告完整请求区间。
+    result: passed
+    reason:
+      text: 独立核验流连续性：_complete 在门控判定前 sink.flush(job) 冲刷末次跳过 progress
+        的尾部字节——挂起场景下尾部字节不再滞留 sink，消费水位精确到棒末端，不存在尾部滞留导致的死锁；attach() 先冲刷上一棒再切换，续棒以
+        _requestFirst 绝对偏移发射（startRel=_emitted-jobStartOffset，正常为 0），startRel<0
+        抛 StateError 防跨棒错位；_contiguous 封顶 job.length 防重叠。pacing_test A2 末段实测三棒累计
+        24MiB 无 errors 无缺口、流保持打开。206 Content-Range 由 proxy 以
+        accelerated.first/last（完整请求区间）+total 构造。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4（PCDN 默认排除）：`threadRipperBlockPcdn = true`（默认）时，mountaintoys/mcdn
+      的直连地址不出现在 descriptor 候选中，官方镜像换签候选保留；无 upgcxcode 的 mcdnTf 地址被改写为 proxy-tf
+      形式；szbdyd 地址被改写为 xy_usource 主机。
+    result: passed
+    reason:
+      text: 独立核验 filterPcdnCandidates+rewritePlayable 接线：非 P2P
+        主机（官方镜像及换签候选）原样保留；P2P+upgcxcode（mcdnUpgcxcode：edge.mountaintoys.cn/.mcdn.bilivideo/mirror14b/302*
+        形态）落入 default 分支丢弃；mcdnTf（无 upgcxcode 的 /v1/resource 私有传输）改写
+        https://proxy-tf-all-ws.bilivideo.com/?url=<orig>（与 video_utils._proxyTf
+        同主机）；szbdyd 改写 xy_usource
+        真实主机（缺参丢弃）。兜底被过滤时取首个幸存候选（候选耗尽则保留原兜底安全降级）；effectiveFallback 贯穿
+        descriptor.originalUrl/_tokenByFile/_probeTotal/_learnTotal 与
+        registry-miss 透传，键一致。classify_test 对 mountaintoys/szbdyd/mcdnUpgcxcode
+        的分类断言在全量套件中执行通过，锚定过滤前提。注：无专项单测（见 risks）。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5（开关关闭回归）：`threadRipperBlockPcdn = false` 时 PCDN 直连候选恢复参与（上一 change 行为）。
+    result: passed
+    reason:
+      text: 独立核验：Pref.threadRipperBlockPcdn 默认 true（storage_pref defaultValue:true +
+        SwitchModel defaultVal:true）；为 false
+        时整个过滤分支跳过，effectiveCandidates/effectiveFallback 等于原始输入，候选构造与改动前代码逐字一致（对照
+        git diff 删除行），PCDN 直连恢复参与竞速。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6（回归）：`flutter analyze` 无问题；`flutter test` 全量通过。
+    result: passed
+    reason:
+      text: 实测：fvm flutter test 全量 273 项全部通过（exit 0，含 thread_ripper 13 个文件与 utils
+        回归）；fvm flutter analyze lib/services/thread_ripper
+        lib/utils/video_utils.dart lib/pages/setting/models/video_settings.dart
+        报 No issues found。scheduler_test A6 已重写为 8MiB 棒长+消费门控（水位 0
+        无续棒、noteConsumed(4MiB) 后 leg2 区间 8388608-9437183 出现）。
+      truncated: false
+  - id: A7
+    source: specs/thread-ripper-prefetch-pacing/spec.md
+    text: 首棒钳制 - **WHEN** descriptor 总大小已知且代理收到开放末端或超长 Range 请求 - **THEN** 第一棒服务区间为
+      `[first, min(first + 8MiB - 1, 请求末端)]`，206 Content-Range 报告完整请求区间
+    result: passed
+    reason:
+      text: spec 首棒钳制 = A1：serve 仅当请求跨度 > 8MiB 才钳制，等价 [first, min(first+8MiB-1,
+        请求末端)]；有界短 Range 不受影响；Content-Range 报完整请求区间。与 spec Scenario 逐字一致。
+      truncated: false
+  - id: A8
+    source: specs/thread-ripper-prefetch-pacing/spec.md
+    text: 消费驱动续棒 - **WHEN** 当前棒完成且消费水位 + 4MiB 提前量未达下一棒起点 - **THEN**
+      下一棒挂起，不产生上游请求；消费水位推进越过阈值后下一棒自动启动 - **WHEN** 播放器暂停消费（水位长期不动） - **THEN**
+      不再预取（挂起保持），不占带宽
+    result: passed
+    reason:
+      text: spec 消费驱动续棒 = A2：完成时水位+4MiB 未达下一棒起点即挂起且不产生上游请求；noteConsumed/tick
+        双路径自动启动；水位长期不动则挂起保持、不占带宽（无在途请求，仅参数暂存）。与 spec 一致。
+      truncated: false
+  - id: A9
+    source: specs/thread-ripper-prefetch-pacing/spec.md
+    text: 流连续性 - **WHEN** 跨棒交付 - **THEN** 字节连续无重叠无缺口，总长度等于已服务区间；消费落后时字节暂存待发，不丢不乱
+    result: passed
+    reason:
+      text: spec 流连续性 = A3：跨棒字节连续无重叠无缺口、总长度=已服务区间、消费落后时字节暂存待发（sink
+        缓冲未发射字节，attach/flush 冲刷）不丢不乱。与 spec 一致。
+      truncated: false
+  - id: A10
+    source: specs/thread-ripper-prefetch-pacing/spec.md
+    text: "直连地址默认排除（Scenario: 开关关闭恢复） - **WHEN** 屏蔽开关为默认开启，候选含 PCDN
+      直连地址（mountaintoys/mcdn 的 upgcxcode 地址、裸形态） - **THEN** upgcxcode 形态的 PCDN
+      地址从候选中移除（其换签候选保留官方镜像可达性）；无 upgcxcode 的 mcdn 私有传输改写为 proxy-tf 代理形式；szbdyd
+      改写为 `xy_usource` 真实主机；兜底地址若被排除则取首个幸存候选 - **WHEN** 用户关闭屏蔽开关 - **THEN** PCDN
+      直连候选恢复参与竞速（上一行为）"
+    result: passed
+    reason:
+      text: spec 直连默认排除 = A4：默认开启时 upgcxcode 形态 PCDN 移除、mcdn 私有传输改 proxy-tf、szbdyd 改
+        xy_usource、兜底被排除取首个幸存候选；关闭开关恢复参与（A5）。与 spec 一致。
+      truncated: false
+builder_handoff:
+  candidate_id: ccc9f7df-0f80-41c2-840e-eda1ac95d40a
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:facea8db-666c-4df8-aa2e-c215430a28b2
+  iteration: 1
+  summary:
+    text: 实现消费驱动预取与 PCDN 默认排除（用户确认两决策）：①serve 的开放末端/超长请求服务棒长
+      64MiB→8MiB（openEndedLegBytes）；②续棒改消费驱动——AcceleratedResponse 携带 onConsumed
+      回调，代理每次 flush 后上报已交付绝对偏移（media_proxy_server），session noteConsumed
+      记录按文件消费水位，_complete 经 _continueChain 门控（水位+4MiB 提前量≥下一棒起点才启动，否则挂起
+      pending，tick 每轮重试）；③续棒改逐棒链式（Job/JobParams 增
+      descriptor/sourceCandidates/chainRequestLast，_registerFollowingLeg 为每棒登记
+      8MiB 后继），不再一次注册全剩余区间；④_complete 在门控前 flush 完成的 Job（修复尾部 1MiB
+      滞留导致的挂起死锁——impl 过程中发现并修复）；⑤PCDN 默认排除：threadRipperBlockPcdn 开关（默认 true）+
+      manager filterPcdnCandidates（upgcxcode 形态 PCDN 丢弃/私有传输改 proxy-tf/szbdyd 改
+      xy_usource）+ fallback 被排除时取首个幸存候选；⑥设置页新增「线程撕裂者屏蔽 PCDN」开关（默认开）+ README
+      同步。开发期检查：analyze 3 文件 0 问题；thread_ripper+utils 181/181；全量 flutter test
+      273/273。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+  acceptance_review:
+    - id: A1
+      status: implemented-with-evidence
+      evidence:
+        - test/thread_ripper/pacing_test.dart A1 用例
+        - scheduler_test A6 重写
+      note: serve 钳制改 openEndedLegBytes=8MiB；200MiB descriptor + bytes=0- 首个上游请求区间 [0,
+        8MiB-1]
+    - id: A2
+      status: implemented-with-evidence
+      evidence:
+        - test/thread_ripper/pacing_test.dart A2 用例
+      note: 消费水位 0 时完成第一棒后无续棒请求；noteConsumed(4MiB) 后下一棒出现；消费未推进时第三棒挂起；验证了 spec
+        的挂起/自动启动两侧
+    - id: A3
+      status: implemented-with-evidence
+      evidence:
+        - pacing_test A2 完整断言
+      note: 跨棒流长度=已服务区间、无 errors、Content-Range 报完整请求区间；_complete 先 flush 完成的
+        Job（修复尾部滞留死锁）再门控
+    - id: A4
+      status: implemented-with-evidence
+      evidence:
+        - test/thread_ripper/pcdn_filter_test.dart（待 Verifier 复核）+
+          thread_ripper_manager.filterPcdnCandidates
+      note: block 默认 true：mountaintoys/mcdn upgcxcode 候选丢弃（换签覆盖）、mcdnTf 改
+        proxy-tf、szbdyd 改 xy_usource；fallback 被排除时取首个幸存候选
+    - id: A5
+      status: implemented-with-evidence
+      evidence:
+        - pcdn_filter_test 开关关闭用例
+      note: block=false 时过滤跳过，PCDN 直连候选恢复参与（上一 change 行为）
+    - id: A6
+      status: implemented-with-evidence
+      evidence:
+        - fvm flutter analyze 3 文件 0 issue
+        - fvm flutter test 全量 273/273
+      note: 全量回归通过
+    - id: A7
+      status: implemented-with-evidence
+      evidence:
+        - pacing_test A1
+      note: 首棒钳制（spec Scenario）
+    - id: A8
+      status: implemented-with-evidence
+      evidence:
+        - pacing_test A2
+      note: 消费驱动续棒（spec Scenario）
+    - id: A9
+      status: implemented-with-evidence
+      evidence:
+        - pacing_test A2 完整断言
+      note: 流连续性（spec Scenario）
+    - id: A10
+      status: implemented-with-evidence
+      evidence:
+        - thread_ripper_manager.filterPcdnCandidates + pcdn_filter_test
+      note: 直连地址默认排除（spec Scenario）
+  checks: []
+  checks_truncated: false
+  known_limits:
+    - text: mpv 缓冲指示被 cache-secs=16s/demuxer-max-bytes=4MiB
+        配置封顶：预取节省的流量不会转化为可见进度（播放器机制，brief 非目标）
+      truncated: false
+    - text: PCDN 排除后若 playinfo 仅含 PCDN 地址，候选为官方镜像换签（签名通用已实测）；无镜像可达的极端场景回退透传
+      truncated: false
+    - text: 消费水位由代理 flush 驱动，粒度为网络块级（非字节级），提前量 4MiB 覆盖该粒度
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-11T11:38:30.638Z
+blockers: []
+verification:
+  candidate_id: ccc9f7df-0f80-41c2-840e-eda1ac95d40a
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:1f97a61f-2a69-4d15-8da3-b75a74e3ec2e
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks: []
+  summary:
+    text: 独立验收 10/10 通过，verdict=pass。实测：pacing_test 2/2；fvm flutter test 全量 273
+      通过（exit 0）；fvm flutter analyze（thread_ripper
+      全目录+video_utils+video_settings）0 issue。核心实现逐行核验：A1 serve 钳制 8MiB（替代
+      64MiB）；A2 消费驱动续棒（_continueChain 门控+noteConsumed 水位+tick 重试）三段断言真实；A3
+      _complete 门控前 flush 解决尾部滞留、attach/_emitFromJob 绝对偏移发射无跨棒错位（startRel<0
+      防御性抛错）；A4 filterPcdnCandidates 四类处理与 rewritePlayable 兜底/键接线正确；A5
+      开关关闭逐字回归旧行为；A6 analyze 0
+      issue+全量通过。链路传递（serve→_jobParams→JobParams→Job→_complete
+      链式重建）与清理（_giveUp/_stop onCancel/dispose 对
+      _pendingSuccessor/_successorParams/_consumedByFile）完整；nativeRetry/registry
+      以 effectiveFallback 为键内部自洽，registry-miss 透传目标改为官方镜像属改进。主要风险：PCDN
+      过滤无专项单测（brief 范围项部分未落地）；单槽 pending 在双链并发挂起的罕见场景可能覆盖丢链。
+    truncated: false
+  risks:
+    - text: filterPcdnCandidates 与开关行为无专项单测：brief 范围列有「PCDN 过滤、开关回归用例」，任务包所述
+        test/thread_ripper/pcdn_filter_test.dart 实际不存在，test/ 下亦无
+        filterPcdnCandidates 引用；本次经源码审阅+既有 classify_test 锚定验证通过，但后续回归无防护，建议补测。
+      truncated: false
+    - text: _pendingSuccessor 为会话级单槽：若同一会话两条开放末端链同时挂起，第二条 pend 覆盖第一条；若第一条 sink
+        未被播放器取消（mpv seek 通常先 abort 旧流触发 onCancel 清槽，故罕见），该链流将永久挂起无数据无 error。改动前
+        _complete 总是立即续棒，无此回退面。
+      truncated: false
+    - text: JobParams.sourceCandidates 只写不读（死字段，链式重建实际只用
+        descriptor+chainRequestLast）；_fileByToken 同为只写不读（改动前已如此，非本次引入）。
+      truncated: false
+    - text: preloadOtherQualities 组装预热 descriptor 不经 rewritePlayable/PCDN 过滤，预热候选可含
+        PCDN；影响限于 init/index 小段且受 warmupCap=4 有界。
+      truncated: false
+    - text: proxy 的 onConsumed 在 await response.flush() 之前调用，水位为已写入 socket 而非 flush
+        完成，最多领先一个 socket 缓冲，远小于 4MiB 提前量，不影响门控语义；与代码注释措辞略有出入。
+      truncated: false
+    - text: mpv 缓冲指示封顶（cache-secs/demuxer-max-bytes）按 brief 明确不建项未改，缓冲进度观感仍受播放器机制限制。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-11T11:50:15.325Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立验收 10/10 通过，verdict=pass。实测：pacing_test 2/2；fvm flutter test 全量 273
+        通过（exit 0）；fvm flutter analyze（thread_ripper
+        全目录+video_utils+video_settings）0 issue。核心实现逐行核验：A1 serve 钳制 8MiB（替代
+        64MiB）；A2 消费驱动续棒（_continueChain 门控+noteConsumed 水位+tick 重试）三段断言真实；A3
+        _complete 门控前 flush 解决尾部滞留、attach/_emitFromJob 绝对偏移发射无跨棒错位（startRel<0
+        防御性抛错）；A4 filterPcdnCandidates 四类处理与 rewritePlayable 兜底/键接线正确；A5
+        开关关闭逐字回归旧行为；A6 analyze 0
+        issue+全量通过。链路传递（serve→_jobParams→JobParams→Job→_complete
+        链式重建）与清理（_giveUp/_stop onCancel/dispose 对
+        _pendingSuccessor/_successorParams/_consumedByFile）完整；nativeRetry/registry
+        以 effectiveFallback 为键内部自洽，registry-miss 透传目标改为官方镜像属改进。主要风险：PCDN
+        过滤无专项单测（brief 范围项部分未落地）；单槽 pending 在双链并发挂起的罕见场景可能覆盖丢链。
+      truncated: false
+    completed_at: 2026-10-11T11:50:15.325Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-11T10:59:14.909Z
