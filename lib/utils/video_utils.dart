@@ -2,6 +2,9 @@ import 'package:PiliPlus/models/common/video/cdn_type.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
 import 'package:PiliPlus/models_new/live/live_room_play_info/codec.dart';
 import 'package:PiliPlus/utils/cdn_node_store.dart';
+import 'package:PiliPlus/services/thread_ripper/classify.dart'
+    show isAkamaiHost, normalizeUpgcxcodeUri, signatureFamilyOf, SignatureFamily;
+import 'package:PiliPlus/services/thread_ripper/thread_ripper_manager.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
@@ -37,7 +40,8 @@ abstract final class VideoUtils {
     if (_blockedHostPrefix.hasMatch(lower)) {
       return false;
     }
-    return lower == 'edge.mountaintoys.cn' ||
+    return lower.endsWith('.edge.mountaintoys.cn') ||
+        lower == 'edge.mountaintoys.cn' ||
         _mediaHostSuffixes.any(lower.endsWith);
   }
 
@@ -74,7 +78,89 @@ abstract final class VideoUtils {
 
   /// [customHost] 显式指定自定义节点（节点测速用）；未传时按 [applyCustomCDN]
   /// 决定是否采用全局自定义节点。全局自定义生效时完全旁路枚举语义。
+  ///
+  /// [useThreadRipper] 仅由播放链路传入：Thread Ripper 开启时改写为本地代理
+  /// URL（多 CDN 并发下载），失败或关闭时仍返回单节点结果；下载等其他
+  /// 调用点不传该参数，行为不变。
   static String getCdnUrl(
+    Iterable<String> urls, {
+    CDNService? defaultCDNService,
+    String? customHost,
+    bool applyCustomCDN = true,
+    bool isAudio = false,
+    bool useThreadRipper = false,
+    int? totalSize,
+    String? mimeType,
+    int? bandWidth,
+    int? indexEnd,
+  }) {
+    final result = _pickCdnUrl(
+      urls,
+      defaultCDNService: defaultCDNService,
+      customHost: customHost,
+      applyCustomCDN: applyCustomCDN,
+      isAudio: isAudio,
+    );
+    if (!useThreadRipper) {
+      return result;
+    }
+    return ThreadRipperManager.I.rewritePlayable(
+          candidateUrls: threadRipperCandidates(urls, result),
+          isAudio: isAudio,
+          fallback: result,
+          totalSize: totalSize,
+          contentType: mimeType,
+          bandWidth: bandWidth,
+          indexEnd: indexEnd,
+        ) ??
+        result;
+  }
+
+  /// Thread Ripper 候选 URL：播放信息给出的全部原始地址（PCDN 包装/直连
+  /// 形态原样保留）+ [fallback] + 对每个含 `/upgcxcode/` 路径地址的节点池
+  /// 换签。签名只绑定查询参数（`os=mcdn` 签名在官方镜像同样 206），换签前
+  /// 剥离 `/v1/resource` 传输包装并清掉源端口（PCDN 边缘的 4483/8082 不适用
+  /// 于官方镜像）；Akamai 主机不接受 upos 签名，两侧都不参与换签。
+  static List<String> threadRipperCandidates(
+    Iterable<String> urls,
+    String fallback,
+  ) {
+    final list = <String>[fallback, ...urls];
+    for (final url in list.toList()) {
+      final uri = Uri.tryParse(url);
+      if (uri == null ||
+          !uri.path.contains('/upgcxcode/') ||
+          isAkamaiHost(uri.host) ||
+          signatureFamilyOf(uri) != SignatureFamily.upos ||
+          !_isReplaceableMediaHost(uri.host) ||
+          _blockedHostPrefix.hasMatch(uri.host)) {
+        continue;
+      }
+      final stripped = normalizeUpgcxcodeUri(uri);
+      for (final svc in CDNService.values) {
+        final host = svc.host;
+        if (host == null ||
+            host.isEmpty ||
+            isAkamaiHost(host) ||
+            host == uri.host ||
+            _blockedHostPrefix.hasMatch(host)) {
+          continue;
+        }
+        final candidate = Uri(
+          scheme: 'https',
+          host: host,
+          path: stripped.path,
+          query: stripped.hasQuery ? stripped.query : null,
+        ).toString();
+        if (!list.contains(candidate)) {
+          list.add(candidate);
+        }
+      }
+    }
+    return list;
+  }
+
+  static String _pickCdnUrl(
     Iterable<String> urls, {
     CDNService? defaultCDNService,
     String? customHost,
@@ -87,15 +173,24 @@ abstract final class VideoUtils {
       customHost = null;
     }
 
+    // PCDN 边缘地址的 /v1/resource 传输包装先剥离：官方镜像没有该前缀路径，
+    // 带着 它换 host 会得到必 404 的地址
+    final preparedUrls = urls
+        .map((u) {
+          final uri = Uri.tryParse(u);
+          return uri == null ? u : normalizeUpgcxcodeUri(uri).toString();
+        })
+        .toList();
+
     if (customHost == null && defaultCDNService == CDNService.baseUrl) {
-      return urls.first;
+      return preparedUrls.first;
     }
 
     String? mcdnTf;
     String? mcdnUpgcxcode;
 
     String last = '';
-    for (final url in urls) {
+    for (final url in preparedUrls) {
       last = url;
       if (_mirrorRegex.hasMatch(url)) {
         final uri = Uri.parse(url);
@@ -144,12 +239,18 @@ abstract final class VideoUtils {
 
     if (mcdnUpgcxcode != null) {
       final uri = Uri.parse(mcdnUpgcxcode);
+      // 换到官方镜像时必须清掉 PCDN 源端口（4483/8082）：镜像只有 443。
+      // Uri.replace 无法删除已有端口，需用构造器重建。
+      String rebuild(Uri source, String host) => Uri(
+            scheme: 'https',
+            host: host,
+            path: source.path,
+            query: source.hasQuery ? source.query : null,
+          ).toString();
       if (customHost != null && _isReplaceableMediaHost(uri.host)) {
-        return uri.replace(host: customHost).toString();
+        return rebuild(uri, customHost);
       }
-      return uri
-          .replace(host: defaultCDNService.host ?? CDNService.ali.host)
-          .toString();
+      return rebuild(uri, (defaultCDNService.host ?? CDNService.ali.host)!);
     }
     return mcdnTf == null
         ? last

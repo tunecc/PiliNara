@@ -167,6 +167,8 @@ CONTEXT.md
 Payload
 outputs/runtime/vibe-sessions
 test*
+# Dart/Flutter 单元测试目录不忽略（test* 规则会吞掉新增测试文件）
+!test/
 /pubspec_overrides.yaml
 .mindfs
 
@@ -176,9 +178,9 @@ test*
 # <<< Comet managed artifacts <<<
 
 .agents
+docs/comet/.DS_Store
 # >>> Comet managed project state >>>
 !/.comet/
 /.comet/*
 !/.comet/config.yaml
 # <<< Comet managed project state <<<
-docs/comet/.DS_Store

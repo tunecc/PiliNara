@@ -86,6 +86,15 @@ List<SettingsModel> get videoSettings => [
     defaultVal: false,
     onChanged: (value) => VideoUtils.disableAudioCDN = value,
   ),
+  const SwitchModel(
+    title: 'Thread Ripper（多 CDN 并发下载）',
+    leading: Icon(Icons.radar),
+    subtitle:
+        '把视频分片切小、同时从多个 CDN 节点并发下载并校验后再交给播放器，'
+        '可提升起播与缓冲速度；注意开启后流量消耗会明显增加',
+    setKey: SettingBoxKey.enableThreadRipper,
+    defaultVal: false,
+  ),
   if (Platform.isAndroid || Platform.isIOS)
     NormalModel(
       title: '半屏默认画质',

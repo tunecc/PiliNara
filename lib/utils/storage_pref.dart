@@ -722,6 +722,12 @@ abstract final class Pref {
   static bool get cdnSpeedTest =>
       _setting.get(SettingBoxKey.cdnSpeedTest, defaultValue: true);
 
+  static bool get enableThreadRipper =>
+      _setting.get(SettingBoxKey.enableThreadRipper, defaultValue: false);
+
+  static set enableThreadRipper(bool value) =>
+      _setting.put(SettingBoxKey.enableThreadRipper, value);
+
   static bool get autoUpdate =>
       _setting.get(SettingBoxKey.autoUpdate, defaultValue: true);
 

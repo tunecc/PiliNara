@@ -65,6 +65,7 @@ import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/services/download/download_collection_service.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/services/pip_overlay_service.dart';
+import 'package:PiliPlus/services/thread_ripper/thread_ripper_manager.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
 import 'package:PiliPlus/utils/danmaku_density_trend.dart';
@@ -665,7 +666,7 @@ class VideoDetailController extends GetxController
         mediaList: mediaList,
         onChangeEpisode: (episode, {bool manual = false}) async {
           try {
-            return Get.find<UgcIntroController>(
+            return await Get.find<UgcIntroController>(
               tag: heroTag,
             ).onChangeEpisode(episode, manual: manual);
           } catch (_) {}
@@ -927,7 +928,13 @@ class VideoDetailController extends GetxController
       ..buffered.value = 0;
 
     firstVideo = findVideoByQa(currentVideoQa.code, setCodecs: true);
-    videoUrl = VideoUtils.getCdnUrl(firstVideo.playUrls);
+    videoUrl = VideoUtils.getCdnUrl(
+      firstVideo.playUrls,
+      useThreadRipper: true,
+      mimeType: firstVideo.mimeType,
+      bandWidth: firstVideo.bandWidth,
+      indexEnd: ThreadRipperManager.indexRangeEnd(firstVideo.segmentBase),
+    );
 
     /// 根据currentAudioQa 重新设置audioUrl
     if (currentAudioQa != null) {
@@ -935,7 +942,14 @@ class VideoDetailController extends GetxController
         (i) => i.id == currentAudioQa!.code,
         orElse: () => data.dash!.audio!.first,
       );
-      audioUrl = VideoUtils.getCdnUrl(firstAudio.playUrls, isAudio: true);
+      audioUrl = VideoUtils.getCdnUrl(
+        firstAudio.playUrls,
+        isAudio: true,
+        useThreadRipper: true,
+        mimeType: firstAudio.mimeType,
+        bandWidth: firstAudio.bandWidth,
+        indexEnd: ThreadRipperManager.indexRangeEnd(firstAudio.segmentBase),
+      );
     }
 
     playerInit();
@@ -1163,6 +1177,9 @@ class VideoDetailController extends GetxController
 
     if (result case Success(:final response)) {
       data = response;
+      // 新 playinfo 落地：丢弃上一视频的会话，并提前预热本地代理
+      ThreadRipperManager.I.beginVideo();
+      ThreadRipperManager.I.warm();
       if (data.dash != null) await _supplementVideoQualities();
 
       languages.value = data.language?.items;
@@ -1205,12 +1222,20 @@ class VideoDetailController extends GetxController
             // TODO: refa
             final sb = StringBuffer('edl://!no_chapters;');
             for (var i in durl) {
-              final video = VideoUtils.getCdnUrl(i.playUrls);
+              final video = VideoUtils.getCdnUrl(
+                i.playUrls,
+                useThreadRipper: true,
+                totalSize: i.size,
+              );
               sb.write('%${video.length}%$video,length=${i.length! / 1000};');
             }
             videoUrl = sb.toString();
           } else {
-            videoUrl = VideoUtils.getCdnUrl(durl.single.playUrls);
+            videoUrl = VideoUtils.getCdnUrl(
+              durl.single.playUrls,
+              useThreadRipper: true,
+              totalSize: durl.single.size,
+            );
           }
 
           audioUrl = '';
@@ -1283,7 +1308,13 @@ class VideoDetailController extends GetxController
       );
       _setVideoHeight();
 
-      videoUrl = VideoUtils.getCdnUrl(firstVideo.playUrls);
+      videoUrl = VideoUtils.getCdnUrl(
+        firstVideo.playUrls,
+        useThreadRipper: true,
+        mimeType: firstVideo.mimeType,
+        bandWidth: firstVideo.bandWidth,
+        indexEnd: ThreadRipperManager.indexRangeEnd(firstVideo.segmentBase),
+      );
 
       /// 优先顺序 设置中指定质量 -> 当前可选的最高质量
       AudioItem? firstAudio;
@@ -1302,10 +1333,46 @@ class VideoDetailController extends GetxController
           (e) => e.id == closestNumber,
           orElse: () => audioList.first,
         );
-        audioUrl = VideoUtils.getCdnUrl(firstAudio.playUrls, isAudio: true);
+        audioUrl = VideoUtils.getCdnUrl(
+          firstAudio.playUrls,
+          isAudio: true,
+          useThreadRipper: true,
+          mimeType: firstAudio.mimeType,
+          bandWidth: firstAudio.bandWidth,
+          indexEnd: ThreadRipperManager.indexRangeEnd(firstAudio.segmentBase),
+        );
         currentAudioQa = AudioQuality.fromCode(firstAudio.id);
       } else {
         audioUrl = '';
+      }
+      // Thread Ripper：预加载其他清晰度的 init segment 与索引，
+      // 画质切换可即时起播
+      if (Pref.enableThreadRipper) {
+        ThreadRipperManager.I.preloadOtherQualities([
+          for (final e in videosList)
+            PreloadStream(
+              // 键必须与画质切换时 getCdnUrl 的改写结果一致，缓存才可命中
+              fileKey: VideoUtils.getCdnUrl(e.playUrls),
+              baseUrl: e.baseUrl,
+              playUrls: e.playUrls,
+              isAudio: false,
+              segmentBase: e.segmentBase,
+              bandWidth: e.bandWidth,
+              currentVideoUrl: firstVideo.baseUrl,
+              currentAudioUrl: firstAudio?.baseUrl,
+            ),
+          for (final e in audioList ?? const <AudioItem>[])
+            PreloadStream(
+              fileKey: VideoUtils.getCdnUrl(e.playUrls, isAudio: true),
+              baseUrl: e.baseUrl,
+              playUrls: e.playUrls,
+              isAudio: true,
+              segmentBase: e.segmentBase,
+              bandWidth: e.bandWidth,
+              currentVideoUrl: firstVideo.baseUrl,
+              currentAudioUrl: firstAudio?.baseUrl,
+            ),
+        ]);
       }
       if (reinitializePlayer) {
         await _initPlayerIfNeeded(autoFullScreenFlag);
@@ -1795,6 +1862,8 @@ class VideoDetailController extends GetxController
     cancelBlockListener();
     _dmTrendTaskId++;
     cid.close();
+    // 退出页面（小窗保留除外）：丢弃 Thread Ripper 会话与代理登记
+    ThreadRipperManager.I.endVideo();
     if (isFileSource) {
       cacheLocalProgress();
     }
