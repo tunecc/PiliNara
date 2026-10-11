@@ -7,7 +7,7 @@ import 'package:PiliPlus/services/thread_ripper/classify.dart'
 import 'package:PiliPlus/services/thread_ripper/thread_ripper_manager.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, visibleForTesting;
 
 abstract final class VideoUtils {
   static CDNService cdnService = Pref.defaultCDNService;
@@ -94,12 +94,13 @@ abstract final class VideoUtils {
     int? bandWidth,
     int? indexEnd,
   }) {
-    final result = _pickCdnUrl(
+    final result = pickCdnUrl(
       urls,
       defaultCDNService: defaultCDNService,
       customHost: customHost,
       applyCustomCDN: applyCustomCDN,
       isAudio: isAudio,
+      bypassCdnPreference: useThreadRipper,
     );
     if (!useThreadRipper) {
       return result;
@@ -160,15 +161,19 @@ abstract final class VideoUtils {
     return list;
   }
 
-  static String _pickCdnUrl(
+  @visibleForTesting
+  static String pickCdnUrl(
     Iterable<String> urls, {
     CDNService? defaultCDNService,
     String? customHost,
     bool applyCustomCDN = true,
     bool isAudio = false,
+    bool bypassCdnPreference = false,
   }) {
     defaultCDNService ??= cdnService;
-    customHost ??= applyCustomCDN ? customCDNUrl : null;
+    if (!bypassCdnPreference) {
+      customHost ??= applyCustomCDN ? customCDNUrl : null;
+    }
     if (isAudio && disableAudioCDN) {
       customHost = null;
     }
@@ -182,7 +187,9 @@ abstract final class VideoUtils {
         })
         .toList();
 
-    if (customHost == null && defaultCDNService == CDNService.baseUrl) {
+    if (!bypassCdnPreference &&
+        customHost == null &&
+        defaultCDNService == CDNService.baseUrl) {
       return preparedUrls.first;
     }
 
@@ -193,6 +200,10 @@ abstract final class VideoUtils {
     for (final url in preparedUrls) {
       last = url;
       if (_mirrorRegex.hasMatch(url)) {
+        if (bypassCdnPreference) {
+          // 线程撕裂者竞速接管：节点偏好旁路，返回 playinfo 原始镜像地址
+          return url;
+        }
         final uri = Uri.parse(url);
         if (uri.queryParameters['os'] == 'mcdn') {
           // upos-sz-mirrorcoso1.bilivideo.com os=mcdn
@@ -223,10 +234,11 @@ abstract final class VideoUtils {
       // may be deprecated
       if (url.contains('szbdyd.com')) {
         final uri = Uri.parse(url);
-        final hostname =
-            uri.queryParameters['xy_usource'] ??
-            customHost ??
-            defaultCDNService.host;
+        final hostname = uri.queryParameters['xy_usource'] ??
+            (bypassCdnPreference ? null : (customHost ?? defaultCDNService.host));
+        if (hostname == null) {
+          continue;
+        }
         return uri
             .replace(scheme: 'https', host: hostname, port: 443)
             .toString();
@@ -238,6 +250,10 @@ abstract final class VideoUtils {
     }
 
     if (mcdnUpgcxcode != null) {
+      if (bypassCdnPreference) {
+        // 线程撕裂者竞速接管：返回剥离包装后的原始地址（P2P 直连变体）
+        return mcdnUpgcxcode;
+      }
       final uri = Uri.parse(mcdnUpgcxcode);
       // 换到官方镜像时必须清掉 PCDN 源端口（4483/8082）：镜像只有 443。
       // Uri.replace 无法删除已有端口，需用构造器重建。

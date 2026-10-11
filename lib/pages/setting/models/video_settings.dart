@@ -61,8 +61,14 @@ List<SettingsModel> get videoSettings => [
   NormalModel(
     title: 'CDN 设置',
     leading: const Icon(MdiIcons.cloudPlusOutline),
-    getSubtitle: () =>
-        '当前使用：${VideoUtils.effectiveCdnDesc()}，部分 CDN 可能失效，如无法播放请尝试切换',
+    getSubtitle: () {
+      final base =
+          '当前使用：${VideoUtils.effectiveCdnDesc()}，部分 CDN 可能失效，如无法播放请尝试切换';
+      // Thread Ripper 开启时节点偏好旁路（互斥语义）
+      return Pref.enableThreadRipper
+          ? '$base；线程撕裂者开启中，本设置不参与选点'
+          : base;
+    },
     onTap: _showCDNDialog,
   ),
   NormalModel(
@@ -91,7 +97,8 @@ List<SettingsModel> get videoSettings => [
     leading: Icon(Icons.radar),
     subtitle:
         '把视频分片切小、同时从多个 CDN 节点并发下载并校验后再交给播放器，'
-        '可提升起播与缓冲速度；注意开启后流量消耗会明显增加',
+        '可提升起播与缓冲速度；注意开启后流量消耗会明显增加，'
+        '且「CDN 设置」选定的节点不参与选点（全部节点按速度自动竞速）',
     setKey: SettingBoxKey.enableThreadRipper,
     defaultVal: false,
   ),
