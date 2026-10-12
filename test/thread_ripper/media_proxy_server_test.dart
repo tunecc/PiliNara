@@ -346,5 +346,70 @@ void main() {
       final r = await request(url, range: 'bytes=0-9');
       expect(r.status, 502);
     });
+
+    // A7（spec: 发射与 flush 批量化）：累计 >=256KB 或距上次 flush >=16ms
+    // 才 flush。只有字节量条件时，慢速播放器永远攒不满 256KB，数据全卡在
+    // 代理缓冲区——起播/seek 后长时间无输出
+    test('A7: 小 chunk 慢速灌入时全部字节交付且 flush 上报了消费水位', () async {
+      const total = 64 * 1024;
+      final controller = StreamController<List<int>>();
+      var consumed = 0;
+      final consumedReports = <int>[];
+      final accelerator = FakeAccelerator((_, _) {
+        return AcceleratedResponse(
+          first: 0,
+          last: total - 1,
+          total: total,
+          stream: controller.stream,
+          onConsumed: (n) {
+            consumed = n;
+            consumedReports.add(n);
+          },
+        );
+      });
+      final proxy = await startProxy(accelerator);
+      addTearDown(proxy.close);
+      final descriptor = descriptorOf('$originBase/video.m4s', totalSize: total);
+      final token = proxy.registry.register(descriptor);
+      final url = buildProxyUrl(proxy.port!, descriptor, token);
+
+      final req = await testClient.openUrl('GET', Uri.parse(url));
+      req.headers.set('range', 'bytes=0-${total - 1}');
+
+      // 首块必须与 close() 并发入队：代理的首块要等 chunk 到达才写响应头
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 5)).then((_) {
+        if (!controller.isClosed) {
+          controller.add(List.filled(1024, 1));
+        }
+      }));
+      final resp = await req.close().timeout(const Duration(seconds: 10));
+      expect(resp.statusCode, HttpStatus.partialContent);
+
+      var received = 0;
+      final drained = Completer<void>();
+      resp.listen(
+        (chunk) => received += chunk.length,
+        onDone: drained.complete,
+        onError: (_) => drained.complete(),
+      );
+
+      // 63 个小 chunk 慢速灌入（共 64KB，远小于 256KB 阈值）：
+      // 只有 16ms 时间下界能让它们及时下发，而不是攒满 256KB 才动
+      for (var i = 0; i < 63; i++) {
+        controller.add(List.filled(1024, i));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      await controller.close();
+      await drained.future.timeout(const Duration(seconds: 10));
+
+      expect(received, total, reason: '64KB 全部交付，一个字节不少');
+      // 16ms 时间下界的直接证据：63 个 chunk 每 10ms 一个，共 630ms，
+      // 期间约每 16ms flush 一次 → 上报次数远大于 1。若只有 256KB 字节
+      // 阈值（总 64KB 永远攒不满），流式过程中一次 flush 都不会有，
+      // 只有收尾的无条件 flush → 上报次数恰好 1
+      expect(consumedReports.length, greaterThan(1),
+          reason: '流式过程中有多次 flush 上报（实测 ${consumedReports.length} 次）');
+      expect(consumed, total, reason: '最终水位 = 全部交付量');
+    });
   });
 }

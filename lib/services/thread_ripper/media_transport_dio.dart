@@ -41,6 +41,12 @@ class DioMediaTransport implements MediaTransport {
   static Dio _createDefault() {
     final options = BaseOptions(
       connectTimeout: const Duration(milliseconds: 10000),
+      // headers + body 全程上限（spec: TTFB 挂起可中止）。dio 的
+      // receiveTimeout 覆盖 request.close() 到响应头到达，即首字节前；
+      // 这正是调度器 TTFB 逃生要兜底的窗口——挂起的主机若连传输层都
+      // 没有超时，attempt 会一直挂着等 tick 来救。收到首字节后的停滞由
+      // 调度器 stallSoft 判定（host 级共享连接，传输层无法区分）
+      receiveTimeout: const Duration(seconds: 12),
       headers: {
         'user-agent': BrowserUa.pc,
         'referer': HttpString.baseUrl,

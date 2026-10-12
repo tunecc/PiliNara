@@ -207,6 +207,8 @@ class ThreadRipperProxy {
     final response = request.response;
     var committed = false;
     var delivered = accelerated.first;
+    var pending = 0;
+    var lastFlushAt = DateTime.now().millisecondsSinceEpoch;
     try {
       await for (final chunk in accelerated.stream) {
         if (!committed) {
@@ -230,12 +232,24 @@ class ThreadRipperProxy {
         }
         response.add(chunk);
         delivered += chunk.length;
+        pending += chunk.length;
         // flush 提供背压：慢速播放器不会无限积压内存；flush 完成即把消费
-        // 水位上报给调度器，驱动下一棒按需预取
-        accelerated.onConsumed?.call(delivered);
-        await response.flush();
+        // 水位上报给调度器，驱动下一棒按需预取。
+        // 批量化（spec: 发射与 flush 批量化）：累计 ≥256KB 才 flush 一次，
+        // 全速下载时保护 UI isolate 不被 syscall 淹没。但必须有时间下界：
+        // 只有字节量条件时，慢速播放器永远攒不满 256KB，数据全卡在缓冲区
+        // → 起播/seek 后长时间无输出（移动端卡顿的直接成因）
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (pending >= 256 * 1024 || now - lastFlushAt >= 16) {
+          accelerated.onConsumed?.call(delivered);
+          await response.flush();
+          pending = 0;
+          lastFlushAt = now;
+        }
       }
       if (committed) {
+        accelerated.onConsumed?.call(delivered);
+        await response.flush();
         await response.close();
         return;
       }

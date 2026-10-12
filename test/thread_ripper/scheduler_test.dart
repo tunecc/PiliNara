@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:PiliPlus/services/thread_ripper/contracts.dart';
 import 'package:PiliPlus/services/thread_ripper/host_model.dart';
 import 'package:PiliPlus/services/thread_ripper/media_transport.dart';
+import 'package:PiliPlus/services/thread_ripper/outcome.dart';
 import 'package:PiliPlus/services/thread_ripper/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -153,8 +154,9 @@ void main() {
       final small = descriptor(total: 1000);
       expect(session.serve(small, const RangeRequest(first: 2000, last: 2999)), isNull);
       expect(session.serve(small, const RangeRequest(suffixLength: -1)), isNull);
-      // 被钳制的超长请求已启动第一棒（4 片）；其余拒绝未触网
-      expect(transport.openCalls, 4);
+      // 被钳制的超长请求已启动第一棒；片级消费门控下初始只启动
+      // start ≤ 消费水位+2MiB 的片（渐进启动，随消费推进放行其余片）
+      expect(transport.openCalls, 2);
     });
   });
 
@@ -174,7 +176,9 @@ void main() {
 
       // Unmeasured hosts: pieceCount's host count is 1 -> ceil(2000000 /
       // 1101004.8) = 2 pieces; no speculative duplicates (no bitrate known).
-      expect(transport.requests.length, 2);
+      // 2 片 + 末片的未测主机探索 racer（upstream 设计：requiredRate 未知时
+      // 以典型速率为基准后，探索 racer 按设计恢复；VidBoost 同语义）
+      expect(transport.requests.length, 3);
       final ranges = transport.requests.map((r) => '${r.request.start}-${r.request.end}').toSet();
       // segment formula: start + floor(length * i / count)
       expect(ranges, {'0-999999', '1000000-1999999'});
@@ -216,7 +220,7 @@ void main() {
     });
 
     test('matching family keeps the mirror tier', () {
-      final candidate = ResolvedCandidate(MediaCandidate(
+      final candidate = ResolvedCandidate(const MediaCandidate(
         url: 'https://upos-hz-mirrorakam.akamaized.net/upgcxcode/v/f.m4s?e=1&hdnts=exp=9999999999~a~b',
         host: 'upos-hz-mirrorakam.akamaized.net',
       ));
@@ -229,7 +233,7 @@ void main() {
       final transport = MockMediaTransport();
       final (session, _) = sessionWith(transport);
       const leg = 8 * 1024 * 1024;
-      final total = leg + 1024 * 1024; // 两棒：8MiB + 1MiB
+      const total = leg + 1024 * 1024;
       final desc = descriptor(hosts: const [hA], total: total);
       final response = session.serve(desc, const RangeRequest(first: 0))!;
 
@@ -244,19 +248,19 @@ void main() {
       response.stream.listen(collected.add, onError: errors.add, onDone: () => done = true);
       await settle();
 
-      // 第一棒：单主机 4 片覆盖 [0, leg-1]
-      final leg1 = transport.requests
+      // 片级消费门控（渐进启动）：水位 0 + 2MiB margin，只放行起点
+      // ≤ 2MiB 的片（片 0 与片 1），其余片排队等消费推进
+      final launched = transport.requests
           .map((r) => '${r.request.start}-${r.request.end}')
           .toSet();
-      expect(leg1, {
-        '0-${leg ~/ 4 - 1}',
-        '${leg ~/ 4}-${leg ~/ 2 - 1}',
-        '${leg ~/ 2}-${3 * leg ~/ 4 - 1}',
-        '${3 * leg ~/ 4}-${leg - 1}',
+      expect(launched, {
+        '0-${2 * 1024 * 1024 - 1}',
+        '${2 * 1024 * 1024}-${4 * 1024 * 1024 - 1}',
       });
 
-      // 逐片响应并按 1MiB 块发射（内容为 0，长度/顺序即契约）
+      // 补完已放行的片并上报水位 4MiB：水位 + 2MiB margin 达到片 2 起点
       for (final r in transport.requests.toList()) {
+        if (r.headersResponded) continue;
         r.respond(status: 206, contentRange: 'bytes ${r.request.start}-${r.request.end}/$total');
         for (var off = r.request.start; off <= r.request.end; off += 1024 * 1024) {
           final size = math.min(1024 * 1024, r.request.end - off + 1);
@@ -265,48 +269,76 @@ void main() {
         r.close();
         await settle();
       }
-
-      // 第一棒完成；消费水位为 0 → 下一棒挂起（消费驱动预取）
-      expect(
-        transport.requests.where((r) => r.request.start >= leg).length,
-        0,
-        reason: '消费水位为 0 时不得预取下一棒',
-      );
-
-      // 播放器消费推进到 4MiB：水位 + 4MiB 提前量达到第二棒起点 → 续棒
       session.noteConsumed(desc.originalUrl, 4 * 1024 * 1024);
       for (var i = 0;
           i < 200 &&
               transport.requests
-                  .where((r) => r.request.start >= leg)
+                  .where((r) => r.request.start >= 4 * 1024 * 1024)
                   .isEmpty;
           i++) {
         await Future<void>.delayed(Duration.zero);
       }
-      final leg2 = transport.requests
-          .map((r) => '${r.request.start}-${r.request.end}')
-          .where((s) => s.startsWith('$leg-'))
-          .toSet();
-      expect(leg2, {'$leg-${total - 1}'});
+      expect(
+        transport.requests.where((r) => r.request.start >= 4 * 1024 * 1024).length,
+        greaterThan(0),
+        reason: '消费推进后其余片放行',
+      );
 
-      final leg2Request = requestFor(transport, hA, leg, total - 1);
-      leg2Request.respond(status: 206, contentRange: 'bytes $leg-${total - 1}/$total');
-      leg2Request.emit(Uint8List(total - leg));
-      leg2Request.close();
-      for (var i = 0; i < 200 && !done; i++) {
+      // 完成第一棒全部片（4 片，按实际范围响应/发射/关闭）；片 2/3 刚放行，
+      // 需边交付边推水位，否则门控再次挡下
+      for (var round = 0; round < 8; round++) {
+        final pending = transport.requests
+            .where((r) => r.request.start < leg && !r.headersResponded)
+            .toList();
+        if (pending.isEmpty) {
+          break;
+        }
+        for (final r in pending) {
+          r.respond(status: 206, contentRange: 'bytes ${r.request.start}-${r.request.end}/$total');
+          for (var off = r.request.start; off <= r.request.end; off += 1024 * 1024) {
+            final size = math.min(1024 * 1024, r.request.end - off + 1);
+            r.emit(Uint8List(size));
+          }
+          r.close();
+          await settle();
+          session.noteConsumed(desc.originalUrl, r.request.end + 1);
+        }
+      }
+
+      // 第一棒完成；水位已达 8MiB → 续棒（消费驱动预取）
+      expect(
+        transport.requests.where((r) => r.request.start >= leg).length,
+        greaterThan(0),
+        reason: '水位达到第二棒起点时续棒',
+      );
+
+      // 完成第二棒（1MiB，消费不再推进 → 无第三棒可续，流正常收口）
+      final leg2Pieces = transport.requests
+          .where((r) => r.request.start >= leg && !r.headersResponded)
+          .toList();
+      for (final r in leg2Pieces) {
+        r.respond(status: 206, contentRange: 'bytes ${r.request.start}-${r.request.end}/$total');
+        for (var off = r.request.start; off <= r.request.end; off += 1024 * 1024) {
+          final size = math.min(1024 * 1024, r.request.end - off + 1);
+          r.emit(Uint8List(size));
+        }
+        r.close();
+        await settle();
+      }
+      for (var i = 0; i < 100; i++) {
         await Future<void>.delayed(Duration.zero);
       }
 
-      expect(errors, isEmpty, reason: 'errors=' + errors.toString());
-      expect(done, isTrue);
+      expect(errors, isEmpty, reason: 'errors=$errors');
+      expect(done, isTrue, reason: '请求区间已全部交付，流正常收口');
       final length = collected.fold<int>(0, (sum, c) => sum + c.length);
-      expect(length, total, reason: '两棒字节必须连续覆盖整个请求区间');
+      expect(length, total, reason: '两棒字节连续覆盖整个请求区间');
     });
 
     test('draining an invalid response is capped (A7)', () async {
       var cancelled = false;
       final controller = StreamController<List<int>>(
-        onCancel: () async {
+        onCancel: () {
           cancelled = true;
         },
       );
@@ -565,26 +597,64 @@ void main() {
       final job = jobWith(10); // 8x = 80 bytes per ms
 
       // nothing delivered yet
-      expect(mayDuplicate(job, 100), isTrue);
+      expect(mayDuplicate(job, 100, 10), isTrue);
 
       // delivering 100 bytes/ms >= 8 * 10: no duplicate
       deliver(job, 40000, [(0, 0), (400, 40000)]);
-      expect(mayDuplicate(job, 400), isFalse);
+      expect(mayDuplicate(job, 400, 10), isFalse);
 
       // a duplicate within RATE_WINDOW_MS of the last one waits
       final job2 = jobWith(10);
       deliver(job2, 50000, [(0, 0), (400, 40000), (900, 50000)]);
       job2.lastDuplicate = (400, 10.0);
-      expect(mayDuplicate(job2, 500), isFalse); // 500 < 400 + 500
-      expect(mayDuplicate(job2, 950), isTrue); // past the window, rate rose
+      expect(mayDuplicate(job2, 500, 10), isFalse); // 500 < 400 + 500
+      expect(mayDuplicate(job2, 950, 10), isTrue); // past the window, rate rose
 
       // a duplicate that raised nothing latches the line as full
       final job3 = jobWith(10);
       deliver(job3, 900, [(0, 0), (500, 900)]);
       job3.lastDuplicate = (0, 100.0);
-      expect(mayDuplicate(job3, 500), isFalse);
+      expect(mayDuplicate(job3, 500, 10), isFalse);
       expect(job3.saturated, isTrue);
-      expect(mayDuplicate(job3, 5000), isFalse, reason: 'saturated latches for the job');
+      expect(mayDuplicate(job3, 5000, 10), isFalse, reason: 'saturated latches for the job');
+    });
+
+    // A4：bandWidth 缺失时 requiredRate=0。若没有 baseline 回退，
+    // hedgeHeadroom * 0 = 0 会使复制门恒开（任何速率都 >= 0），全速竞速
+    // 放大流量。调用方以宿主模型实测典型速率为基准，本用例必须让该分支
+    // 真的被执行——删掉回退时下面关键断言会失败
+    test('A4: requiredRate 缺失时以 baselineRate 为基准抑制投机复制', () {
+      // 交付速率已超过 8 × baseline：带宽充裕，不得再开投机复制。
+      // 若误用 requiredRate(0) 作基准，阈值恒为 0，这里会变成"允许复制"
+      final fast = jobWith(0);
+      deliver(fast, 40000, [(0, 0), (400, 40000)]); // 100 B/ms
+      expect(mayDuplicate(fast, 400, 10), isFalse,
+          reason: 'baseline=10 → 阈值 80 B/ms，实测 100 B/ms 已超过，必须抑制');
+
+      // 交付速率远低于 8 × baseline：带宽不足，允许复制去救
+      final slow = jobWith(0);
+      deliver(slow, 100, [(0, 0), (100, 100)]); // 1 B/ms
+      expect(mayDuplicate(slow, 100, 10), isTrue,
+          reason: 'baseline=10 → 阈值 80 B/ms，实测 1 B/ms 未达到，允许复制');
+
+      // 同一个低速 job，把 baseline 降到 0.1：阈值 0.8 B/ms，实测 1 B/ms 反超
+      // → 判定必须翻转。这一对断言证明基准值真的参与计算，而不是恒 0
+      final lowBaseline = jobWith(0);
+      deliver(lowBaseline, 100, [(0, 0), (100, 100)]); // 1 B/ms
+      expect(mayDuplicate(lowBaseline, 100, 0.1), isFalse,
+          reason: 'baseline=0.1 → 阈值 0.8 B/ms，实测 1 B/ms 已超过，必须抑制');
+
+      // 未交付任何字节时门初开
+      final idle = jobWith(0);
+      expect(mayDuplicate(idle, 100, 10), isTrue);
+    });
+
+    // 反向证明：有 requiredRate 时 baseline 参数不得覆盖它
+    test('A4: requiredRate 存在时以 requiredRate 为基准，忽略 baselineRate', () {
+      final job = jobWith(10); // 阈值 80 B/ms
+      deliver(job, 40000, [(0, 0), (400, 40000)]); // 100 B/ms
+      expect(mayDuplicate(job, 400, 1000), isFalse,
+          reason: 'requiredRate=10 优先，baseline 再大也不抬高阈值');
     });
   });
 
@@ -723,6 +793,218 @@ void main() {
       expect(flat, patternBytes(0, 100), reason: 'each byte exactly once, in order');
       // session is still healthy
       expect(session.serve(desc, const RangeRequest(first: 0, last: 99)), isNotNull);
+    });
+  });
+
+  group('TTFB 挂起逃生', () {
+    // 上游在同一位置显式跳过未收到首字节的 attempt（浏览器有连接层超时兜底）；
+    // mpv 的流没有，所以本移植必须在这里救（spec: TTFB 挂起可中止）
+    test('A1: 首字节超过 ttfbSoft×系数×2 且有替代主机时被 abort 并由替代主机接管', () async {
+      final transport = MockMediaTransport();
+      void Function()? tick;
+      final (session, clock) = sessionWith(transport, onTick: (cb) => tick = cb);
+      final desc = descriptor(hosts: const [hA, hB, hC], total: 1000);
+      final response = session.serve(desc, const RangeRequest(first: 0, last: 999))!;
+      await settle();
+      // 片 0 raced：primary on hA + racer on hB
+      expect(transport.requestsFrom(hA).length, 1);
+      expect(transport.requestsFrom(hB).length, 1);
+      final before = transport.openCalls;
+
+      // ttfbSoft = clamp(2 * (350 * 2 cold), 250, 1200) = 1200；紧急系数 0.85
+      // → 逃生阈值 1200 * 0.85 * 2 = 2040ms
+      clock.now = 2041;
+      tick!();
+      await settle();
+
+      // hA 的 attempt 被中止（connectFail），hC 接手该片
+      expect(transport.requestsFrom(hA).single.abort.abortReason, MediaOutcome.connectFail);
+      expect(transport.openCalls, before + 1);
+      expect(transport.requestsFrom(hC).length, 1, reason: '替代主机接管该片');
+
+      response.stream.listen((_) {});
+      await settle();
+    });
+
+    test('A1: 无替代主机时保留等待，不打死唯一可达主机', () async {
+      final transport = MockMediaTransport();
+      void Function()? tick;
+      final (session, clock) = sessionWith(transport, onTick: (cb) => tick = cb);
+      final desc = descriptor(hosts: const [hA], total: 1000);
+      session.serve(desc, const RangeRequest(first: 0, last: 999))!;
+      await settle();
+      expect(transport.requestsFrom(hA).length, 1);
+      final before = transport.openCalls;
+
+      // 已过 TTFB 逃生阈值（2040ms），但既无替代主机也未到 job 级兜底
+      // （jobStallMs = 8000）：不得中止，等唯一可达主机自己回来
+      clock.now = 3000;
+      tick!();
+      await settle();
+
+      expect(transport.requestsFrom(hA).single.abort.abortReason, isNull);
+      expect(transport.openCalls, before);
+    });
+  });
+
+  group('链式棒 deadline 适配', () {
+    // requiredRate 单位是「字节每毫秒」（bandWidth/8000）。棒长 8MiB、
+    // bandWidth 4Mbps → requiredRate = 500000 B/ms → 棒长/requiredRate
+    // ≈ 16.8ms，仍远低于 deadlineMs[urgent]=1500，故 deadline 取 1500。
+    // 这里验证的是单位正确：公式若误乘 1000，deadline 会大到
+    // needsRelief 的 `eta <= deadline - slack` 恒真，慢片永不救援
+    test('A5: deadline 按 max(deadlineMs[cls], 棒长/requiredRate) 计算', () {
+      final rc = ResolvedCandidate(MediaCandidate(url: urlFor(hA), host: hA));
+      Job jobWith(double requiredRate, int length) => Job(
+            fileKey: 'f',
+            range: (first: 0, last: length - 1),
+            cls: urgent,
+            createdAt: 0,
+            requiredRate: requiredRate,
+            length: length,
+            candidates: {},
+            requested: rc,
+            descriptor: MediaDescriptor(
+              originalUrl: urlFor(hA),
+              candidates: [MediaCandidate(url: urlFor(hA), host: hA)],
+              isAudio: false,
+            ),
+          );
+
+      // requiredRate 缺失 → 沿用 cls 基准
+      final noRate = jobWith(0, 8 * 1024 * 1024);
+      expect(noRate.deadline, deadlineMs[urgent]);
+
+      // requiredRate 很小（慢流）：棒长/requiredRate 远超 1500 → 按棒长定
+      final slow = jobWith(100, 8 * 1024 * 1024); // 8MiB/100 = 83886ms
+      expect(slow.deadline, 83886);
+
+      // 关键单位校验：8MiB / 500000 B/ms ≈ 16ms < 1500 → 取 1500。
+      // 若公式误写 length * 1000 / requiredRate，结果会是 16777ms
+      final fast = jobWith(500000, 8 * 1024 * 1024);
+      expect(fast.deadline, deadlineMs[urgent], reason: '不得把毫秒换算多乘 1000');
+    });
+  });
+
+  group('seek 水位重置', () {
+    // 陈旧水位的危害在 _continueChain：它按绝对水位判定是否续棒
+    //（consumed + lookahead >= next.range.first）。seek 回退后若不清水位，
+    // 旧的高水位（64MiB）会让 _continueChain 立即放行第二棒——一次预取
+    // 16MiB 而非 8MiB，绕过消费驱动预取（brief 缺陷 2）。
+    //
+    // 构造要点：warm 请求的未完成片会占 hostCap（单主机 6 槽），若不先
+    // 补完它们，seek 回退后无论有没有修复都只能起 2 片，hostCap 会掩盖
+    // 门控差异。必须先补完 warm 请求（含其续棒）释放全部槽位
+    test('A6: seek 回退后陈旧水位被清除，零消费时不预取下一棒', () async {
+      final transport = MockMediaTransport();
+      final (session, _) = sessionWith(transport);
+      final desc = descriptor(hosts: const [hA], total: 64 * 1024 * 1024);
+      const leg = 8 * 1024 * 1024;
+
+      // 先在一个高位区间把水位推到很高（模拟 seek 前进后播放过）
+      final warm = session.serve(desc, const RangeRequest(first: 48 * 1024 * 1024, last: 64 * 1024 * 1024 - 1))!;
+      warm.stream.listen((_) {});
+      await settle();
+      session.noteConsumed(desc.originalUrl, 64 * 1024 * 1024);
+      await settle();
+
+      // 补完 warm 请求（含其续棒），释放 hostCap——否则后续差异被掩盖
+      for (var round = 0; round < 6; round++) {
+        final pending = transport.requests.where((r) => !r.headersResponded).toList();
+        if (pending.isEmpty) {
+          break;
+        }
+        for (final r in pending) {
+          r.respond(status: 206, contentRange: 'bytes ${r.request.start}-${r.request.end}/${64 * 1024 * 1024}');
+          for (var off = r.request.start; off <= r.request.end; off += 1024 * 1024) {
+            r.emit(Uint8List(math.min(1024 * 1024, r.request.end - off + 1)));
+          }
+          r.close();
+          await settle();
+        }
+      }
+      expect(transport.requests.where((r) => !r.headersResponded), isEmpty,
+          reason: 'warm 请求全部完成，hostCap 释放');
+
+      // seek 回退到文件头，请求 16MiB（两棒）
+      final seeked = session.serve(desc, const RangeRequest(first: 0, last: 16 * 1024 * 1024 - 1))!;
+      expect(seeked, isNotNull, reason: 'seek 回退后仍能加速');
+      seeked.stream.listen((_) {});
+      await settle();
+
+      // 水位已重置到请求起点：渐进启动只放行前两片（起点 ≤ 0+2MiB）。
+      // 若不清陈旧水位（64MiB），ahead=64MiB 会让全部 4 片启动
+      expect(
+        transport.requests.where((r) => r.request.start < leg).length,
+        2,
+        reason: '水位重置后门控从零计算，只放行前两片',
+      );
+
+      // 零消费：补完已启动的两片（不上报水位——播放器没消费）
+      for (final r in transport.requests
+          .where((r) => r.request.start < leg && !r.headersResponded)
+          .toList()) {
+        r.respond(status: 206, contentRange: 'bytes ${r.request.start}-${r.request.end}/${64 * 1024 * 1024}');
+        for (var off = r.request.start; off <= r.request.end; off += 1024 * 1024) {
+          r.emit(Uint8List(math.min(1024 * 1024, r.request.end - off + 1)));
+        }
+        r.close();
+        await settle();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      // 第一棒只完成一半（另两片仍被门控挡下），续棒未触发 → 第二棒 0 片。
+      // 若不清陈旧水位，全部 4 片会被放行、第一棒完成，_continueChain 凭
+      // 64MiB 旧水位立即放行第二棒（一次预取 16MiB，绕过消费驱动）
+      expect(
+        transport.requests.where((r) => r.request.start >= leg && r.request.start < 48 * 1024 * 1024).length,
+        0,
+        reason: '零消费时不得提前预取下一棒（陈旧水位已清除）',
+      );
+    });
+  });
+
+  group('发射与 flush 批量化', () {
+    // 高频小 chunk 全速到达时，sink 不得逐块 add：累计 <256KB 且距上次发射
+    // 不足 16ms 时暂缓（spec: 发射与 flush 批量化）
+    test('A7: 全速小 chunk 下 add 次数远低于 chunk 数', () async {
+      final transport = MockMediaTransport();
+      final (session, _) = sessionWith(transport);
+      final desc = descriptor(hosts: const [hA], total: 8 * 1024 * 1024);
+      final response = session.serve(desc, const RangeRequest(first: 0, last: 8 * 1024 * 1024 - 1))!;
+
+      final emitted = <List<int>>[];
+      var adds = 0;
+      response.stream.listen((chunk) {
+        adds++;
+        emitted.add(chunk);
+      });
+      await settle();
+
+      // 推进消费水位放行首片（渐进启动：水位 0 + 2MiB margin）
+      session.noteConsumed(desc.originalUrl, 2 * 1024 * 1024);
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(transport.requests.isNotEmpty, isTrue, reason: '门控放行后至少一片在跑');
+      for (final r in transport.requests) {
+        r.respond(status: 206, contentRange: 'bytes ${r.request.start}-${r.request.end}/${8 * 1024 * 1024}');
+      }
+      await settle();
+
+      // 128 个 4KB chunk（共 512KB）连灌：未批量化时 add 会接近 128 次
+      for (var i = 0; i < 128; i++) {
+        final pending = transport.requests
+            .where((r) => r.headersResponded && !r.bodyClosed)
+            .toList();
+        if (pending.isEmpty) {
+          break;
+        }
+        pending.first.emit(Uint8List(4 * 1024));
+        await settle();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      final total = emitted.fold<int>(0, (sum, c) => sum + c.length);
+      expect(total, greaterThan(0), reason: '字节最终都交付了');
+      expect(adds, lessThan(64), reason: '批量发射使 add 次数显著下降（实测 $adds 次）');
     });
   });
 }

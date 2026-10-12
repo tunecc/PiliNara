@@ -262,10 +262,13 @@ ReliefKind? needsRelief(
 /// while the job already delivers `hedgeHeadroom` times what the stream
 /// needs, none for a job whose last duplicate raised nothing (the line is
 /// full), and the last one gets `rateWindowMs` to show before the next
-bool mayDuplicate(Job job, int now) {
+/// [baselineRate]：bandWidth 缺失时 requiredRate=0，0 基准会使复制门恒开
+/// （全速竞速放大），调用方以宿主模型实测典型速率为基准传入。
+bool mayDuplicate(Job job, int now, double baselineRate) {
   final rate = deliveredRate(job, now);
   final last = job.lastDuplicate;
-  if (job.saturated || rate >= hedgeHeadroom * job.requiredRate || (last != null && now - last.$1 < rateWindowMs)) {
+  final baseline = job.requiredRate > 0 ? job.requiredRate : baselineRate;
+  if (job.saturated || rate >= hedgeHeadroom * baseline || (last != null && now - last.$1 < rateWindowMs)) {
     return false;
   }
   if (last != null && last.$2 > 0 && rate <= last.$2) {
@@ -480,6 +483,7 @@ class ResponseSink {
   /// 请求起点为基准绝对计算
   int _requestFirst = 0;
   int _emitted = 0;
+  int _lastEmitAt = 0;
   bool _finished = false;
 
   /// Set by the scheduler: the consumer went away before the job ended.
@@ -525,10 +529,29 @@ class ResponseSink {
   }
 
   void _emitAvailable() {
-    final job = _job;
-    if (job != null) {
-      _emitFromJob(job);
+    if (_finished) {
+      return;
     }
+    final job = _job;
+    if (job == null) {
+      return;
+    }
+    // 批量化（spec: 发射与 flush 批量化）：距上次发射不足 16ms 且累计
+    // 不足 256KB 时暂缓发射——高频小 chunk 全速下载时保护 UI isolate。
+    // done/attach 路径绕过本节流（必须即时冲刷/切换）。
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final contiguous = _contiguous(job);
+    final pendingBytes = contiguous - _emitted;
+    if (pendingBytes == 0) {
+      return;
+    }
+    if (pendingBytes < 256 * 1024 &&
+        now - _lastEmitAt < 16 &&
+        contiguous < job.length) {
+      return;
+    }
+    _lastEmitAt = now;
+    _emitFromJob(job);
   }
 
   void _emitFromJob(Job job) {
@@ -587,7 +610,7 @@ class Job {
     this.chainRequestLast,
     this.timeout = 0,
     this.sink,
-  })  : deadline = createdAt + deadlineMs[cls],
+  })  : deadline = createdAt + math.max(deadlineMs[cls], requiredRate > 0 ? length ~/ requiredRate : 0),
         rescuesStraggler = 0,
         rescuesStale = 0,
         bytes = Uint8List(length),
@@ -785,6 +808,10 @@ class ThreadRipperSession implements MediaAccelerator {
       _consumedByFile[fileKey] = absoluteOffset;
     }
     _flushPendingSuccessor();
+    // 水位推进即重新调度：片级门控挡住的片要立刻放行，否则要等最多一个
+    // tick（50ms）才启动——起播/seek 后这是纯白丢的延迟（_flushPendingSuccessor
+    // 只覆盖续棒路径，不覆盖本棒仍在排队的片）
+    _pump();
   }
 
   /// 消费驱动续棒：水位 + 提前量达到下一棒起点才启动；否则挂起待 tick。
@@ -847,6 +874,10 @@ class ThreadRipperSession implements MediaAccelerator {
   final List<(Job, Segment)> _queue = [];
   final Set<Attempt> _running = {};
   bool _pumping = false;
+
+  /// 消费门控提前量（未启动片的 start 超过消费水位该值才 launch）
+  static const int pieceConsumptionMarginBytes = 2 * 1024 * 1024;
+
   void Function()? _cancelTicker;
 
   int _now() => _nowMs?.call() ?? DateTime.now().millisecondsSinceEpoch;
@@ -919,6 +950,15 @@ class ThreadRipperSession implements MediaAccelerator {
     _flushPendingWarmups(descriptor);
 
     final fileKey = descriptor.originalUrl;
+    // seek 回退/跳转：新请求 first 与既有消费水位不连续时，把水位对齐到
+    // 新请求起点（spec: seek 水位重置）。对齐与删除在实际效果上等价——
+    // noteConsumed 的递增守卫以 ?? 0 兜底，删除后任何正偏移同样会被接受；
+    // 保留对齐是为了维持「水位 ≥ 当前请求起点」的不变式，让 _continueChain
+    // 的绝对比较不会看到低于请求起点的值
+    final staleConsumed = _consumedByFile[fileKey];
+    if (staleConsumed != null && resolved.first < staleConsumed - consumptionLookaheadBytes) {
+      _consumedByFile[fileKey] = resolved.first;
+    }
     final indexEnd = _indexEndOf?.call(descriptor);
     final params = _jobParams(
       fileKey: fileKey,
@@ -1060,7 +1100,7 @@ class ThreadRipperSession implements MediaAccelerator {
     }
     if (count == 1) {
       _race(job);
-    } else if (job.segments[count - 1].attempts.isNotEmpty && mayDuplicate(job, now)) {
+    } else if (job.segments[count - 1].attempts.isNotEmpty && mayDuplicate(job, now, _model.typicalSpeed(job.fileKey).rate)) {
       // One piece is raced on a host never measured, if any: that measures
       // it, at no risk to the request (`chooseRacer`)
       final seg = job.segments[count - 1];
@@ -1481,10 +1521,22 @@ class ThreadRipperSession implements MediaAccelerator {
             next = i;
           }
         }
-        if (next == -1 || !_hasSlot(_queue[next].$1)) {
+        if (next == -1) {
           break;
         }
         final (job, seg) = _queue[next];
+        // 上游在这里 break：没有 slot 的 job 挡住全部队列。片级消费门控下
+        // 一个 job 无 slot 是常态（消费停滞），若 break，同一 tick 内后续
+        // job（续棒）的片永远排不到——预取链整体饿死。改为标记后继续，
+        // 让仍有余量的 job 照常启动
+        if (!_hasSlot(job) || _pieceGated(job, seg)) {
+          for (final s in job.segments) {
+            if (s.queued) {
+              blocked.add(s);
+            }
+          }
+          continue;
+        }
         HostOption? target;
         if (job.state == JobState.running && seg.frontier <= seg.end) {
           target = seg.isFinal ? _ownUrl(job) : _pickHost(job, seg, null);
@@ -1516,6 +1568,22 @@ class ThreadRipperSession implements MediaAccelerator {
       }
     }
     return warming < warmupCap && _running.length < globalCap - urgentReserve;
+  }
+
+  /// 片级消费门控（spec: 片级消费门控；上游无需此层——MSE 按需小块请求
+  /// 天然有界）：mpv 消费落后超过 margin 时，这一片不 launch。
+  ///
+  /// 判定必须落在单个 seg 上，不能放在 [_hasSlot] 里按 job 判：那里任一
+  /// queued 片越界就会返回 false，把同一 job 里本来该放行的片一起挡死，
+  /// 渐进启动就永远推不完（一片越界 → 全 job 停摆）。
+  ///
+  /// 基准是本棒 range.first：seek 或续棒后新棒起点可能高于文件级绝对水位，
+  /// 用绝对水位会把不连续的起点判成"消费停滞"，使新链门控误挂起。
+  /// 顺序播放时（水位 = 绝对偏移）两者等价
+  bool _pieceGated(Job job, Segment seg) {
+    final base = job.range.first;
+    final ahead = math.max(0, (_consumedByFile[job.fileKey] ?? 0) - base);
+    return seg.start - base > ahead + pieceConsumptionMarginBytes;
   }
 
   ///
@@ -1584,25 +1652,32 @@ class ThreadRipperSession implements MediaAccelerator {
   void _tick() {
     final now = _now();
     for (final att in _running.toList()) {
-      // A slow first byte is never given up on: an edge without the file is
-      // pulling it from upstream, and another one would start over. Its
-      // racer takes over once that one delivers (`settleRace`)
-      if (att.abortReason != null || att.firstByteAt == 0) {
+      if (att.abortReason != null) {
         continue;
       }
+      // TTFB 挂起逃生（upstream 无此形态：MSE 请求有浏览器连接层超时兜底，
+      // mpv 的流没有）：首字节超过 ttfbSoft×紧急系数×2 且该片存在替代主机
+      // 时中止，由替代主机接管；无替代则保留等待（不打死唯一可达主机）。
+      // 必须在 firstByteAt==0 的早退之前判断——那正是本条要救的形态：
+      // 上游对应位置显式跳过未收首字节的 attempt（"A slow first byte is
+      // never given up on"），那里有浏览器兜底，mpv 流没有。
+      final job = att.job;
+      final seg = att.seg;
+      final factor = urgencyFactor[job.cls];
+      final silence = 2 * att.stallSoft * factor;
+      final ttfbOver = att.firstByteAt == 0 && now - att.startedAt > att.ttfbSoft * factor * 2;
       // Gone silent after bytes flowed, and so has its host: one silent
       // while the host delivers to its other requests only waits its turn on
       // their shared connection, and its racer takes over (`settleRace`).
       // Only when something else can carry its bytes, else the piece would
       // only go to whatever racer is on it, there because it was the worse
       // choice
-      final job = att.job;
-      final seg = att.seg;
-      final silence = 2 * att.stallSoft * urgencyFactor[job.cls];
-      if (now - att.lastByteAt > silence &&
-          now - (_lastDelivery[att.hostname] ?? double.negativeInfinity) > silence &&
+      final silentAfterBytes = att.firstByteAt != 0 &&
+          now - att.lastByteAt > silence &&
+          now - (_lastDelivery[att.hostname] ?? double.negativeInfinity) > silence;
+      if ((ttfbOver || silentAfterBytes) &&
           (seg.attempts.length > 1 || _hasAlternative(job, seg, now) || now - att.startedAt > jobStallMs)) {
-        _abortAttempt(att, MediaOutcome.stall);
+        _abortAttempt(att, ttfbOver ? MediaOutcome.connectFail : MediaOutcome.stall);
       }
     }
 
@@ -1784,7 +1859,7 @@ class ThreadRipperSession implements MediaAccelerator {
       _launch(job, tail, 'primary', target);
       return true;
     }
-    if (mayDuplicate(job, now) && _duplicate(job, seg, true)) {
+    if (mayDuplicate(job, now, _model.typicalSpeed(job.fileKey).rate) && _duplicate(job, seg, true)) {
       job.lastDuplicate = (now, deliveredRate(job, now));
       return true;
     }
