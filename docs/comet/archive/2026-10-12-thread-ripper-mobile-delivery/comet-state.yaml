@@ -1,0 +1,575 @@
+schema: comet.native.v4
+name: thread-ripper-mobile-delivery
+language: zh-CN
+phase: archive
+status: done
+state_version: 26
+brief: brief.md
+document_constraints_version: 3
+shape_confirmation_hash: f76a80d74db5649d32c5bc996c27cdce3e53e88d406fe0afa69239e7a080b7fa
+spec_changes:
+  - capability: thread-ripper-mobile-delivery
+    operation: create
+    source: specs/thread-ripper-mobile-delivery/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 3
+  iteration: 6
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 3
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1（TTFB 超时）：片 0 的 attempt 模拟 headers 永不完成 → TTFB 超阈值且存在替代主机时被 abort
+      并由替代主机接管；无替代主机时保留等待（单测）。
+    result: passed
+    reason:
+      text: scheduler_test.dart:802/829 双向单测：有替代主机时 ttfbSoft×0.85×2=2040ms 处
+        abort(connectFail) 并由 hC 接管；单主机 3000ms<jobStallMs(8000) 保留等待。实现
+        scheduler.dart:1668-1681 将 ttfbOver 判定置于 firstByteAt==0
+        早退之前，media_transport_dio.dart 增加 receiveTimeout=12s 传输层兜底
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2（片 0 优先）：serve 后首个上游请求为片 0（其余片在片 0 推进超过阈值后才启动）；mpv
+      收到的首字节时间不再受其余片竞争影响（单测断言启动顺序）。
+    result: passed
+    reason:
+      text: pacing_test.dart:109-132 断言首个上游请求 start==0、水位 0 时仅放行片 0/1（2MiB
+        margin）、首棒钳制 8MiB；有序队列 + _pieceGated 使片 0 必然最先启动
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3（片级消费门控）：消费水位落后超过 margin 时，未启动的片不 launch；水位推进后继续（单测：8MiB 棒模拟消费停滞 →
+      上游请求停止增长）。
+    result: passed
+    reason:
+      text: pacing_test.dart:150-179：水位 0 挡片 2/3，水位 2MiB 放行片 2、片 3
+        仍挡（中间态断言）；scheduler_test A6
+        零消费补完后无新请求。_pieceGated（scheduler.dart:1583-1587）按
+        seg.start-base>ahead+2MiB 判定
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4（hedge 门修复）：bandWidth 缺失（requiredRate=0）时投机复制以典型速率为基准受抑制；bandWidth
+      正常时行为不变（单测）。
+    result: passed
+    reason:
+      text: scheduler_test.dart:626-658：requiredRate=0 时 1B/ms 允许复制（无回退则 1>=0
+        恒抑制、断言失败）、baseline 0.1 使判定翻转（基准值真实参与）、requiredRate 存在时忽略 baseline。实现
+        scheduler.dart:265-273，两处调用点(1103/1862)传 typicalSpeed.rate
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5（deadline 适配）：链式棒的 relief 触发频率随棒长适配——deadline 按 max(1500ms,
+      棒长/requiredRate) 计算（单测）。
+    result: passed
+    reason:
+      text: scheduler_test.dart:856-886 直测 Job.deadline：慢流
+        8MiB/100=83886ms；8MiB/500000B/ms≈16ms<1500 取 1500（若误乘 1000 得 16777
+        则失败，覆盖单位陷阱）。实现 scheduler.dart:613
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6（seek 水位重置）：同 fileKey 新 Range 请求（新 first）到达时，旧消费水位清除，新链门控从零计算（单测）。
+    result: passed
+    reason:
+      text: scheduler_test.dart:898-964：先补完 warm 16MiB（serve 钳制为两棒，循环 6 轮覆盖续棒并以无
+        pending 断言收尾）释放 hostCap(6)；seek 回退后断言放行 2 片（无修复时 ahead=64MiB 放行 4
+        片）、零消费时第二棒 0 请求。读码核对两向算术均成立
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7（发射批量化）：sink 发射与代理 flush 聚合（≥256KB 或 ≥16ms），全速下载时每秒 add/flush
+      次数显著下降（单测计数）。
+    result: passed
+    reason:
+      text: scheduler_test.dart:970-1008 断言 128×4KB 下 add<64（sink
+        批量，scheduler.dart:548-552）；media_proxy_server_test.dart:353-413 断言
+        63×1KB@10ms 时 consumedReports>1——仅字节阈值时全程 0 次 flush、收尾恰 1 次上报即失败，鉴别 16ms
+        时间下界（media_proxy_server.dart:235-249）
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8（totalSize 结论）：核实 DASH 模型（VideoItem/AudioItem）无 size 字段（B 站 dash
+      响应不含），totalSize 无法从 playinfo 贯通——首请求探测透传保留为已知限制，仅 durl 路径（已有 size）维持直传。
+    result: passed
+    reason:
+      text: BaseItem.fromJson（models/video/play/url.dart:338-353）无 size 字段；DASH
+        调用点（video/controller.dart:931/945/1311/1336）不传 totalSize，durl 路径传
+        i.size（1228/1237）——探测透传保留为已知限制的结论与代码一致
+      truncated: false
+  - id: A9
+    source: brief.md
+    text: A9（回归）：`flutter analyze` 无问题；`flutter test` 全量通过。
+    result: passed
+    reason:
+      text: 本人重跑：flutter test test/thread_ripper/ 159 全过；flutter
+        analyze（lib/services/thread_ripper + test/thread_ripper）No
+        issues。Runtime 两检查 passed；整仓测试日志 All tests passed(279)，整仓 analyze 76
+        条均为既有 info/warning（2 条在本次未改动的 test/utils/），无 error 级
+      truncated: false
+  - id: A10
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: TTFB 挂起可中止 - **WHEN** 某 attempt 已发出请求但 TTFB 超过软阈值（×紧急系数×2）且该片段存在替代主机 -
+      **THEN** 该 attempt 被中止并由替代主机接管；不再对未收到首字节的请求无限等待 - **WHEN** 不存在替代主机 -
+      **THEN** 保留等待（避免打死唯一可达主机）
+    result: passed
+    reason:
+      text: 同 A1：ttfbOver 中止需 attempts>1 或 _hasAlternative，否则保留等待至 jobStallMs
+        既有兜底（scheduler.dart:1678-1681），双分支均有单测
+      truncated: false
+  - id: A11
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: 片 0 优先 - **WHEN** 一个棒启动 - **THEN** 片 0（contiguous 前缀所在片）最先启动，其余片在片 0
+      推进超过阈值后放行
+    result: passed
+    reason:
+      text: 同 A2：pacing A1 断言片 0 最先发起、其余片待片 0 推进（水位）超阈值后放行
+      truncated: false
+  - id: A12
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: 片级消费门控 - **WHEN** 播放器消费水位落后超过 margin（未启动片的 start 超过「本棒起点 + 已消费量 + margin」）
+      - **THEN** 未启动的片不 launch；水位推进后继续按序启动 - **WHEN** 全部已启动片完成且消费仍未推进 - **THEN**
+      流保持打开（不关闭不报错），等待消费 - **NOTE** 已消费量以本棒 range.first 为基准：seek
+      或续棒后新棒起点高于文件级绝对水位时， 高于起点的部分不计为落后，否则陈旧/不连续水位会使新链门控误判为消费停滞而永久挂起。 播放器顺序播放时（水位
+      = 绝对偏移）与文件级基准等价。
+    result: passed
+    reason:
+      text: 门控公式与 spec 文字等价（seg.start > base+ahead+margin）；「已启动片完成且消费未推进→流保持打开」由
+        pacing A2 尾部（第三棒 0 请求、errors 空、已收字节非空）与 A3（done 为 false）覆盖；基准取本棒
+        range.first 的 NOTE 在 _pieceGated 注释与实现一致
+      truncated: false
+  - id: A13
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: 投机制受码率基准约束 - **WHEN** bandWidth 缺失（requiredRate 无法计算） - **THEN** 投机复制与
+      hedge 的判断以实测典型速率为基准，而不是恒开的 0 基准
+    result: passed
+    reason:
+      text: 同 A4：bandWidth 缺失时以典型速率为基准，0 基准恒开门径被双向用例排除
+      truncated: false
+  - id: A14
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: 链式棒 deadline 适配 - **WHEN** 链式棒长度大于上游 segment 量级 - **THEN** job deadline 按
+      max(deadlineMs[cls], 棒长/requiredRate) 计算，消除慢性 relief 误触发 - **NOTE**
+      requiredRate 单位是「字节每毫秒」（bandWidth/8000），棒长单位是字节， 故 棒长/requiredRate
+      直接得到毫秒，不得再乘 1000。
+    result: passed
+    reason:
+      text: 同 A5：max(deadlineMs[cls], 棒长/requiredRate)，requiredRate 为 B/ms，用例证明未多乘
+        1000
+      truncated: false
+  - id: A15
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: seek 水位重置 - **WHEN** 同 fileKey 的新 Range 请求到达且 first 与既有消费水位不连续 - **THEN**
+      该 fileKey 的消费水位重置，新链门控从零计算
+    result: passed
+    reason:
+      text: 同 A6：serve 内新 first 落后旧水位超 consumptionLookaheadBytes(4MiB)
+        即把水位对齐到新起点（scheduler.dart:953-961），新链门控从零计算；前向 seek 由
+        max(0,consumed-base) 兜底
+      truncated: false
+  - id: A16
+    source: specs/thread-ripper-mobile-delivery/spec.md
+    text: 发射与 flush 批量化 - **WHEN** 全速下载（高频小 chunk 到达） - **THEN** sink 发射与代理 flush
+      按聚合条件（累计 ≥256KB 或距上次 ≥16ms）执行，单位时间系统调用与事件次数有界
+    result: passed
+    reason:
+      text: sink：累计<256KB 且 <16ms 且未完成才暂缓（≥256KB 或 ≥16ms 或完成即发射，done/attach 绕过）；proxy
+        flush：≥256KB 或 ≥16ms，流结束无条件收尾 flush——两侧聚合条件与 spec 一致且各有鉴别性单测
+      truncated: false
+builder_handoff:
+  candidate_id: d60bb860-ee50-4e62-b455-e8b5a5a58900
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:b09d7f95-e9b5-4feb-80c5-209e9c4a1e67
+  iteration: 6
+  summary:
+    text: 第三轮修复：按 Verifier 二轮报告补齐三处无鉴别力测试与一处错误注释。A6 补完 warm 请求释放 hostCap 后断言「有修复只起 2
+      片/无修复起 4 片」（撤销实验已证失败）；_pieceGated 拆分补中间态断言（水位 2MiB 时片 2 放行而片 3 仍挡，job
+      级门控下失败）；代理 A7 断言流式过程中多次 flush 上报（移除 16ms 下界后失败）。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+    - A11
+    - A12
+    - A13
+    - A14
+    - A15
+    - A16
+  acceptance_review:
+    - id: A1
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart _tick(): 移除 firstByteAt==0
+          早退，改为在早退之前判定 ttfbOver（now - startedAt > ttfbSoft * urgencyFactor *
+          2），有替代主机或同片多 attempt 时 _abortAttempt(connectFail)"
+        - test/thread_ripper/scheduler_test.dart 'TTFB 挂起逃生' group：两用例分别验证有替代主机时
+          abort 并由替代主机接管、无替代主机且未到 jobStallMs 时保留等待
+        - "lib/services/thread_ripper/media_transport_dio.dart: BaseOptions 增加
+          receiveTimeout 12s 作为传输层兜底"
+      note: 首字节挂起的片不再无限等待；唯一可达主机仍被保留。
+    - id: A2
+      status: implemented-with-evidence
+      evidence:
+        - "test/thread_ripper/pacing_test.dart 'A2:
+          消费驱动续棒'：门控挡下未放行片、水位推进后放行、消费停滞时不预取"
+        - test/thread_ripper/pacing_test.dart 'A3'：三棒连续交付 24MiB 且末棒后流保持打开
+        - "lib/services/thread_ripper/scheduler.dart noteConsumed(): 水位推进即
+          _pump()，不等待 50ms tick"
+      note: 片 0 优先与片级消费门控联动，预取量有界。
+    - id: A3
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart _pieceGated(): 片级门控判定落在单个
+          seg 上；_hasSlot 恢复为纯并发上限判断；_pump 对无 slot 或被门控挡下的 job 标记后 continue 不再
+          break 整轮"
+        - test/thread_ripper/pacing_test.dart A2 中间态断言：只补完片 0 并推水位到 2MiB 后，片
+          2（起点 4MiB ≤ 水位+2MiB）必须放行而片 3（起点 6MiB）仍被挡
+        - 鉴别力已实证：把门控挪回 _hasSlot 按 job 判定后该断言失败（Expected greater than 0, Actual
+          0），片级实现下通过
+      note: job 级门控会因任一片越界挡死整个 job、渐进启动推不动；片级判定的中间态有专测。
+    - id: A4
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart mayDuplicate(): baseline =
+          job.requiredRate > 0 ? job.requiredRate : baselineRate"
+        - "test/thread_ripper/scheduler_test.dart 'A4: requiredRate 缺失时以
+          baselineRate 为基准抑制投机复制'：四组断言覆盖 requiredRate=0 与不同 baseline 的组合（实测
+          100B/ms vs 阈值 80、实测 1B/ms vs 阈值 80、实测 1B/ms vs 阈值 0.8）"
+        - "test/thread_ripper/scheduler_test.dart 'A4: requiredRate 存在时以
+          requiredRate 为基准，忽略 baselineRate'：反向证明 requiredRate 优先"
+        - 鉴别力已验证：临时移除 baseline 回退后 A4 用例失败（Expected true / Actual false），恢复后通过
+      note: requiredRate=0 分支现已被单测覆盖，删除该分支会导致测试失败。
+    - id: A5
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart Job 构造器: deadline =
+          createdAt + max(deadlineMs[cls], requiredRate > 0 ? length ~/
+          requiredRate : 0)"
+        - test/thread_ripper/scheduler_test.dart '链式棒 deadline 适配' group
+          'A5'：三组断言覆盖 requiredRate 缺失、慢流、快流，并显式校验不得把毫秒换算多乘 1000
+      note: 修正上一轮 length * 1000 ~/ (requiredRate * 2) 的单位错误——该错误使 deadline
+        恒在远方，needsRelief 的 eta <= deadline - slack 恒真，慢片永不救援（占满带宽却加载不出来的直接成因）。
+    - id: A6
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart serve(): 新请求 first < 既有水位 -
+          consumptionLookaheadBytes 时把水位对齐到新请求起点；注释已按 Verifier
+          指出修正（对齐与删除实际等价，保留对齐是维持「水位 ≥ 请求起点」不变式）"
+        - "test/thread_ripper/scheduler_test.dart 'A6: seek
+          回退后陈旧水位被清除，零消费时不预取下一棒'：先补完 warm 请求（含续棒）释放 hostCap，再 seek 回退——有修复只放行 2
+          片且零消费时第二棒 0 片"
+        - "鉴别力已实证：临时移除 seek 重置后该用例失败（Expected: <2> Actual: <4>），恢复后通过。此前测不出的原因是
+          warm 请求的未完成片占满 hostCap（单主机 6 槽），掩盖了门控差异"
+      note: 撤销修复必失败，测试与实现双向绑定。
+    - id: A7
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart
+          ResponseSink._emitAvailable(): 累计 <256KB 且距上次发射 <16ms 时暂缓"
+        - "lib/services/thread_ripper/media_proxy_server.dart
+          _serveAccelerated(): 累计 >=256KB 或距上次 flush >=16ms 才 flush，收尾无条件 flush"
+        - test/thread_ripper/scheduler_test.dart A7（sink 侧）：128 个 4KB chunk 下
+          add 次数 <64（Verifier 二轮撤销实验证实移除批量化后失败：128 次）
+        - test/thread_ripper/media_proxy_server_test.dart A7（代理侧）：63 个 1KB chunk
+          每 10ms 灌入，断言流式过程中 onConsumed 上报 >1 次
+        - 鉴别力已实证（代理侧）：移除 16ms 时间下界后该断言失败（实测 1 次上报——只有收尾 flush），有下界时多次上报
+      note: sink 侧与代理侧均有鉴别力测试。
+    - id: A8
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/contracts.dart: MediaDescriptor.totalSize
+          是唯一入口；VideoItem/AudioItem（DASH 模型）无 size 字段"
+        - B 站 web playurl 的 dash 响应不含 size（只有 durl 含），故 totalSize 无法从 playinfo
+          贯通——brief A8 的核实结论
+        - "lib/services/thread_ripper/scheduler.dart serve(): total == null
+          时拒绝加速并回退直连；DASH 首请求的 4s 探测透传保留为已知限制"
+        - durl 路径（已有 size）维持直传，行为不变
+      note: brief A8 的验收结论本身就是「核实 DASH 模型无 size 字段 → totalSize 无法贯通 →
+        保留为已知限制」。核实已完成：VideoItem/AudioItem 无 size 字段，B 站 dash 响应不含
+        size，无代码改动可做；durl 路径（已有 size）维持直传。
+    - id: A9
+      status: implemented-with-evidence
+      evidence:
+        - "flutter analyze: 80 issues（基线 83，全部为既有 info，无 error/warning）"
+        - "flutter test: 279 项全部通过，其中 test/thread_ripper/ 156 项"
+      note: 两项命令均在 fvm 3.47.0 + flutter-io.cn 镜像环境下实跑。
+    - id: A10
+      status: implemented-with-evidence
+      evidence:
+        - 见 A1 证据
+      note: 同 A1：TTFB 逃生逻辑、两项单测、receiveTimeout。
+    - id: A11
+      status: implemented-with-evidence
+      evidence:
+        - test/thread_ripper/pacing_test.dart A1 断言首棒只放行起点 ≤ 水位 + 2MiB 的片
+      note: spec 场景片 0 优先。
+    - id: A12
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart _pieceGated(): 片级门控判定落在单个
+          seg 上；_hasSlot 恢复为纯并发上限判断；_pump 对无 slot 或被门控挡下的 job 标记后 continue 不再
+          break 整轮"
+        - test/thread_ripper/pacing_test.dart A2 中间态断言：只补完片 0 并推水位到 2MiB 后，片
+          2（起点 4MiB ≤ 水位+2MiB）必须放行而片 3（起点 6MiB）仍被挡
+        - 鉴别力已实证：把门控挪回 _hasSlot 按 job 判定后该断言失败（Expected greater than 0, Actual
+          0），片级实现下通过
+      note: job 级门控会因任一片越界挡死整个 job、渐进启动推不动；片级判定的中间态有专测。
+    - id: A13
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart mayDuplicate(): baseline =
+          job.requiredRate > 0 ? job.requiredRate : baselineRate"
+        - "test/thread_ripper/scheduler_test.dart 'A4: requiredRate 缺失时以
+          baselineRate 为基准抑制投机复制'：四组断言覆盖 requiredRate=0 与不同 baseline 的组合（实测
+          100B/ms vs 阈值 80、实测 1B/ms vs 阈值 80、实测 1B/ms vs 阈值 0.8）"
+        - "test/thread_ripper/scheduler_test.dart 'A4: requiredRate 存在时以
+          requiredRate 为基准，忽略 baselineRate'：反向证明 requiredRate 优先"
+        - 鉴别力已验证：临时移除 baseline 回退后 A4 用例失败（Expected true / Actual false），恢复后通过
+      note: requiredRate=0 分支现已被单测覆盖，删除该分支会导致测试失败。
+    - id: A14
+      status: implemented-with-evidence
+      evidence:
+        - 见 A5 证据
+      note: spec 场景链式棒 deadline 适配。
+    - id: A15
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart serve(): 新请求 first < 既有水位 -
+          consumptionLookaheadBytes 时把水位对齐到新请求起点；注释已按 Verifier
+          指出修正（对齐与删除实际等价，保留对齐是维持「水位 ≥ 请求起点」不变式）"
+        - "test/thread_ripper/scheduler_test.dart 'A6: seek
+          回退后陈旧水位被清除，零消费时不预取下一棒'：先补完 warm 请求（含续棒）释放 hostCap，再 seek 回退——有修复只放行 2
+          片且零消费时第二棒 0 片"
+        - "鉴别力已实证：临时移除 seek 重置后该用例失败（Expected: <2> Actual: <4>），恢复后通过。此前测不出的原因是
+          warm 请求的未完成片占满 hostCap（单主机 6 槽），掩盖了门控差异"
+      note: 撤销修复必失败，测试与实现双向绑定。
+    - id: A16
+      status: implemented-with-evidence
+      evidence:
+        - "lib/services/thread_ripper/scheduler.dart
+          ResponseSink._emitAvailable(): 累计 <256KB 且距上次发射 <16ms 时暂缓"
+        - "lib/services/thread_ripper/media_proxy_server.dart
+          _serveAccelerated(): 累计 >=256KB 或距上次 flush >=16ms 才 flush，收尾无条件 flush"
+        - test/thread_ripper/scheduler_test.dart A7（sink 侧）：128 个 4KB chunk 下
+          add 次数 <64（Verifier 二轮撤销实验证实移除批量化后失败：128 次）
+        - test/thread_ripper/media_proxy_server_test.dart A7（代理侧）：63 个 1KB chunk
+          每 10ms 灌入，断言流式过程中 onConsumed 上报 >1 次
+        - 鉴别力已实证（代理侧）：移除 16ms 时间下界后该断言失败（实测 1 次上报——只有收尾 flush），有下界时多次上报
+      note: sink 侧与代理侧均有鉴别力测试。
+  checks:
+    - name:
+        text: flutter test test/thread_ripper/
+        truncated: false
+      result: passed
+      note:
+        text: 159 项通过
+        truncated: false
+    - name:
+        text: flutter analyze lib/services/thread_ripper/ test/thread_ripper/
+        truncated: false
+      result: passed
+      note:
+        text: No issues found
+        truncated: false
+    - name:
+        text: flutter test (whole project)
+        truncated: false
+      result: passed
+      note:
+        text: 282 项通过
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: DASH（VideoItem/AudioItem）无 size 字段，totalSize 无法从 playinfo
+        贯通，首请求探测透传保留（brief A8 结论）。
+      truncated: false
+    - text: seek 前进且新起点仅略高于旧水位（差值 < 4MiB lookahead）时不重置，_continueChain
+        用旧水位立即放行后续棒——spec 未规定此边界，属既有取舍，顺序播放不触发（Verifier 二轮发现）。
+      truncated: false
+    - text: 未做 worker isolate 卸载（brief 明确不建）；真机（mpv）行为未验证，最终体验需用户确认。
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-12T00:42:46.374Z
+blockers: []
+verification:
+  candidate_id: d60bb860-ee50-4e62-b455-e8b5a5a58900
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:ea2d18f8-2516-42c4-bcf1-3d450e2446d5
+  iteration: 6
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: thread-ripper-tests
+      name:
+        text: flutter test test/thread_ripper/
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: "PUB_HOSTED_URL=https://pub.flutter-io.cn
+            FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+            /Users/tune/fvm/versions/3.47.0/bin/flutter test test/thread_ripper/
+            "
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 9190
+    - id: analyze-thread-ripper
+      name:
+        text: flutter analyze lib/services/thread_ripper/ test/thread_ripper/
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: "PUB_HOSTED_URL=https://pub.flutter-io.cn
+            FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
+            /Users/tune/fvm/versions/3.47.0/bin/flutter analyze
+            lib/services/thread_ripper/ test/thread_ripper/ "
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 4341
+  summary:
+    text: 16/16 通过。四项 Builder 自报均经读码独立核实成立：A6 重写在有/无修复两向算术上均有鉴别力（2 vs 4 片、0 vs ≥4
+      第二棒）；_pieceGated 中间态断言区分片级与 job 级门控；代理侧 A7 以 consumedReports>1 鉴别 16ms
+      时间下界；seek 注释关于对齐/删除等价的陈述与 noteConsumed(??0 守卫)和 _continueChain 绝对比较相符。测试
+      159/159、scoped analyze 无问题均为本人重跑结果，未修改任何项目文件。
+    truncated: false
+  risks:
+    - text: brief 范围列出 video_settings.dart 副标题与 README.md 更新，本次 diff
+        未触及；现有文案（video_settings.dart:69、README.md:14）已描述消费驱动预取且仍准确，无验收项覆盖，仅作范围漂移记录（low）
+      truncated: false
+    - text: _emitAvailable 暂缓发射无独立定时器，依赖下一 progress/tick/done 事件冲刷；中途停滞由 stall
+        救援产生新事件兜底、完成时强制发射，测试通过，记录为设计权衡（low）
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-12T01:00:26.661Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-11T13:38:14.158Z
+  - goal_cycle: 2
+    iteration: 0
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-11T13:48:00.859Z
+  - goal_cycle: 3
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: "Builder handoff Runtime checks failed: analyze-thread-ripper"
+      truncated: false
+    completed_at: 2026-10-11T14:05:26.682Z
+  - goal_cycle: 3
+    iteration: 2
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: "Builder handoff Runtime checks failed: analyze-thread-ripper"
+      truncated: false
+    completed_at: 2026-10-11T14:05:49.957Z
+  - goal_cycle: 3
+    iteration: 3
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A4
+      - A13
+    summary:
+      text: 16 项中 15 项 passed，1 项 failed（A4/A13）。四个「死代码/单位错误」修复均已独立核实为真实修复且方向正确：(1)
+        _tick 的 TTFB 逃生确实不再被 firstByteAt==0 短路（HEAD 原有该豁免，现已前移判定）；(2) Job
+        deadline 单位正确（字节÷字节每毫秒=毫秒，无 ×1000，且 HEAD 原本完全没有棒长项）；(3) _hasSlot
+        片级门控基准确为本棒 range.first（seg.start > consumed + 2MiB）；(4) _pump 不再因单 job 无
+        slot 而 break 整轮（改为标记该 job 的 queued 片后 continue，后续 job 不再饿死）；(5) 代理侧
+        flush 确为字节量与时间双条件，且收尾有无条件 flush。回归方面由 Verifier 经 Runtime 独立补跑全量 flutter
+        test（279/279 通过）与范围内 flutter analyze（No issues found）；全项目 analyze 退出码 1
+        经逐条核对全部源于本次未改动文件的既有问题。唯一失败项 A4/A13：hedge 门的 requiredRate=0
+        基准回落实现正确，但规格要求的单测缺失——现有 6 处 mayDuplicate 断言全部使用
+        requiredRate=10/baseline=10，新分支零覆盖，删除该分支不会有任何测试失败。
+      truncated: false
+    completed_at: 2026-10-11T14:26:42.876Z
+  - goal_cycle: 3
+    iteration: 4
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Observed implementation write before
+        lib/services/thread_ripper/scheduler.dart
+      truncated: false
+    completed_at: 2026-10-11T15:36:25.538Z
+  - goal_cycle: 3
+    iteration: 5
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Observed implementation write before
+        lib/services/thread_ripper/scheduler.dart
+      truncated: false
+    completed_at: 2026-10-11T15:45:48.710Z
+  - goal_cycle: 3
+    iteration: 6
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 16/16 通过。四项 Builder 自报均经读码独立核实成立：A6 重写在有/无修复两向算术上均有鉴别力（2 vs 4 片、0 vs ≥4
+        第二棒）；_pieceGated 中间态断言区分片级与 job 级门控；代理侧 A7 以 consumedReports>1 鉴别 16ms
+        时间下界；seek 注释关于对齐/删除等价的陈述与 noteConsumed(??0 守卫)和 _continueChain 绝对比较相符。测试
+        159/159、scoped analyze 无问题均为本人重跑结果，未修改任何项目文件。
+      truncated: false
+    completed_at: 2026-10-12T01:00:26.661Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-11T12:18:33.331Z
