@@ -71,6 +71,12 @@
 - D2 合并方式 `git merge`（保留 merge 双亲形态），与 fork 历史既有同步形态一致。
 - D3 冲突裁决沿用既定原则：上游功能全收；三钉/flutter 3.47.0/.fvmrc/README 差异为 fork 保留项；实现选择（API 适配细节、lock 重解析流程）由 Agent 决定。
 - D4 撞车条目（fork 实现的功能上游也实现了）不自动裁决，逐项呈报用户取舍——用户本次明确要求。
+- D5 撞车 C1「我的页横向预览卡片」（fork 3e9ffec47 vs 上游 548c0f04a）：用户裁决采用上游版——上游为超集（收藏/历史/稍后再看/订阅可配置 tab + 分页加载 + mineTabs 偏好设置），fork 手写的 take(20) 拉取逻辑废弃。
+- D6 撞车 C2「截图弹窗」（fork 58bcee3e1 内存优化版 vs 上游 d2544b312 Enter 保存版）：用户裁决采用上游版（防重入 _screenshotState + S/Enter/小键盘 Enter 保存 + RawImage 渲染 + image.dispose()），放弃 fork 的 uiImageToPngBytes 中转。
+- D7 非撞车、但 pl_player/controller.dart 取 theirs 时连带丢失的 fork 功能（作者专属倍速 applyAuthorDefaultSpeed / 双击分区时长与布局 / 两指轻点暂停）：按 D3"fork 功能保留"原则手工补回该文件（getter 块、setupVideoType 回退调用、倍速方法块、import），不属撞车不改用户裁决。
+- D8 patch.sh sdk_patches 补回 double_tap_gesture（fork 18d4289e0 所需的 SDK multitap patch；上游 image viewer 手势重构 2515ecfc8 后 fork patch.ps1 仍含此项，shell 版漏同步）。
+- D9 上游删除且 fork 无引用的 desktop_webview_window 依赖一并移除；waterfall_flow 同（上游删，fork 无引用）。
+- D10 lock 结构化差异 12 包：三钉（connectivity_plus/device_info_plus/file_picker）及其传递伴随包（android_file_picker、file_picker_darwin/linux/platform_interface/web、windows_file_picker）+ 三包在 ^ 约束内 fork 解析出比上游更新的版本（cupertino_ui 1.1.3/1.1.2、hive_ce 2.22/2.21、material_ui 1.7/1.6，均为 fork pub get 正常结果、上游 lock 偏旧）。
 
 # Open questions
 
