@@ -81,7 +81,7 @@ sdk_patches=(
   navigation_drawer popup_menu fab null_safety_for_selectable_region
   selectable_region editable_text text_field scroll_position scrollable
   scrollable_gesture draggable_scrollable_sheet scaffold text text_painter
-  sliver refresh_indicator
+  sliver refresh_indicator double_tap_gesture
   # iOS 专属
   scroll_view bottom_sheet_ios_flutter navigator
 )
