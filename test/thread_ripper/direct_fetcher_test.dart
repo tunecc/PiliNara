@@ -122,8 +122,10 @@ void main() {
       await for (final chunk in resp.stream.timeout(const Duration(seconds: 5))) {
         received += chunk.length;
         if (!firstChunkReceived.isCompleted) {
-          // 第一块已送达播放器侧，而上游还没写第二块 —— 流式成立
-          expect(received, chunkSize);
+          // 上游只写了第一块、第二块还没发出：第一包能先于上游写出到达，
+          // 流式成立。dart:io 解析器的首包大小在合包优化下有波动，只断言
+          // 「已收到非空数据且第二块尚未发出」，不锚定具体字节数。
+          expect(received, greaterThan(0));
           firstChunkReceived.complete();
         }
       }
