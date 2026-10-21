@@ -1,0 +1,667 @@
+schema: comet.native.v4
+name: sync-upstream-2026-10-21
+language: zh-CN
+phase: archive
+status: done
+state_version: 8
+brief: brief.md
+document_constraints_version: 3
+shape_confirmation_hash: 391bb83f88f1db45b3f3ec1416e6a277e99f76f8996d9f2b45cf81225f333c44
+spec_changes:
+  - capability: upstream-sync
+    operation: modify
+    source: specs/upstream-sync/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "A1: 合并后重新 `git fetch upstream`，`git rev-list --count main..upstream/main`
+      为 0；merge commit 恰好两行 parent（合并前 main 与 upstream/main）。"
+    result: passed
+    reason:
+      text: merge deb3756e7 恰 2 父（014dcdd4+e52ad34a5）；ls-remote 确认
+        upstream/main=e52ad34a5；HEAD..upstream/main=0。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: 'A2: fork 保留项幸存：`pubspec.yaml` 含三钉与 `environment.flutter: 3.47.0`；`.fvmrc`
+      为 `{"flutter": "3.47.0"}`；README fork
+      差异章节、`BUILD_IOS.md`、`lib/scripts/patch.sh`、`sync_upstream_build.yml` 存在；8
+      个被裁剪 workflow 保持删除；`ios.yml` 保留 ref/artifact_name/file_suffix 增强输入。'
+    result: passed
+    reason:
+      text: 三钉与 environment.flutter 3.47.0、.fvmrc 精确；README fork
+        章节、BUILD_IOS/patch.sh/sync_upstream_build 在；仅 3 个 workflow（8
+        个裁剪删除）；ios.yml 有 ref/artifact_name/file_suffix。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "A3: fork 功能全量幸存：`lib/services/thread_ripper/` 13 个文件与 161
+      用例；`video_settings` 含 Thread Ripper / PCDN / 屏蔽画质条目与 CDN 互斥
+      subtitle；pl_player controller 含作者倍速方法、双击分区
+      getter、`enableTwoFingerTapPause`；`view.dart` 含 `TwoFingerTapDetector` 与
+      `doubleTapSeekLayout.resolveType` 接线；router 含
+      `/doubleTapSeekZoneSetting`；`lib/pages/member_video/` 筛选文件完整；屏蔽画质语义在
+      `url.dart` 或等价位置保留。"
+    result: passed
+    reason:
+      text: thread_ripper 13 文件、178 用例（≥161）；video_settings 三入口+CDN 互斥；controller
+        作者倍速/双击 getter/两指；view 接线；router 与 member_video 5 文件齐；url.dart 屏蔽语义在。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: "A4: `bash lib/scripts/patch.sh ios` 在升级后的 cupertino_ui / material_ui
+      上无失败段；抽验补丁应用在 lock 活跃版本目录。"
+    result: passed
+    reason:
+      text: lock 活跃 material_ui-1.8.0/cupertino_ui-1.1.4 上 10 个 material+cupertino 补丁
+        reverse-check 全过；patch.sh 选目录即 lock 版本；Runtime ios-patch-state passed。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: "A5: `fvm flutter analyze` 相对合并前基线不新增 error / warning（存量 info 级 lint
+      允许，退出码 1 不作失败判据）。"
+    result: passed
+    reason:
+      text: Runtime analyze 0 error/7 warning/74 issues，与合并前基线 0/7 持平；重复 import 已由
+        5c32bc020 修复；退出码 1 为存量 info。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: "A6: `fvm flutter test` 全部用例通过（含 test/thread_ripper 161 用例与上游新增 3 个测试文件）。"
+    result: passed
+    reason:
+      text: Runtime flutter test +316 All tests passed；3 个上游新测试与 blocklist
+        测试均在日志；thread_ripper 178 声明用例全过。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: "A7: 撞车排查零遗漏：上游本批不存在与 fork 六项功能同类的实现；排查方式与证据记录于 brief D4；无新增撞车条目需要用户裁决。"
+    result: passed
+    reason:
+      text: e52ad34a5 全树 fork 六功能标识 grep 全 0；上游未触 member_video，pl_player 改动无关；唯一重叠为
+        VideoUtils API 重构，按 D5 适配；D4 记录完整。
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: "A8: 提交树纯净：无 `gt3_flutter_plugin`；`geetest_plugin.dart` 不在工作树；bottom_sheet
+      / geetest 补丁污染文件恢复上游纯净态。"
+    result: passed
+    reason:
+      text: pubspec/lock 无 gt3；geetest_plugin.dart 不在索引/工作树/merge 树；三个补丁目标文件对 upstream
+        diff 为空；工作树仅 Comet 状态文件。
+      truncated: false
+  - id: A9
+    source: brief.md
+    text: "A9: 依赖刷新与钉版共存：`pubspec.lock` 采用上游 15 个包的版本升级，同时三钉保持钉定版本；hosted URL 全为镜像（无
+      pub.dev）；与上游 lock 的差异可逐项解释（钉版及其传递约束）。"
+    result: passed
+    reason:
+      text: lock 220 条镜像 URL、0 pub.dev；三钉精确；15 个上游升级中 12 个在位（3 个 file_picker 13 平台包因
+        beta.7 不引入）；其余 3 个 analyzer 系传递版本较新，可解释。
+      truncated: false
+  - id: A10
+    source: brief.md
+    text: "A10: 屏蔽画质在新 API
+      下行为不变：播放初始化、半屏→全屏切换、目标画质无流兜底、画质菜单过滤均剔除屏蔽档位；`test/models/video/play/video_\
+      quality_blocklist_test.dart` 及新增/调整用例通过。"
+    result: passed
+    reason:
+      text: 播放初始化传 blockedQualities 至 findTargetVideo；半屏→全屏走
+        findAvailableVideoQuality；findVideoByQa 用 fallbackVideo；画质菜单用
+        selectableVideoFormats；blocklist 与上游测试通过。
+      truncated: false
+  - id: A11
+    source: specs/upstream-sync/spec.md
+    text: 上游功能全收 - **WHEN** 上游在 `b908eccfb..e52ad34a5` 范围内新增或修改了功能实现，且 fork
+      对同一代码位置没有自己的更改或更改可与之共存 - **THEN** 合并结果采用上游实现，fork 不保留旧实现；上游新增文件（如
+      `config_archive.dart`、`dm_settings.dart`、member_opus 组件与 3 个新增测试）随合并进入
+      fork 树；上游对设置页的拆分结构（`extra_settings.dart` 内容迁出到 play/dm/dyn 等设置）被完整接受
+    result: passed
+    reason:
+      text: config_archive/dm_settings/member_opus 组件/3 新测试均在树；extra_settings
+        与上游一致，设置拆分文件齐全；92 个上游触及文件中 76 个逐字节一致，16 个差异均为 fork 保留/适配。
+      truncated: false
+  - id: A12
+    source: specs/upstream-sync/spec.md
+    text: 'fork 保留项不被上游覆盖 - **WHEN** 合并涉及以下 fork 钉定或差异文件 - **THEN** 合并后须满足： -
+      `pubspec.yaml`: `connectivity_plus: 7.0.0`、`device_info_plus:
+      13.0.0`、`file_picker: 12.0.0-beta.7`、`environment.flutter: 3.47.0` -
+      `.fvmrc`: `{"flutter": "3.47.0"}` - README.md 保留 fork
+      差异文档章节（线程撕裂者、双击预览、画质屏蔽、作者专属倍速、iOS 构建指引） - fork 的 iOS
+      构建脚本（`lib/scripts/patch.sh`、`BUILD_IOS.md`）与 `sync_upstream_build.yml`
+      不被删除 - fork 已裁剪的上游
+      workflow（`linux_x64.yml`、`win_x64_newlibmpv.yml`、`android.yml`、`build.yml`、`debug_android.yml`、`debug_build.yml`、`mac.yml`、`win_x64.yml`）保持删除，即使上游在其删除后继续修改
+      - fork 增强版 `ios.yml`（`ref` / `artifact_name` / `file_suffix`
+      输入）幸存，不回退为上游精简版'
+    result: passed
+    reason:
+      text: 三钉/Flutter 3.47.0/.fvmrc/README
+        差异章节/BUILD_IOS/patch.sh/sync_upstream_build 均在；8 个裁剪 workflow
+        未恢复；ios.yml 增强输入保留。
+      truncated: false
+  - id: A13
+    source: specs/upstream-sync/spec.md
+    text: 上游 API 重构适配 - **WHEN** 上游重构了画质/音质选择
+      API（本批：`PlayUrlModel.findAvailableVideoQuality` 被移除，选择逻辑迁入
+      `VideoUtils.findTargetVideo` / `findTargetAudio`，`acceptQuality` 与 `Dash`
+      列表成为入参），而 fork 的屏蔽画质调用点建立在旧 API 上 - **THEN** 修改 fork 调用方与 `VideoUtils`
+      以适配新 API：屏蔽画质的候选剔除、剔空回退、最高档被屏蔽时的降档、目标画质无流兜底与菜单过滤行为保持不变；fork 的 ThreadRipper
+      URL 改写参数（`useThreadRipper` / `mimeType` / `bandWidth` /
+      `indexEnd`）继续传入；适配不删除 fork 功能、不改钉版依赖
+    result: passed
+    reason:
+      text: findTargetVideo/findTargetAudio 为唯一入口，blockedQualities 贯穿；url.dart 保留
+        findAvailableVideoQuality/fallbackVideo；Thread Ripper
+        useThreadRipper/mimeType/bandWidth/indexEnd 在初始化与切档传入；钉版未动。
+      truncated: false
+  - id: A14
+    source: specs/upstream-sync/spec.md
+    text: 撞车取舍 - **WHEN** fork 已实现的某功能，上游在本批次中也做了同类实现（同一功能、不同写法） - **THEN**
+      该条目不自动裁决；由 Agent 呈报双方差异，用户逐项选择保留 fork 版 / 采用上游版 / 融合，选择结论记入 brief `#
+      Decisions` 并落盘 - **若排查后无撞车条目**，记录排查方式与“无撞车”结论，本场景以“零遗漏”为通过标准
+    result: passed
+    reason:
+      text: D4 排查方式与零撞车结论在 brief；独立 grep upstream 全树 0 命中；无新增撞车；仅 API 重构按 D5 适配。
+      truncated: false
+  - id: A15
+    source: specs/upstream-sync/spec.md
+    text: 依赖刷新与钉版共存 - **WHEN** 上游本批升级了 `pubspec.lock`（media-kit 及 15 个兼容包），而 fork
+      维护三钉与镜像 URL - **THEN** 合并后的 lock 采用上游的版本升级（含 `material_ui
+      1.8.0`、`cupertino_ui 1.1.4` 等），三钉保持钉定版本；所有 hosted 依赖 URL 为
+      `pub.flutter-io.cn`，无 `pub.dev`；lock 与上游的剩余差异仅来自三钉及其传递约束，并可逐项解释；iOS
+      补丁脚本在升级后的包版本上仍可应用
+    result: passed
+    reason:
+      text: material_ui 1.8.0/cupertino_ui 1.1.4/media_kit 1.1.11 等上游升级在位；镜像 URL 全；12
+        项差异已解释；补丁在活跃版本反向校验通过。
+      truncated: false
+  - id: A16
+    source: specs/upstream-sync/spec.md
+    text: 工作树纯净 - **WHEN** `patch.sh` 应用 geetest / bottom_sheet iOS 补丁产生工作区污染 -
+      **THEN** 提交前污染文件恢复上游纯净态、`geetest_plugin.dart` 不在工作树（停车场策略）、`pubspec.yaml`
+      不含 `gt3_flutter_plugin`，merge commit 树中无 gt3 残留
+    result: passed
+    reason:
+      text: 补丁污染三文件与上游一致；geetest_plugin.dart 不在工作树；pubspec 无 gt3；merge 树无注入；工作树仅 Comet
+        状态文件。
+      truncated: false
+builder_handoff:
+  candidate_id: a86837db-0e08-43b9-9564-fe7432894efa
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:9cbc01f4-1e88-4aaa-9780-62c3ae5e0c20
+  iteration: 1
+  summary:
+    text: 已合入 upstream/main e52ad34a5（b908eccfb..e52ad34a5，35 提交）并解决 4 处冲突：url.dart
+      / lib/pages/video/controller.dart / lib/utils/video_utils.dart 保留屏蔽画质并适配
+      VideoUtils.findTargetVideo；play_settings.dart 同时保留上游设置拆分与 fork
+      双击快进/中间滑动条目；pubspec.lock 采用上游升级并保留三钉与镜像。export_import.dart 适配 file_picker
+      12.0.0-beta.7 的 String 路径返回；login/controller.dart 移除合并带入的重复 material_ui
+      导入（5c32bc020）。已验证：patch.sh applied=12 / skipped=26；analyze 0 error / 7
+      warning（=合并前基线）；flutter test 316 用例全过；ThreadRipper 178 用例全过；fetch 后
+      main..upstream/main=0。未运行 iOS 真机构建。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+    - A11
+    - A12
+    - A13
+    - A14
+    - A15
+    - A16
+  acceptance_review:
+    - id: A1
+      status: implemented-with-evidence
+      evidence:
+        - 合并提交 deb3756e7：git rev-list --parents -n1 显示 parents=014dcdd4eaf7...
+          e52ad34a57a1...，恰好双亲
+        - git fetch upstream 后 git rev-list --count main..upstream/main =
+          0，upstream/main = e52ad34a5
+        - git merge-base --is-ancestor upstream/main HEAD 成功（后续 5c32bc020
+          修复提交之上仍以该 merge 为祖先）
+      note: 双亲 merge commit（合并前 main 014dcdd4e + upstream/main e52ad34a5）已提交；重新 fetch
+        上游后 rev-list 计数为 0。
+    - id: A2
+      status: implemented-with-evidence
+      evidence:
+        - "pubspec.yaml 含 connectivity_plus: 7.0.0、device_info_plus:
+          13.0.0、file_picker: 12.0.0-beta.7、environment.flutter: 3.47.0"
+        - '.fvmrc 内容为 {"flutter": "3.47.0"}'
+        - README.md 第 1 行起保留 fork 差异说明章节（线程撕裂者、双击预览、画质屏蔽、作者专属倍速、iOS 构建指引）
+        - BUILD_IOS.md、lib/scripts/patch.sh、.github/workflows/sync_upstream_build.yml
+          均存在
+        - git ls-files .github/workflows 仅
+          android_reusable.yml、ios.yml、sync_upstream_build.yml；8 个被裁剪 workflow
+          未恢复
+        - .github/workflows/ios.yml 第 6/16/21 行保留 ref、artifact_name、file_suffix
+          输入
+      note: 三钉、Flutter 版本、.fvmrc、README 差异章节、iOS 构建脚本与 fork CI 裁剪集、增强版 ios.yml 全部幸存。
+    - id: A3
+      status: implemented-with-evidence
+      evidence:
+        - lib/services/thread_ripper 共 13 个文件；test/thread_ripper 与
+          test/utils/thread_ripper_* 定向运行 178 用例全部通过（不低于 brief 的 161）
+        - lib/pages/setting/models/video_settings.dart 第 96/106/154 行含 Thread
+          Ripper、PCDN 屏蔽、屏蔽画质条目及互斥 subtitle
+        - lib/plugin/pl_player/controller.dart 第 536 行 enableTwoFingerTapPause、第
+          537 行 doubleTapSeekLayout；view.dart 第 169 行 TwoFingerTapDetector、第
+          1385 行 resolveType
+        - lib/router/app_pages.dart 第 120 行注册 /doubleTapSeekZoneSetting
+        - lib/pages/member_video/ 下
+          controller.dart、view.dart、video_filter.dart、widgets 完整；作者专属倍速见
+          lib/utils/storage_key.dart 第 380 行 authorPlaySpeeds
+        - 屏蔽画质键见 lib/utils/storage_key.dart 第 8 行 blockedVideoQualities
+      note: ThreadRipper、屏蔽画质、双击区域调整与预览、两指轻点暂停、作者专属倍速、会员视频本地筛选均完整保留，专项测试通过。
+    - id: A4
+      status: implemented-with-evidence
+      evidence:
+        - "bash lib/scripts/patch.sh ios 输出：完成: applied=12 skipped=26，Flutter
+          SDK 改动文件数 27"
+        - lock 活跃目录
+          ~/.pub-cache/hosted/pub.flutter-io.cn/material_ui-1.8.0/lib/src/scaffold.dart
+          含 typedef StandardBottomSheet 与 popGestureEnabled 补丁标记
+        - ~/.pub-cache/hosted/pub.flutter-io.cn/cupertino_ui-1.1.4/lib/src/route.dart
+          含 popGestureEnabled_ 标记
+        - material/bottom_sheet_ios_flutter_material.patch 与
+          cupertino/bottom_sheet_ios_flutter.patch 在对应缓存目录 git apply --reverse
+          --check 通过
+      note: 升级后的 material_ui 1.8.0 / cupertino_ui 1.1.4 上补丁应用成功且可反向校验；无失败段。
+    - id: A5
+      status: implemented-with-evidence
+      evidence:
+        - flutter analyze 当前结果：0 error / 7 warning / 67 info = 74 issues
+        - 合并前基线：0 error / 7 warning / 74 issues（Build 初始记录）
+        - lib/pages/login/controller.dart 中合并带入的重复 material_ui 导入已在 5c32bc020
+          删除，warning 数回到基线
+        - flutter analyze 退出码 1 仅由存量 info 触发，按 brief 不作失败判据
+      note: error/warning 均未超过合并前基线，info 级 lint 为存量。
+    - id: A6
+      status: implemented-with-evidence
+      evidence:
+        - flutter test 全量运行：316 用例全部通过（All tests passed）
+        - 上游新增
+          test/utils/audio_quality_select_test.dart、test/utils/live_buffer_test.dart、test/utils/video_quality_select_test.dart
+          均在套件内并通过
+        - ThreadRipper 定向套件 178 用例全部通过
+      note: 全量测试通过，含上游新增 3 个测试文件与 fork ThreadRipper 用例。
+    - id: A7
+      status: implemented-with-evidence
+      evidence:
+        - brief D4 记录：34 个非 merge 提交逐个核对与 fork 六项功能的交集，并对 upstream/main 全树 grep
+          thread_ripper、blockedQualit、doubleTapBackward、authorPlaySpeed、twoFinger、member_video_filter、playCountFilter、qualityBlock
+          及中文关键词，均 0 命中
+        - 上游本批触及会员页仅为 member_home 重构，未动 fork 筛选所在的 member_video；pl_player
+          改动为剧集面板与 PlayOwner typedef
+        - 本批未发现新的同类实现，无需要用户裁决的撞车条目
+      note: 零撞车结论与排查证据保持在 brief D4；合并过程未出现新撞车。
+    - id: A8
+      status: implemented-with-evidence
+      evidence:
+        - pubspec.yaml 与 pubspec.lock 均无 gt3_flutter_plugin（grep 无命中）
+        - lib/pages/login/geetest/geetest_plugin.dart 不在 git
+          ls-files，工作树中也已不存在（停车场策略）
+        - patch.sh 产生的
+          mini_scaffold.dart、common_slide_page.dart、geetest_webview_dialog.dart、pubspec.yaml
+          本地修改已 git checkout 还原
+        - 提交后 git status --porcelain 为空；merge 树未包含补丁应用态
+      note: gt3 依赖、geetest_plugin.dart 与 bottom_sheet/geetest 补丁污染均已清除，工作树纯净。
+    - id: A9
+      status: implemented-with-evidence
+      evidence:
+        - pubspec.lock 共 220 条 hosted URL，全部为 https://pub.flutter-io.cn，0 条
+          pub.dev
+        - 三钉锁定：connectivity_plus 7.0.0、device_info_plus 13.0.0、file_picker
+          12.0.0-beta.7
+        - 上游升级已采用：material_ui 1.8.0、cupertino_ui 1.1.4、media_kit
+          1.1.11、media_kit_video 1.2.5 等
+        - 与 upstream lock 的 12 项差异：3 个钉版 + 6 个 file_picker 13 系列包（钉版 beta.7
+          不引入）+ analyzer 14.6.0/_fe_analyzer_shared 110.0.0/http_multi_server
+          3.2.3（fork 既有较新传递版本，满足约束）
+      note: 上游依赖升级与三钉共存，镜像 URL 完整保留，差异可逐项解释。
+    - id: A10
+      status: implemented-with-evidence
+      evidence:
+        - lib/utils/video_utils.dart：findTargetVideo 增加 blockedQualities
+          参数，_findAvailableVideoQuality/_selectFromCandidates
+          在屏蔽集非空时剔除屏蔽档、剔空回退原候选、最高档被屏蔽时取不超过它的最高未屏蔽档；屏蔽集为空时保持上游原语义
+        - lib/pages/video/controller.dart 播放初始化改用 VideoUtils.findTargetVideo
+          返回的四元组并传入 Pref.blockedVideoQualities，ThreadRipper getCdnUrl 参数
+          useThreadRipper/mimeType/bandWidth/indexEnd 继续传入
+        - lib/models/video/play/url.dart 保留
+          findAvailableVideoQuality(blockedQualities) 与
+          fallbackVideo，供半屏→全屏切换与画质菜单使用
+        - test/models/video/play/video_quality_blocklist_test.dart 与
+          test/utils/video_quality_select_test.dart 均在 316 用例中通过
+      note: 播放初始化、全屏切换、无流兜底与菜单过滤均保留屏蔽语义；上游与 fork 两套测试同时通过。
+    - id: A11
+      status: implemented-with-evidence
+      evidence:
+        - git merge 全收 34 个非 merge
+          提交；lib/utils/config_archive.dart、lib/pages/setting/models/dm_settings.dart、member_opus
+          三个组件、3 个上游测试文件均存在于合并树
+        - 设置拆分完成：play_settings.dart、dm_settings.dart、dynamics_settings.dart、reply_settings.dart、style_settings.dart
+          均存在，extra_settings.dart 内容已迁出（632 行）
+        - 缓存音质选择实现见 lib/pages/video/download_panel/view.dart 与
+          lib/services/download/download_service.dart 的 audioQuality
+        - flutter test 316 用例通过，覆盖上游新增测试
+      note: 上游新增功能与设置页拆分结构全部进入 fork 树并通过测试。
+    - id: A12
+      status: implemented-with-evidence
+      evidence:
+        - 'pubspec.yaml 三钉与 environment.flutter: 3.47.0 保持；.fvmrc 为 {"flutter":
+          "3.47.0"}'
+        - README.md fork
+          差异章节、BUILD_IOS.md、lib/scripts/patch.sh、sync_upstream_build.yml 均保留
+        - git ls-files .github/workflows 仅 3 个 fork 维护文件，8 个裁剪 workflow 保持删除
+        - .github/workflows/ios.yml 的 ref / artifact_name / file_suffix 输入保留
+      note: fork 钉定、文档、iOS 脚本、CI 裁剪集与增强版 ios.yml 均未被上游覆盖。
+    - id: A13
+      status: implemented-with-evidence
+      evidence:
+        - VideoUtils.findTargetVideo / findTargetAudio
+          成为唯一选择入口；lib/pages/video/controller.dart 使用 (targetQuality,
+          targetFormat, targetDecode, targetVideo) 元组
+        - blockedQualities 从 findTargetVideo 贯穿至 _findAvailableVideoQuality 与
+          _selectFromCandidates，无屏蔽时沿用上游 findTargetMedia/findClosestTarget 语义
+        - ThreadRipper URL 改写参数
+          useThreadRipper=true、mimeType、bandWidth、indexEnd=ThreadRipperManager.indexRangeEnd(segmentBase)
+          继续传入
+        - lib/models/video/play/url.dart 保留 fork 方法；上游
+          video_quality_select_test.dart 与 fork
+          video_quality_blocklist_test.dart 均通过
+      note: 按新 API 完成最小适配，未删除 fork 功能、未升级钉版依赖。
+    - id: A14
+      status: implemented-with-evidence
+      evidence:
+        - brief D4 撞车排查：34 个提交逐个核对 + upstream/main 全树关键标识 grep 均 0 命中
+        - 上游本批未触及 fork 六项功能的实现位置；唯一重叠为画质选择 API 重构，按 D5 适配处理
+        - 本 change 无 [blocking] 待决项，Shape 阶段已确认零撞车，无需用户逐项选择
+      note: 无撞车条目需要裁决；场景以零遗漏通过。
+    - id: A15
+      status: implemented-with-evidence
+      evidence:
+        - pubspec.lock 采用上游升级（material_ui 1.8.0 / cupertino_ui 1.1.4 / media_kit
+          1.1.11 等），三钉保持钉定版本
+        - 220 条 hosted URL 全为 pub.flutter-io.cn，无 pub.dev
+        - 与 upstream lock 差异 12 项，均可由三钉传递约束与 fork 既有较新传递依赖解释
+        - patch.sh 在升级后的 lock 活跃版本目录应用成功，反向 dry-run 通过
+      note: 依赖刷新与钉版共存，iOS 补丁在新版本上兼容。
+    - id: A16
+      status: implemented-with-evidence
+      evidence:
+        - 提交前 git status --porcelain 为空
+        - geetest_plugin.dart 不在工作树与索引中；pubspec.yaml/pubspec.lock 无
+          gt3_flutter_plugin
+        - mini_scaffold.dart、common_slide_page.dart、geetest_webview_dialog.dart、pubspec.yaml
+          的补丁本地修改已还原
+        - merge commit 与后续修复提交均不含补丁应用态或 gt3 残留
+      note: 补丁污染已还原，提交树纯净。
+  checks:
+    - name:
+        text: flutter analyze（最终）
+        truncated: false
+      result: passed
+      note:
+        text: 0 error / 7 warning / 67 info = 74 issues，与合并前基线一致；退出码 1 由存量 info 触发
+        truncated: false
+    - name:
+        text: flutter test（全量）
+        truncated: false
+      result: passed
+      note:
+        text: 316 用例全部通过
+        truncated: false
+    - name:
+        text: ThreadRipper 定向测试
+        truncated: false
+      result: passed
+      note:
+        text: test/thread_ripper 与 test/utils/thread_ripper_* 共 178 用例通过
+        truncated: false
+    - name:
+        text: bash lib/scripts/patch.sh ios
+        truncated: false
+      result: passed
+      note:
+        text: applied=12 skipped=26，material_ui 1.8.0 / cupertino_ui 1.1.4 补丁已应用
+        truncated: false
+    - name:
+        text: 依赖与镜像结构核对
+        truncated: false
+      result: passed
+      note:
+        text: lock 220 条镜像 URL、0 pub.dev，三钉精确
+        truncated: false
+    - name:
+        text: 同步完整性核对
+        truncated: false
+      result: passed
+      note:
+        text: fetch 后 main..upstream/main=0；merge deb3756e7 双亲为 014dcdd4e 与 e52ad34a5
+        truncated: false
+    - name:
+        text: 污染清理核对
+        truncated: false
+      result: passed
+      note:
+        text: geetest_plugin.dart 不存在、无 gt3、补丁修改已还原、git status 干净
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 未构建或运行 iOS 真机包（需本机 Xcode 与签名）；iOS 补丁通过 patch.sh 在 lock
+        活跃缓存应用与反向校验验证，未做真机走查。
+      truncated: false
+    - text: flutter analyze 仍有 7 个合并前已存在 warning 与 67 个 info；退出码为 1 属预期，验收按
+        error/warning 计数判断。
+      truncated: false
+    - text: 测试为单元/组件级，不覆盖真实网络请求与端到端播放；未执行 Flutter 应用的 UI 手动回归。
+      truncated: false
+    - text: patch.sh 会临时修改仓库内 bottom_sheet/geetest 文件与
+        pubspec；已按流程在提交前还原，本次候选不包含补丁应用态。
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-21T09:13:27.380Z
+blockers: []
+verification:
+  candidate_id: a86837db-0e08-43b9-9564-fe7432894efa
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:6cdfa2d5-af8e-4e9b-8b6a-896a30c58a31
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: analyze
+      name:
+        text: flutter analyze：0 error 且 warning 不超过基线 7
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: cd /Users/tune/Develop/GitHub/PiliNara &&
+            out=$(/Users/tune/fvm/versions/3.47.0/bin/flutter analyze 2>&1);
+            echo "$out" | tail -1; e=$(printf "%s\n" "$out" | grep -cE "^ *error
+            "); w=$(printf "%s\n" "$out" | grep -cE "^ *warning "); echo
+            "errors=$e warnings=$w"; test "$e" -eq 0 && test "$w" -le 7
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 9154
+    - id: test
+      name:
+        text: flutter test 全量用例
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: cd /Users/tune/Develop/GitHub/PiliNara &&
+            /Users/tune/fvm/versions/3.47.0/bin/flutter test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 32524
+    - id: lineage
+      name:
+        text: 同步完整性：upstream/main 为祖先、rev-list 为 0、merge 双亲
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: cd /Users/tune/Develop/GitHub/PiliNara && git merge-base --is-ancestor
+            upstream/main HEAD && test "$(git rev-list --count
+            HEAD..upstream/main)" -eq 0 && m=$(git rev-list --merges -n1 HEAD)
+            && test "$(git rev-list --parents -n1 "$m" | wc -w)" -eq 3 && echo
+            "lineage-ok merge=$m"
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 154
+    - id: lock-pins
+      name:
+        text: lock 全镜像 URL、无 pub.dev、三钉与 Flutter 版本保持
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: 'cd /Users/tune/Develop/GitHub/PiliNara && test "$(grep -c "url:
+            \"https://pub.dev\"" pubspec.lock)" -eq 0 && test "$(grep -c "url:
+            \"https://pub.flutter-io.cn\"" pubspec.lock)" -ge 200 && grep -q
+            "connectivity_plus: 7.0.0" pubspec.yaml && grep -q
+            "device_info_plus: 13.0.0" pubspec.yaml && grep -q "file_picker:
+            12.0.0-beta.7" pubspec.yaml && grep -q "flutter: 3.47.0"
+            pubspec.yaml && echo lock-pins-ok'
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 25
+    - id: ios-patch-state
+      name:
+        text: iOS 补丁在 lock 活跃版本缓存中已应用且可反向校验
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: set -e; M="$HOME/.pub-cache/hosted/pub.flutter-io.cn/material_ui-1.8.0";
+            C="$HOME/.pub-cache/hosted/pub.flutter-io.cn/cupertino_ui-1.1.4";
+            test -d "$M"; test -d "$C"; grep -q "typedef StandardBottomSheet ="
+            "$M/lib/src/scaffold.dart"; grep -q "popGestureEnabled_"
+            "$C/lib/src/route.dart"; cd "$M" && git apply --reverse --check
+            /Users/tune/Develop/GitHub/PiliNara/lib/scripts/material/bottom_sheet_ios_flutter_material.patch;
+            cd "$C" && git apply --reverse --check
+            /Users/tune/Develop/GitHub/PiliNara/lib/scripts/cupertino/bottom_sheet_ios_flutter.patch;
+            echo patch-state-ok
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 43
+    - id: clean-tree
+      name:
+        text: 提交树无 gt3 与 geetest 插件、补丁污染已还原
+        truncated: false
+      argv_display:
+        - text: -c
+          truncated: false
+        - text: cd /Users/tune/Develop/GitHub/PiliNara && ! grep -q gt3_flutter_plugin
+            pubspec.yaml pubspec.lock && ! git ls-files | grep -q
+            geetest_plugin.dart && test ! -e
+            lib/pages/login/geetest/geetest_plugin.dart && git diff --quiet HEAD
+            -- lib/common/widgets/scaffold/mini_scaffold.dart
+            lib/pages/common/slide/common_slide_page.dart
+            lib/pages/login/geetest/geetest_webview_dialog.dart pubspec.yaml &&
+            echo clean-tree-ok
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 39
+  summary:
+    text: 16/16 通过。merge 双亲与 rev-list=0；fork 保留项/功能/CI
+      裁剪/钉版全部幸存；上游新增文件与设置拆分全收；屏蔽画质四路径适配成立；patch.sh 在 1.8.0/1.1.4
+      全量反向校验通过；analyze 0/7、test 316 全过；gt3/geetest 污染已清。风险：3 个 analyzer
+      系传递版本较新、Podfile.lock 历史 gt3 引用、无 iOS 真机验证。
+    truncated: false
+  risks:
+    - text: A9/A15：analyzer 14.6.0/_fe_analyzer_shared 110.0.0/http_multi_server 3.2.3
+        比上游新（14.5.0/109.0.0/3.2.2），是本次重新解析引入（合并前 014dcdd4 为
+        14.5.0），超出『仅三钉』字面；Builder『fork 既有』表述不准确；均在约束内且测试通过。
+      truncated: false
+    - text: A8/A16：ios/Podfile.lock 仍含 gt3_flutter_plugin 条目（上游与合并前均如此，本次未新增；与 iOS
+        geetest 补丁构建流程一致），未做真机验证。
+      truncated: false
+    - text: A5：未在只读约束下重跑 pre-merge 树；基线取自上一轮已验收记录（0 error/7 warning）与 Build 记录，当前计数一致。
+      truncated: false
+    - text: A10：VideoUtils.findTargetVideo 的 blockedQualities 分支无直接单测，仅 url.dart
+        blocklist 测试覆盖；行为经代码审查与上游视频选择测试验证。
+      truncated: false
+    - text: lib/utils/font_utils.dart 有一行未缩进（beta.7 适配），仅格式问题。
+      truncated: false
+    - text: 工作树存在 docs/comet/changes/sync-upstream-2026-10-21/comet-state.yaml
+        修改（Comet verify 状态写入），非实现污染。
+      truncated: false
+    - text: 未执行 iOS 真机/UI 回归；测试为单元/组件级。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-21T09:21:42.292Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 16/16 通过。merge 双亲与 rev-list=0；fork 保留项/功能/CI
+        裁剪/钉版全部幸存；上游新增文件与设置拆分全收；屏蔽画质四路径适配成立；patch.sh 在 1.8.0/1.1.4
+        全量反向校验通过；analyze 0/7、test 316 全过；gt3/geetest 污染已清。风险：3 个 analyzer
+        系传递版本较新、Podfile.lock 历史 gt3 引用、无 iOS 真机验证。
+      truncated: false
+    completed_at: 2026-10-21T09:21:42.292Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-21T08:49:29.005Z
