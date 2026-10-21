@@ -281,6 +281,14 @@ class SearchPanelController<R extends SearchNumData<T>, T>
 
   String? gaiaVtoken;
 
+  Timer? _timer;
+  void _stopTimer() {
+    if (_timer != null) {
+      _timer!.cancel();
+      _timer = null;
+    }
+  }
+
   @override
   Future<LoadingState<R>> customGetData() => SearchHttp.searchByType<R>(
     searchType: searchType_,
@@ -295,13 +303,18 @@ class SearchPanelController<R extends SearchNumData<T>, T>
     pubBegin: pubBegin,
     pubEnd: pubEnd,
     gaiaVtoken: gaiaVtoken,
-    onSuccess: (String gaiaVtoken) {
-      this.gaiaVtoken = gaiaVtoken;
-      Timer(const Duration(milliseconds: 200), _onRequery);
-    },
+    onSuccess: _onSuccess,
   );
 
+  void _onSuccess(String gaiaVtoken) {
+    this.gaiaVtoken = gaiaVtoken;
+    SmartDialog.showLoading(onDismiss: _stopTimer);
+    _timer = Timer(const Duration(milliseconds: 500), _onRequery);
+  }
+
   void _onRequery() {
+    _stopTimer();
+    SmartDialog.dismiss(status: .loading);
     if (!isClosed) queryData(page == 1);
   }
 
@@ -326,5 +339,11 @@ class SearchPanelController<R extends SearchNumData<T>, T>
     } else {
       return super.onLoadMore();
     }
+  }
+
+  @override
+  void onClose() {
+    _stopTimer();
+    super.onClose();
   }
 }

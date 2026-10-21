@@ -1,5 +1,10 @@
+import 'dart:math' show max;
+
+import 'package:PiliPlus/models/common/video/audio_quality.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
+import 'package:PiliPlus/models/video/play/url.dart'
+    show AudioItem, VideoItem, FormatItem;
 import 'package:PiliPlus/models_new/live/live_room_play_info/codec.dart';
 import 'package:PiliPlus/utils/cdn_node_store.dart';
 import 'package:PiliPlus/services/thread_ripper/classify.dart'
@@ -304,5 +309,113 @@ abstract final class VideoUtils {
       }
     }
     return VideoDecodeFormatType.fromString(codecs.first);
+  }
+
+  static int _selectFromCandidates(
+    List<int> candidates,
+    int preferredQuality,
+    Set<int> blockedQualities,
+  ) {
+    if (blockedQualities.isNotEmpty) {
+      final allowed =
+          candidates.where((e) => !blockedQualities.contains(e)).toList();
+      if (allowed.isNotEmpty) {
+        return allowed.findClosestTarget((e) => e <= preferredQuality, max);
+      }
+    }
+    return candidates.findClosestTarget((e) => e <= preferredQuality, max);
+  }
+
+  static int _findAvailableVideoQuality(
+    List<VideoItem> videoList,
+    List<int>? acceptQuality,
+    int preferQuality, {
+    Set<int> blockedQualities = const {},
+  }) {
+    final highestVideoQa = videoList.first.id;
+
+    // 无屏蔽时沿用上游语义
+    if (blockedQualities.isEmpty) {
+      if (preferQuality >= highestVideoQa) {
+        return highestVideoQa;
+      }
+      if (acceptQuality != null && acceptQuality.isNotEmpty) {
+        return acceptQuality.findTargetMedia((e) => e, preferQuality);
+      }
+      return videoList.findTargetMedia((e) => e.id, preferQuality).quality.code;
+    }
+
+    final qualitys = acceptQuality;
+    if (qualitys == null || qualitys.isEmpty) {
+      return highestVideoQa;
+    }
+    if (preferQuality <= highestVideoQa) {
+      return _selectFromCandidates(qualitys, preferQuality, blockedQualities);
+    }
+    if (blockedQualities.contains(highestVideoQa)) {
+      final allowed = qualitys
+          .where((e) => !blockedQualities.contains(e) && e <= highestVideoQa)
+          .toList();
+      if (allowed.isNotEmpty) return allowed.reduce(max);
+    }
+    return highestVideoQa;
+  }
+
+  static (
+    int targetQuality,
+    FormatItem targetFormat,
+    VideoDecodeFormatType targetDecode,
+    VideoItem targetVideo,
+  )
+  findTargetVideo(
+    List<VideoItem> videoList,
+    int preferQuality,
+    List<int>? acceptQuality,
+    List<FormatItem> supportFormats,
+    List<VideoDecodeFormatType> preferCodecs, {
+    Set<int> blockedQualities = const {},
+  }) {
+    assert(videoList.isNotEmpty);
+
+    final targetQuality = _findAvailableVideoQuality(
+      videoList,
+      acceptQuality,
+      preferQuality,
+      blockedQualities: blockedQualities,
+    );
+
+    final targetFormat = supportFormats.firstWhere(
+      (e) => e.quality == targetQuality,
+      orElse: () => supportFormats.first,
+    );
+
+    final targetDecode = VideoUtils.selectCodec(
+      targetFormat.codecs!,
+      preferCodecs,
+    );
+
+    final targetQaVideoList = videoList
+        .where((e) => e.id == targetQuality)
+        .toList();
+
+    final targetVideo = targetQaVideoList.firstWhere(
+      (e) => targetDecode.codes.any(e.codecs!.startsWith),
+      orElse: () => targetQaVideoList.first,
+    );
+
+    return (targetQuality, targetFormat, targetDecode, targetVideo);
+  }
+
+  static AudioItem findTargetAudio(
+    List<AudioItem> audioList,
+    int preferQuality,
+  ) {
+    assert(audioList.isNotEmpty);
+
+    final preferredRank = AudioQuality.fromCode(preferQuality).rank;
+    return audioList.findTargetMedia(
+      (audio) => AudioQuality.fromCode(audio.id).rank,
+      preferredRank,
+    );
   }
 }

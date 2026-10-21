@@ -5,18 +5,18 @@ packages:
     dependency: transitive
     description:
       name: _fe_analyzer_shared
-      sha256: "48e48f73a431eb269eec66d243a63a07ed90ef9417a74047a3b98d52338626ad"
+      sha256: "9bfb8122e2505aca17219018593c384a87166cfe860d11c7ae927e7f978eb05f"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "109.0.0"
+    version: "110.0.0"
   analyzer:
     dependency: transitive
     description:
       name: analyzer
-      sha256: "6d377901d198536b648172974d9d4f277910502cad92193466869cac0ff34990"
+      sha256: "74c36179c4de542efea24c9dff78324375e4b118a2c1e14e8a7659f457947f8d"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "14.5.0"
+    version: "14.6.0"
   ansicolor:
     dependency: transitive
     description:
@@ -94,7 +94,7 @@ packages:
     description:
       path: audio_service
       ref: dev
-      resolved-ref: ac920683b8140134fe8af8f7d1d89f155a879e1d
+      resolved-ref: "9f91eb8d6aa0905661ab3914ebdd3c9fb5c37cc2"
       url: "https://github.com/bggRGjQaUbCoE/audio_service.git"
     source: git
     version: "0.18.19"
@@ -225,16 +225,16 @@ packages:
     description:
       path: cached_network_image
       ref: develop
-      resolved-ref: "733d4aae9cadaafa9e16f20a6f6a3682c935de01"
+      resolved-ref: b1597d6d58ad3bc5bcf2d93022bc893add7ce66b
       url: "https://github.com/bggRGjQaUbCoE/flutter_cached_network_image_ce.git"
     source: git
-    version: "4.6.4"
+    version: "4.11.1"
   cached_network_image_platform_interface_ce:
     dependency: transitive
     description:
       path: cached_network_image_platform_interface
-      ref: "733d4aae9cadaafa9e16f20a6f6a3682c935de01"
-      resolved-ref: "733d4aae9cadaafa9e16f20a6f6a3682c935de01"
+      ref: b1597d6d58ad3bc5bcf2d93022bc893add7ce66b
+      resolved-ref: b1597d6d58ad3bc5bcf2d93022bc893add7ce66b
       url: "https://github.com/bggRGjQaUbCoE/flutter_cached_network_image_ce.git"
     source: git
     version: "5.2.0"
@@ -243,7 +243,7 @@ packages:
     description:
       path: "."
       ref: "feat/mask-region"
-      resolved-ref: "1fad3fb35c44031657867f9d0bb3214a2d7d052f"
+      resolved-ref: dd95b61aaea4a6e1ad56ce13e4188b9edf57160f
       url: "https://github.com/Starfallan/canvas_danmaku.git"
     source: git
     version: "0.2.6"
@@ -398,10 +398,10 @@ packages:
     dependency: "direct main"
     description:
       name: cupertino_ui
-      sha256: "8e14acc2817ff469b925b0e275ab85ecc6c769621360dd0af1331c47f916e247"
+      sha256: a47c4e7c66fd7444a063a602597fceb238f705c3f6b1322bc0053d0a2638ee6e
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "1.1.3"
+    version: "1.1.4"
   dart_style:
     dependency: transitive
     description:
@@ -559,10 +559,10 @@ packages:
     dependency: transitive
     description:
       name: file_selector_macos
-      sha256: d57c62362766b5e7ae739448650b66c6aab7a68ba7ecc65e04018652645ae0f4
+      sha256: d785431f1910aac8a50e5c492cae912320158030a88703c67b9ef7f1f96fd7ba
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.9.5+1"
+    version: "0.9.5+2"
   file_selector_platform_interface:
     dependency: transitive
     description:
@@ -898,10 +898,10 @@ packages:
     dependency: transitive
     description:
       name: http_multi_server
-      sha256: aa6199f908078bb1c5efb8d8638d4ae191aac11b311132c3ef48ce352fb52ef8
+      sha256: "361668bdd71f0ae2dc6d17b75a593520f3c414af6534f9eed1aa72049dd71d18"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "3.2.2"
+    version: "3.2.3"
   http_parser:
     dependency: transitive
     description:
@@ -1187,16 +1187,16 @@ packages:
     dependency: "direct main"
     description:
       name: material_ui
-      sha256: "27ea1af251a79728ee63068417f2ab469d294931a9bb8366ba8b85b0ef839060"
+      sha256: e4031746f96c8316864d9b92bce375f1320a36ed56e166307e1e1bda9d90b4ab
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "1.7.0"
+    version: "1.8.0"
   media_kit:
     dependency: "direct main"
     description:
       path: media_kit
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.1.11"
@@ -1205,7 +1205,7 @@ packages:
     description:
       path: "libs/android/media_kit_libs_android_video"
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.3.7"
@@ -1214,7 +1214,7 @@ packages:
     description:
       path: "libs/ios/media_kit_libs_ios_video"
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.1.4"
@@ -1239,7 +1239,7 @@ packages:
     description:
       path: "libs/universal/media_kit_libs_video"
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.0.5"
@@ -1248,7 +1248,7 @@ packages:
     description:
       path: "libs/windows/media_kit_libs_windows_video"
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.0.10"
@@ -1257,7 +1257,7 @@ packages:
     description:
       path: media_kit_native_event_loop
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.0.9"
@@ -1266,7 +1266,7 @@ packages:
     description:
       path: media_kit_video
       ref: native
-      resolved-ref: "83dc986255a260932ccf3cfa865da31956050eb2"
+      resolved-ref: "86f0ffe6e69a84066a09a5a525f1410a0b20bc79"
       url: "https://github.com/Starfallan/media-kit.git"
     source: git
     version: "1.2.5"
@@ -1660,10 +1660,10 @@ packages:
     dependency: transitive
     description:
       name: shared_preferences_android
-      sha256: b90caa27669d5f3ef9918d55343b44000f088ee9d4685ed822310848004c793e
+      sha256: a67a1a6a62b241ad4ddd8a97f5a12bb547c445190930233b63cd28cc0a104a76
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "2.5.0"
+    version: "2.5.1"
   shared_preferences_foundation:
     dependency: transitive
     description:
@@ -1914,10 +1914,10 @@ packages:
     dependency: transitive
     description:
       name: vector_graphics
-      sha256: "9d0e3b9cb16542ad660daee871e726a10d13a93b7b5391677c3160e8f5e83935"
+      sha256: "0964703d02677ac8636b4aef95de0b7e816224ff0082908c2c950529cb9a2f5e"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "1.2.3"
+    version: "1.2.4"
   vector_graphics_codec:
     dependency: transitive
     description:

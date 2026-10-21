@@ -906,12 +906,12 @@ class VideoDetailController extends GetxController
     VideoItem? bestVideo;
     int bestIndex = preferCodecs.length;
     for (final video in videoList) {
-      final c = video.codecs!;
-      if (currentCodes.any(c.startsWith)) {
+      final codecs = video.codecs!;
+      if (currentCodes.any(codecs.startsWith)) {
         return video;
       }
       for (int i = 0; i < bestIndex; i++) {
-        if (preferCodecs[i].codes.any(c.startsWith)) {
+        if (preferCodecs[i].codes.any(codecs.startsWith)) {
           bestIndex = i;
           bestVideo = video;
           break;
@@ -1246,7 +1246,8 @@ class VideoDetailController extends GetxController
           displayTime: const Duration(seconds: 3),
         );
       }
-      if (data.dash == null) {
+      final dash = data.dash;
+      if (dash == null) {
         if (data.durl case final durl?) {
           // it will cause all files to be opened simultaneously
           if (durl.length > 1) {
@@ -1308,40 +1309,27 @@ class VideoDetailController extends GetxController
         }
       }
 
-      // if (kDebugMode) debugPrint("allVideosList:${allVideosList}");
       final cacheVideoQa = plPlayerController.cacheVideoQa!;
-      final targetVideoQa = data.findAvailableVideoQuality(
+      final (
+        int targetQuality,
+        FormatItem targetFormat,
+        VideoDecodeFormatType targetDecode,
+        VideoItem targetVideo,
+      ) = VideoUtils.findTargetVideo(
+        dash.video!,
         cacheVideoQa,
+        response.acceptQuality,
+        response.supportFormats!,
+        preferCodecs,
         blockedQualities: Pref.blockedVideoQualities,
       );
-      currentVideoQa.value = VideoQuality.fromCode(targetVideoQa);
-
-      /// 优先顺序 设置中指定解码格式 -> 当前可选的首个解码格式
-      final supportFormats = data.supportFormats!;
-
-      // 根据画质选编码格式
-      currentDecodeFormats = VideoUtils.selectCodec(
-        supportFormats
-            .firstWhere(
-              (e) => e.quality == targetVideoQa,
-              orElse: () => supportFormats.first,
-            )
-            .codecs!,
-        preferCodecs,
-      );
-
-      /// 取出符合当前画质的videoList
-      final videosList = data.dash!.video!
-          .where((e) => e.quality.code == targetVideoQa)
+      final videosList = dash.video!
+          .where((e) => e.quality.code == targetQuality)
           .toList();
-
-      /// 取出符合当前解码格式的videoItem
-      firstVideo = videosList.firstWhere(
-        (e) => currentDecodeFormats.codes.any(e.codecs!.startsWith),
-        orElse: () => videosList.first,
-      );
+      firstVideo = targetVideo;
+      currentDecodeFormats = targetDecode;
+      currentVideoQa.value = VideoQuality.fromCode(targetQuality);
       _setVideoHeight();
-
       videoUrl = VideoUtils.getCdnUrl(
         firstVideo.playUrls,
         useThreadRipper: true,
@@ -1350,22 +1338,12 @@ class VideoDetailController extends GetxController
         indexEnd: ThreadRipperManager.indexRangeEnd(firstVideo.segmentBase),
       );
 
-      /// 优先顺序 设置中指定质量 -> 当前可选的最高质量
       AudioItem? firstAudio;
-      final audioList = data.dash?.audio;
+      final audioList = dash.audio;
       if (audioList != null && audioList.isNotEmpty) {
-        final audioIds = audioList.map((map) => map.id).toList();
-        int closestNumber = audioIds.findClosestTarget(
-          (e) => e <= plPlayerController.cacheAudioQa,
-          (a, b) => a > b ? a : b,
-        );
-        if (!audioIds.contains(plPlayerController.cacheAudioQa) &&
-            audioIds.any((e) => e > plPlayerController.cacheAudioQa)) {
-          closestNumber = AudioQuality.k192.code;
-        }
-        firstAudio = audioList.firstWhere(
-          (e) => e.id == closestNumber,
-          orElse: () => audioList.first,
+        firstAudio = VideoUtils.findTargetAudio(
+          audioList,
+          plPlayerController.cacheAudioQa,
         );
         audioUrl = VideoUtils.getCdnUrl(
           firstAudio.playUrls,

@@ -284,9 +284,9 @@ class LiveRoomController extends GetxController {
       return null;
     }
 
-    // 如果播放器已被彻底销毁（例如在其他页面关闭了小窗），重新获取单例实例
-    if (plPlayerController.videoPlayerController == null) {
-      plPlayerController = PlPlayerController.ensureInstance(isLive: true);
+    // 当前引用已失效时，重新取得单例并持有一次引用。
+    if (!identical(plPlayerController, PlPlayerController.instance)) {
+      plPlayerController = PlPlayerController.getInstance(isLive: true);
     }
 
     // 确保播放器处于直播模式
