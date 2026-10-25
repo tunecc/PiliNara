@@ -70,7 +70,7 @@ List<SettingsModel> get dynamicsSettings => [
     key: SettingBoxKey.banWordForDyn,
     onChanged: (value) {
       DynamicsDataModel.banWordForDyn = value;
-      DynamicsDataModel.enableFilter = value.pattern.isNotEmpty;
+      DynamicsDataModel.enableFilter = value.isNotEmpty;
     },
   ),
   getListUidModel(

@@ -421,7 +421,7 @@ void main() {
     });
     RecommendFilter.applyFilterToSearch = true;
     RecommendFilter.enableFilter = true;
-    RecommendFilter.rcmdRegExp = RegExp('推荐屏蔽');
+    RecommendFilter.rcmdRegExp = [RegExp('推荐屏蔽')];
     final blocked = _video('保留 推荐屏蔽', 1);
     final shown = _video('保留', 2);
     final keywordHidden = _video('关键词隐藏', 3);

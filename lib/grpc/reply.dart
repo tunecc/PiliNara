@@ -13,11 +13,8 @@ abstract final class ReplyGrpc {
   static bool antiGoodsReply = Pref.antiGoodsReply;
   static var blockAtOnlyReply = Pref.blockAtOnlyReply;
   static var blockReplyAtCount = Pref.blockReplyAtCount;
-  static RegExp replyRegExp = RegExp(
-    Pref.parseBanWordToRegex(Pref.banWordForReply),
-    caseSensitive: false,
-  );
-  static bool enableFilter = replyRegExp.pattern.isNotEmpty;
+  static List<RegExp> replyRegExp = Pref.compileBanWord(Pref.banWordForReply);
+  static bool enableFilter = replyRegExp.isNotEmpty;
   static Map<int, String> replyBlockedMids = Pref.replyBlockedMids;
   static int replyMinLevel = Pref.replyMinLevel;
   static bool keepUpOwnerReply = Pref.keepUpOwnerReply;

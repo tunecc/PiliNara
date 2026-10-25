@@ -163,7 +163,7 @@ List<SettingsModel> get replySettings => [
     key: SettingBoxKey.banWordForReply,
     onChanged: (value) {
       ReplyGrpc.replyRegExp = value;
-      ReplyGrpc.enableFilter = value.pattern.isNotEmpty;
+      ReplyGrpc.enableFilter = value.isNotEmpty;
     },
   ),
   getListUidWithNameModel(
