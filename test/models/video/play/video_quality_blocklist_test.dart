@@ -1,4 +1,4 @@
-import 'package:PiliPlus/models/common/video/video_quality.dart';
+import 'package:PiliPlus/models/common/video/base_quality.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -164,7 +164,21 @@ void main() {
         acceptQuality: const [127, 116, 112, 80],
         available: const [112, 80],
       );
-      const all = <int>{129, 127, 126, 125, 120, 116, 112, 80, 74, 64, 32, 16, 6};
+      const all = <int>{
+        129,
+        127,
+        126,
+        125,
+        120,
+        116,
+        112,
+        80,
+        74,
+        64,
+        32,
+        16,
+        6,
+      };
       for (final qa in const [127, 116, 112, 80, 6]) {
         expect(
           () => model.select(qa, blocked: all),

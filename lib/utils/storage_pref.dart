@@ -24,16 +24,14 @@ import 'package:PiliPlus/models/common/super_chat_time_type.dart';
 import 'package:PiliPlus/models/common/super_chat_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/theme/theme_type.dart';
-import 'package:PiliPlus/models/common/video/audio_quality.dart';
 import 'package:PiliPlus/models/common/video/author_play_speed.dart';
+import 'package:PiliPlus/models/common/video/base_quality.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
-import 'package:PiliPlus/models/common/video/live_quality.dart';
 import 'package:PiliPlus/models/common/video/subtitle_pref_type.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
-import 'package:PiliPlus/models/common/video/video_quality.dart';
 import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/user/info.dart';
-import 'package:PiliPlus/pages/setting/pages/fullscreen_sc_size.dart'
+import 'package:PiliPlus/pages/setting/pages/fullscreen_sc.dart'
     show kFullScreenSCWidth;
 import 'package:PiliPlus/plugin/pl_player/models/audio_output_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
@@ -340,15 +338,19 @@ abstract final class Pref {
 
   static List<Pair<SegmentType, SkipType>> get blockSettings {
     final list = _setting.get(SettingBoxKey.blockSettings) as List?;
-    if (list == null || list.length != SegmentType.values.length) {
+    if (list == null || list.length > SegmentType.values.length) {
       return SegmentType.values
           .map((i) => Pair(first: i, second: SkipType.skipOnce))
           .toList();
     }
     return SegmentType.values
         .map(
-          (item) =>
-              Pair(first: item, second: SkipType.values[list[item.index]]),
+          (item) => Pair<SegmentType, SkipType>(
+            first: item,
+            second: item.index < list.length
+                ? .values[list[item.index]]
+                : .skipOnce,
+          ),
         )
         .toList();
   }
@@ -949,6 +951,9 @@ abstract final class Pref {
     defaultValue: true,
   );
 
+  static bool get enableScrollVolume =>
+      _setting.get(SettingBoxKey.enableScrollVolume, defaultValue: true);
+
   static bool get enableSlideFS =>
       _setting.get(SettingBoxKey.enableSlideFS, defaultValue: true);
 
@@ -1267,6 +1272,8 @@ abstract final class Pref {
   static double get sideBarThreshold =>
       (_setting.get(SettingBoxKey.sideBarThreshold, defaultValue: 600.0) as num)
           .toDouble();
+  static bool get hideSideBarLabel =>
+      _setting.get(SettingBoxKey.hideSideBarLabel, defaultValue: false);
 
   static bool get dynamicsShowAllFollowedUp => _setting.get(
     SettingBoxKey.dynamicsShowAllFollowedUp,
@@ -1423,34 +1430,15 @@ abstract final class Pref {
     };
   }
 
-  /// 直播流无后向缓冲，全部给前向（mpv 的 --demuxer-max-bytes 与
-  /// --demuxer-max-back-bytes）。未单独设置时保持旧实现的默认值：
-  /// 前向缓冲为 [bufferSize] 的两倍且不限制时长。
-  static Map<String, String> initLiveBuffer() => buildLiveBuffer(
-    sizeMb: liveBufferSize,
-    sec: liveBufferSec,
-    fallbackSizeMb: bufferSize,
-  );
-
-  /// 构造直播流使用的 mpv 额外参数。
-  ///
-  /// [sizeMb] 为前向缓冲大小（MB），小于等于 0 时使用
-  /// [fallbackSizeMb]（缺省为 [bufferSize]）的两倍；
-  /// [sec] 为缓冲时长上限（s），小于等于 0 时不限制。
-  @visibleForTesting
-  static Map<String, String> buildLiveBuffer({
-    double sizeMb = 0,
-    double sec = 0,
-    double? fallbackSizeMb,
-  }) {
-    final effectiveSizeMb = sizeMb > 0
-        ? sizeMb
-        : (fallbackSizeMb ?? bufferSize) * 2;
-    final buffer = <String, String>{
+  static Map<String, String> initLiveBuffer() {
+    final liveBufMb = liveBufferSize;
+    final effectiveSizeMb = liveBufMb > 0 ? liveBufMb : bufferSize * 2;
+    final buffer = {
       'cache': 'yes',
       'demuxer-max-bytes': (effectiveSizeMb * 0x100000).toStringAsFixed(0),
       'demuxer-max-back-bytes': '0',
     };
+    final sec = Pref.liveBufferSec;
     if (sec > 0) {
       buffer['cache-secs'] = sec.toStringAsFixed(3);
       buffer['demuxer-hysteresis-secs'] = (sec / 1.5).toStringAsFixed(3);
@@ -1593,20 +1581,15 @@ abstract final class Pref {
 
     value = _localCache.get(SettingBoxKey.buvid);
     if (value != null) {
-      _setting
-          .put(SettingBoxKey.buvid, value)
-          .whenComplete(() => _localCache.delete(SettingBoxKey.buvid));
-      return value;
-    }
-
-    if (value == null) {
-      buvid = value = LoginUtils.generateBuvid();
+      _setting.put(SettingBoxKey.buvid, value);
+      _localCache.delete(SettingBoxKey.buvid);
+    } else {
+      value = LoginUtils.generateBuvid();
+      GStorage.setting.put(SettingBoxKey.buvid, value);
     }
 
     return value;
   }
-
-  static set buvid(String value) => _setting.put(SettingBoxKey.buvid, value);
 
   static bool get showMemberShop =>
       _setting.get(SettingBoxKey.showMemberShop, defaultValue: false);
@@ -1627,6 +1610,15 @@ abstract final class Pref {
     SettingBoxKey.fullScreenSCWidth,
     defaultValue: kFullScreenSCWidth,
   );
+
+  static bool get enableFullScreenSC =>
+      _setting.get(SettingBoxKey.enableFullScreenSC, defaultValue: true);
+
+  static double get fullScreenSCOpacity =>
+      _setting.get(SettingBoxKey.fullScreenSCOpacity, defaultValue: 1.0);
+
+  static double get fullScreenSCScale =>
+      _setting.get(SettingBoxKey.fullScreenSCScale, defaultValue: 1.0);
 
   static bool get minimizeOnExit =>
       _setting.get(SettingBoxKey.minimizeOnExit, defaultValue: true);
@@ -1786,8 +1778,10 @@ abstract final class Pref {
 
   /// 思考强度（reasoning_effort）：未干预服务商默认行为时为 'default'。
   static String get aiReasoningEffort {
-    final value =
-        _setting.get(SettingBoxKey.aiReasoningEffort, defaultValue: 'default');
+    final value = _setting.get(
+      SettingBoxKey.aiReasoningEffort,
+      defaultValue: 'default',
+    );
     return value == 'auto' ? 'default' : value;
   }
 

@@ -17,6 +17,10 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// 稍后再看移除接口的 aids 参数：跳过没有 aid 的条目，避免把 null 拼成字面量
+String laterRemoveAids(Iterable<LaterItemModel> items) =>
+    items.map((item) => item.aid).nonNulls.join(',');
+
 mixin BaseLaterController
     on
         CommonListController<LaterData, LaterItemModel>,
@@ -28,10 +32,12 @@ mixin BaseLaterController
     if (removeList.isEmpty) {
       return;
     }
+    final aids = laterRemoveAids(removeList);
+    if (aids.isEmpty) {
+      return;
+    }
     SmartDialog.showLoading(msg: '请求中');
-    final res = await UserHttp.toViewDel(
-      aids: removeList.map((item) => item.aid).join(','),
-    );
+    final res = await UserHttp.toViewDel(aids: aids);
     SmartDialog.dismiss();
     if (res.isSuccess) {
       updateCount?.call(removeList.length);

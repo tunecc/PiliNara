@@ -23,6 +23,12 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp('pilinara-account-test-');
     Hive.init(tempDir.path);
     GStorage.regAdapter();
+    // LoginAccountAdapter.write 会经 LoginAccount.buvid 读 Pref，
+    // 取不到时回退到 localCache 的指纹缓存，两个盒都要开
+    GStorage.setting = await Hive.openBox('test_setting_deleted_account');
+    GStorage.localCache = await Hive.openBox(
+      'test_local_cache_deleted_account',
+    );
     Accounts.account = await Hive.openBox<LoginAccount>('account');
   });
 

@@ -1,6 +1,6 @@
 import 'dart:math' show max;
 
-import 'package:PiliPlus/models/common/video/audio_quality.dart';
+import 'package:PiliPlus/models/common/video/base_quality.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
 import 'package:PiliPlus/models/video/play/url.dart'
@@ -8,11 +8,16 @@ import 'package:PiliPlus/models/video/play/url.dart'
 import 'package:PiliPlus/models_new/live/live_room_play_info/codec.dart';
 import 'package:PiliPlus/utils/cdn_node_store.dart';
 import 'package:PiliPlus/services/thread_ripper/classify.dart'
-    show isAkamaiHost, normalizeUpgcxcodeUri, signatureFamilyOf, SignatureFamily;
+    show
+        isAkamaiHost,
+        normalizeUpgcxcodeUri,
+        signatureFamilyOf,
+        SignatureFamily;
 import 'package:PiliPlus/services/thread_ripper/thread_ripper_manager.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, visibleForTesting;
 
 abstract final class VideoUtils {
   static CDNService cdnService = Pref.defaultCDNService;
@@ -185,17 +190,28 @@ abstract final class VideoUtils {
 
     // PCDN 边缘地址的 /v1/resource 传输包装先剥离：官方镜像没有该前缀路径，
     // 带着 它换 host 会得到必 404 的地址
-    final preparedUrls = urls
-        .map((u) {
-          final uri = Uri.tryParse(u);
-          return uri == null ? u : normalizeUpgcxcodeUri(uri).toString();
-        })
-        .toList();
+    final preparedUrls = urls.map((u) {
+      final uri = Uri.tryParse(u);
+      return uri == null ? u : normalizeUpgcxcodeUri(uri).toString();
+    }).toList();
 
     if (!bypassCdnPreference &&
         customHost == null &&
         defaultCDNService == CDNService.baseUrl) {
       return preparedUrls.first;
+    }
+
+    if (!bypassCdnPreference &&
+        defaultCDNService == CDNService.akamai &&
+        !(isAudio && disableAudioCDN)) {
+      // Akamai URLs have their own signature (e.g. hdnts). Replacing another
+      // CDN's host preserves the wrong signature and results in HTTP 403.
+      // Keep the API-provided URL intact, including its encoded query string.
+      // 线程撕裂者开启时不在这里早退：那条路径本就不换 host，且要保留全节点竞速。
+      return urls.firstWhere(
+        (url) => Uri.tryParse(url)?.host == CDNService.akamai.host,
+        orElse: () => urls.first,
+      );
     }
 
     String? mcdnTf;
@@ -239,8 +255,11 @@ abstract final class VideoUtils {
       // may be deprecated
       if (url.contains('szbdyd.com')) {
         final uri = Uri.parse(url);
-        final hostname = uri.queryParameters['xy_usource'] ??
-            (bypassCdnPreference ? null : (customHost ?? defaultCDNService.host));
+        final hostname =
+            uri.queryParameters['xy_usource'] ??
+            (bypassCdnPreference
+                ? null
+                : (customHost ?? defaultCDNService.host));
         if (hostname == null) {
           continue;
         }
@@ -263,11 +282,11 @@ abstract final class VideoUtils {
       // 换到官方镜像时必须清掉 PCDN 源端口（4483/8082）：镜像只有 443。
       // Uri.replace 无法删除已有端口，需用构造器重建。
       String rebuild(Uri source, String host) => Uri(
-            scheme: 'https',
-            host: host,
-            path: source.path,
-            query: source.hasQuery ? source.query : null,
-          ).toString();
+        scheme: 'https',
+        host: host,
+        path: source.path,
+        query: source.hasQuery ? source.query : null,
+      ).toString();
       if (customHost != null && _isReplaceableMediaHost(uri.host)) {
         return rebuild(uri, customHost);
       }
@@ -317,8 +336,9 @@ abstract final class VideoUtils {
     Set<int> blockedQualities,
   ) {
     if (blockedQualities.isNotEmpty) {
-      final allowed =
-          candidates.where((e) => !blockedQualities.contains(e)).toList();
+      final allowed = candidates
+          .where((e) => !blockedQualities.contains(e))
+          .toList();
       if (allowed.isNotEmpty) {
         return allowed.findClosestTarget((e) => e <= preferredQuality, max);
       }
@@ -377,12 +397,23 @@ abstract final class VideoUtils {
   }) {
     assert(videoList.isNotEmpty);
 
-    final targetQuality = _findAvailableVideoQuality(
+    var targetQuality = _findAvailableVideoQuality(
       videoList,
       acceptQuality,
       preferQuality,
       blockedQualities: blockedQualities,
     );
+    if (!videoList.any((e) => e.id == targetQuality)) {
+      // 选定档位在实际流列表里不存在：退回实际存在且未屏蔽的最高档，
+      // 否则下面按档位取流会得到空列表
+      final available = videoList
+          .where((e) => !blockedQualities.contains(e.id))
+          .map((e) => e.id)
+          .toList();
+      if (available.isNotEmpty) {
+        targetQuality = available.reduce(max);
+      }
+    }
 
     final targetFormat = supportFormats.firstWhere(
       (e) => e.quality == targetQuality,
@@ -403,7 +434,7 @@ abstract final class VideoUtils {
       orElse: () => targetQaVideoList.first,
     );
 
-    return (targetQuality, targetFormat, targetDecode, targetVideo);
+    return (targetVideo.id, targetFormat, targetDecode, targetVideo);
   }
 
   static AudioItem findTargetAudio(

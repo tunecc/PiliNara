@@ -8,7 +8,7 @@ import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/super_chat_time_type.dart';
 import 'package:PiliPlus/models/common/video/subtitle_pref_type.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
-import 'package:PiliPlus/pages/setting/pages/fullscreen_sc_size.dart';
+import 'package:PiliPlus/pages/setting/pages/fullscreen_sc.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
@@ -167,6 +167,12 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.enableSlideVolumeBrightness,
     defaultVal: true,
   ),
+  const SwitchModel(
+    title: '滚轮调节音量',
+    leading: Icon(Icons.mouse_outlined),
+    setKey: SettingBoxKey.enableScrollVolume,
+    defaultVal: true,
+  ),
   if (Platform.isAndroid)
     const SwitchModel(
       title: '调节系统亮度',
@@ -310,20 +316,6 @@ List<SettingsModel> get playSettings => [
       onTap: _showMaxVolumeDialog,
     ),
   const SwitchModel(
-    title: '中间滑动进入/退出全屏',
-    leading: Icon(MdiIcons.panVertical),
-    setKey: SettingBoxKey.enableSlideFS,
-    defaultVal: true,
-  ),
-  getVideoFilterSelectModel(
-    title: '双击快进/快退时长',
-    suffix: 's',
-    key: SettingBoxKey.fastForBackwardDuration,
-    values: [5, 10, 15],
-    defaultValue: 10,
-    isFilter: false,
-  ),
-  const SwitchModel(
     title: '滑动快进/快退使用相对时长',
     leading: Icon(Icons.swap_horiz_outlined),
     setKey: SettingBoxKey.useRelativeSlide,
@@ -374,10 +366,10 @@ List<SettingsModel> get playSettings => [
     onTap: _showSuperChatTimeDialog,
   ),
   NormalModel(
-    title: '全屏 SC 大小',
-    subtitle: 'SuperChat (醒目留言) 大小设置',
+    title: '全屏 SuperChat 设置',
+    subtitle: '全屏 SuperChat (醒目留言) 大小、不透明度、缩放设置',
     leading: const Icon(Icons.open_in_full),
-    onTap: (_, _) => Get.to(const FullScreenScSize()),
+    onTap: (_, _) => Get.to(const FullScreenSc()),
   ),
   const SwitchModel(
     title: '竖屏扩大展示',
@@ -547,7 +539,6 @@ List<SettingsModel> get playSettings => [
     defaultVal: false,
   ),
 ];
-
 
 Future<void> _showSubtitleDialog(
   BuildContext context,
