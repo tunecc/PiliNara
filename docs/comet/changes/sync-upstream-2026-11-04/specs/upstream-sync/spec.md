@@ -2,7 +2,7 @@
 
 ## Capability: upstream-sync
 
-本 spec 描述本次合并完成后 fork `main` 的整体行为契约。上游本批为 `git log b5694ccda..9851aa3ba`，78 个非 merge 提交、196 文件，含 Release 2.2.0、flutter 3.47.8/3.47.9、Linux MPRIS 与 webview_all 重构、桌面 hover seek 预览、滚轮音量、侧栏标签隐藏、pgc section 与面板重构、折叠评论、直播分区 pin、opus 优化与一批 issue 修复。本 spec 不逐条复述上游实现，只规定合并的裁决规则与结果不变量。
+本 spec 描述本次合并完成后 fork `main` 的整体行为契约。上游本批为 `git log b5694ccda..1db0d72e4`，79 个非 merge 提交：前 78 个（到 `9851aa3ba`，196 文件）含 Release 2.2.0、flutter 3.47.8/3.47.9、Linux MPRIS 与 webview_all 重构、桌面 hover seek 预览、滚轮音量、侧栏标签隐藏、pgc section 与面板重构、折叠评论、直播分区 pin、opus 优化与一批 issue 修复；第 79 个 `1db0d72e4`（桌面触摸延迟全屏）在首轮验收期间由上游新推，按 D12 一并纳入。本 spec 不逐条复述上游实现，只规定合并的裁决规则与结果不变量。
 
 ### Scenario: 上游功能与缺陷修复全收
 
@@ -36,7 +36,7 @@
 ### Scenario: 上游删除项的处置
 
 - **WHEN** 上游删除文件或移除 fork 之前可见的配置能力
-- **THEN** fork 未改过的删除跟随：`lib/pages/setting/pages/fullscreen_sc_size.dart`（改名 `fullscreen_sc.dart`）、`lib/pages/video/introduction/pgc/widgets/pgc_panel.dart`、`linux/runner/plugins/linux_webview_plugin.{cc,h}` 不残留引用；按 D6 接受上游移除 `Pref.buildLiveBuffer`、`static set buvid` 及其设置入口与 `test/utils/live_buffer_test.dart`，`lib/` 内对三者的引用计数为 0，`recommend_settings.dart` 不再出现手动输入 buvid 的入口，该消失项在发版说明中点名。
+- **THEN** fork 未改过的删除跟随：`lib/pages/setting/pages/fullscreen_sc_size.dart`（改名 `fullscreen_sc.dart`）、`lib/pages/video/introduction/pgc/widgets/pgc_panel.dart`、`linux/runner/plugins/linux_webview_plugin.{cc,h}` 不残留引用；按 D6 接受上游移除 `Pref.buildLiveBuffer`、`static set buvid` 及其设置入口与 `test/utils/live_buffer_test.dart`，`lib/` 内对三者的引用计数为 0，`recommend_settings.dart` 不再出现手动输入 buvid 的入口，且该消失项在 `CHANGELOG.md` 的 `[Unreleased]` 新增条目中点名（D13）。
 
 ### Scenario: 撞车与版本线取舍
 
@@ -47,4 +47,4 @@
 ### Scenario: 合并形态与工作树纯净
 
 - **WHEN** 本次同步合并提交并完成本地验证
-- **THEN** merge commit 恰好两行 parent（合并前 `main` 与 `upstream/main` @ 9851aa3ba），重新 fetch 后 `git rev-list --count HEAD..upstream/main` 为 0；工作树无冲突标记；`pubspec.lock` 由 fork 钉版与镜像重新解析得到且 hosted URL 无 pub.dev 条目；`flutter analyze` 相对合并前基线不新增 error / warning，`flutter test` 全部通过；若执行过 `patch.sh`，bottom_sheet / geetest 补丁污染文件在提交前已还原，`geetest_plugin.dart` 不在工作树，提交内容仅包含本 change 的实现与正式产物。
+- **THEN** `main` 上按顺序存在两个双亲 merge commit（第一个为合并前 `main`(67c3e55a1) + `upstream/main`@9851aa3ba，第二个为其 + `upstream/main`@1db0d72e4），每个恰好两行 parent；重新 fetch 后 `git rev-list --count HEAD..upstream/main` 为 0；第二段合并不回退 fork 的两指轻点暂停、双击分区 `resolveType`、SeekIndicator 的 GlobalKey 与分向时长接线，也不恢复键盘 `←` 的第二条触发路径；工作树无冲突标记；`pubspec.lock` 由 fork 钉版与镜像重新解析得到且 hosted URL 无 pub.dev 条目；`flutter analyze` 相对合并前基线不新增 error / warning，`flutter test` 全部通过；若执行过 `patch.sh`，bottom_sheet / geetest 补丁污染文件在提交前已还原，`geetest_plugin.dart` 不在工作树，提交内容仅包含本 change 的实现与正式产物；Runtime 检查计划中的多行 shell 脚本以 `set -e` 起始，避免末条命令决定退出码造成假通过。
