@@ -13,10 +13,10 @@ const _kIndicatorHeight = _kNavigationHeight - 2 * _kIndicatorPaddingInt;
 const _kIndicatorWidth = 86.0;
 const _kIndicatorPaddingInt = 4.0;
 const _kIndicatorPadding = EdgeInsets.all(_kIndicatorPaddingInt);
-const _kBorderRadius = BorderRadius.all(.circular(_kNavigationHeight / 2));
-const _kNavigationShape = RoundedSuperellipseBorder(
-  borderRadius: _kBorderRadius,
-);
+
+// 仅图标时收窄为“图标 + 少量内边距”，避免每个 icon 占据整格文字宽度。
+const _kCompactNavigationHeight = 48.0;
+const _kCompactCellWidth = 56.0;
 
 /// ref [NavigationBar]
 class FloatingNavigationBar extends StatelessWidget {
@@ -85,6 +85,17 @@ class FloatingNavigationBar extends StatelessWidget {
 
     final padding = MediaQuery.viewPaddingOf(context);
 
+    final isCompact = style == FloatingNavBarStyle.iconOnly;
+    final navigationHeight = isCompact
+        ? _kCompactNavigationHeight
+        : _kNavigationHeight;
+    final itemWidth = isCompact ? _kCompactCellWidth : _kIndicatorWidth;
+    final indicatorHeight = navigationHeight - 2 * _kIndicatorPaddingInt;
+    // 紧凑模式让每个 icon 占到固定的 56dp 单元格，而不是被整体 padding 挤压。
+    final barWidth = isCompact
+        ? destinations.length * itemWidth + 2 * _kIndicatorPaddingInt
+        : destinations.length * itemWidth;
+
     return Padding(
       padding: .fromLTRB(
         padding.left,
@@ -93,8 +104,8 @@ class FloatingNavigationBar extends StatelessWidget {
         bottomPadding + padding.bottom,
       ),
       child: SizedBox(
-        height: _kNavigationHeight,
-        width: destinations.length * _kIndicatorWidth,
+        height: navigationHeight,
+        width: barWidth,
         child: DecoratedBox(
           decoration: ShapeDecoration(
             color: ElevationOverlay.applySurfaceTint(
@@ -108,7 +119,7 @@ class FloatingNavigationBar extends StatelessWidget {
             ),
             shape: RoundedSuperellipseBorder(
               side: defaults.borderSide,
-              borderRadius: _kBorderRadius,
+              borderRadius: .all(.circular(navigationHeight / 2)),
             ),
           ),
           child: Padding(
@@ -128,6 +139,8 @@ class FloatingNavigationBar extends StatelessWidget {
                           totalNumberOfDestinations: destinations.length,
                           selectedAnimation: animation,
                           style: style,
+                          indicatorWidth: itemWidth,
+                          indicatorHeight: indicatorHeight,
                           labelBehavior: effectiveLabelBehavior,
                           indicatorColor: indicatorColor,
                           indicatorShape: indicatorShape,
@@ -186,6 +199,8 @@ class FloatingNavigationDestination extends StatelessWidget {
       children: [
         NavigationIndicator(
           animation: animation,
+          width: info.indicatorWidth,
+          height: info.indicatorHeight,
           color:
               info.indicatorColor ??
               navigationBarTheme.indicatorColor ??
@@ -324,6 +339,8 @@ class _NavigationDestinationInfo extends InheritedWidget {
     required this.totalNumberOfDestinations,
     required this.selectedAnimation,
     required this.style,
+    required this.indicatorWidth,
+    required this.indicatorHeight,
     required this.labelBehavior,
     required this.indicatorColor,
     required this.indicatorShape,
@@ -343,6 +360,10 @@ class _NavigationDestinationInfo extends InheritedWidget {
   final Animation<double> selectedAnimation;
 
   final FloatingNavBarStyle style;
+
+  final double indicatorWidth;
+
+  final double indicatorHeight;
 
   final NavigationDestinationLabelBehavior labelBehavior;
 
@@ -430,13 +451,12 @@ class NavigationIndicator extends StatelessWidget {
                 opacity: fadeAnimation,
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
-                    shape: _kNavigationShape,
+                    shape: RoundedSuperellipseBorder(
+                      borderRadius: .all(.circular(height / 2)),
+                    ),
                     color: color ?? Theme.of(context).colorScheme.secondary,
                   ),
-                  child: const SizedBox(
-                    width: _kIndicatorWidth,
-                    height: _kIndicatorHeight,
-                  ),
+                  child: SizedBox(width: width, height: height),
                 ),
               );
             },

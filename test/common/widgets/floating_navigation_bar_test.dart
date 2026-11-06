@@ -1,7 +1,7 @@
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
 import 'package:PiliPlus/models/common/floating_nav_bar_style.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' hide NavigationIndicator;
 
 void main() {
   Future<void> pumpBar(
@@ -106,6 +106,20 @@ void main() {
 
       await tester.tap(find.text('首页'));
       expect(tapped, 0);
+    });
+
+    testWidgets('iconOnly uses a compact bar and indicator', (tester) async {
+      await pumpBar(tester, style: FloatingNavBarStyle.iconOnly);
+
+      // 两个 destination，每个 56 宽，加左右各 4 的容器内边距；高度 48 + bottomPadding 8。
+      final barSize = tester.getSize(find.byType(FloatingNavigationBar));
+      expect(barSize, const Size(120, 56));
+
+      // 指示器 = 56 x (48 - 2 * 4)。
+      final indicatorSize = tester.getSize(
+        find.byType(NavigationIndicator).first,
+      );
+      expect(indicatorSize, const Size(56, 40));
     });
   });
 }
