@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:PiliPlus/models/common/floating_nav_bar_style.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -24,6 +25,7 @@ class FloatingNavigationBar extends StatelessWidget {
     super.key,
     this.animationDuration = const Duration(milliseconds: 500),
     this.selectedIndex = 0,
+    this.style = FloatingNavBarStyle.iconAndLabel,
     required this.destinations,
     this.onDestinationSelected,
     this.backgroundColor,
@@ -42,6 +44,7 @@ class FloatingNavigationBar extends StatelessWidget {
 
   final Duration animationDuration;
   final int selectedIndex;
+  final FloatingNavBarStyle style;
   final List<Widget> destinations;
   final ValueChanged<int>? onDestinationSelected;
   final Color? backgroundColor;
@@ -67,10 +70,18 @@ class FloatingNavigationBar extends StatelessWidget {
     final defaults = _NavigationBarDefaultsM3(context);
 
     final navigationBarTheme = NavigationBarTheme.of(context);
-    final effectiveLabelBehavior =
+    final effectiveLabelBehavior = switch (style) {
+      // 仅图标：文字淡出，tooltip 兜底提示。
+      FloatingNavBarStyle.iconOnly =>
+        NavigationDestinationLabelBehavior.alwaysHide,
+      // 仅文字：所有 tab 的文字恒显，不依赖选中状态。
+      FloatingNavBarStyle.labelOnly =>
+        NavigationDestinationLabelBehavior.alwaysShow,
+      FloatingNavBarStyle.iconAndLabel =>
         labelBehavior ??
-        navigationBarTheme.labelBehavior ??
-        defaults.labelBehavior!;
+            navigationBarTheme.labelBehavior ??
+            defaults.labelBehavior!,
+    };
 
     final padding = MediaQuery.viewPaddingOf(context);
 
@@ -116,6 +127,7 @@ class FloatingNavigationBar extends StatelessWidget {
                           selectedIndex: selectedIndex,
                           totalNumberOfDestinations: destinations.length,
                           selectedAnimation: animation,
+                          style: style,
                           labelBehavior: effectiveLabelBehavior,
                           indicatorColor: indicatorColor,
                           indicatorShape: indicatorShape,
@@ -284,11 +296,16 @@ class _NavigationDestinationBuilderState
     final child = GestureDetector(
       behavior: .opaque,
       onTap: widget.enabled ? info.onTap : null,
-      child: _NavigationBarDestinationLayout(
-        icon: widget.buildIcon(context),
-        iconKey: iconKey,
-        label: widget.buildLabel(context),
-      ),
+      child: info.style == FloatingNavBarStyle.labelOnly
+          // 仅文字：不构建图标，文字在 destination 内居中且恒显。
+          ? SizedBox.expand(
+              child: Center(child: widget.buildLabel(context)),
+            )
+          : _NavigationBarDestinationLayout(
+              icon: widget.buildIcon(context),
+              iconKey: iconKey,
+              label: widget.buildLabel(context),
+            ),
     );
     if (info.labelBehavior == .alwaysShow) {
       return child;
@@ -306,6 +323,7 @@ class _NavigationDestinationInfo extends InheritedWidget {
     required this.selectedIndex,
     required this.totalNumberOfDestinations,
     required this.selectedAnimation,
+    required this.style,
     required this.labelBehavior,
     required this.indicatorColor,
     required this.indicatorShape,
@@ -323,6 +341,8 @@ class _NavigationDestinationInfo extends InheritedWidget {
   final int totalNumberOfDestinations;
 
   final Animation<double> selectedAnimation;
+
+  final FloatingNavBarStyle style;
 
   final NavigationDestinationLabelBehavior labelBehavior;
 
@@ -354,6 +374,7 @@ class _NavigationDestinationInfo extends InheritedWidget {
     return index != oldWidget.index ||
         totalNumberOfDestinations != oldWidget.totalNumberOfDestinations ||
         selectedAnimation != oldWidget.selectedAnimation ||
+        style != oldWidget.style ||
         labelBehavior != oldWidget.labelBehavior ||
         onTap != oldWidget.onTap;
   }

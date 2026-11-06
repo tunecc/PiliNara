@@ -162,6 +162,7 @@ class _MainAppState extends PopScopeState<MainApp>
       if (_mainController.floatingNavBar) {
         bottomNav = Obx(
           () => FloatingNavigationBar(
+            style: _mainController.floatingNavBarStyle.value,
             onDestinationSelected: _mainController.setIndex,
             selectedIndex: _mainController.selectedIndex.value,
             destinations: _mainController.navigationBars

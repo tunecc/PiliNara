@@ -11,6 +11,7 @@ import 'package:PiliPlus/models/common/dm_chart_source.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
+import 'package:PiliPlus/models/common/floating_nav_bar_style.dart';
 import 'package:PiliPlus/models/common/follow_order_type.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/mine_tab_type.dart';
@@ -1712,6 +1713,19 @@ abstract final class Pref {
 
   static bool get floatingNavBar =>
       _setting.get(SettingBoxKey.floatingNavBar, defaultValue: false);
+
+  static FloatingNavBarStyle get floatingNavBarStyle {
+    final value = _setting.get(
+      SettingBoxKey.floatingNavBarStyle,
+      defaultValue: FloatingNavBarStyle.iconAndLabel.index,
+    );
+    if (value is int &&
+        value >= 0 &&
+        value < FloatingNavBarStyle.values.length) {
+      return FloatingNavBarStyle.values[value];
+    }
+    return FloatingNavBarStyle.iconAndLabel;
+  }
 
   static bool get enableCurrentPageRefresh => _setting.get(
     SettingBoxKey.enableCurrentPageRefresh,

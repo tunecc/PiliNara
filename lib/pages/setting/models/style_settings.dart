@@ -15,6 +15,7 @@ import 'package:PiliPlus/common/widgets/stateful_builder.dart';
 import 'package:PiliPlus/models/common/bar_hide_type.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
+import 'package:PiliPlus/models/common/floating_nav_bar_style.dart';
 import 'package:PiliPlus/models/common/home_tab_type.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/mine_tab_type.dart';
@@ -163,6 +164,19 @@ List<SettingsModel> get styleSettings => [
     setKey: SettingBoxKey.floatingNavBar,
     defaultVal: false,
     needReboot: true,
+  ),
+  PopupModel(
+    title: '悬浮底栏样式',
+    leading: const Icon(Icons.label_outline),
+    value: () => Pref.floatingNavBarStyle,
+    items: FloatingNavBarStyle.values,
+    onSelected: (value, setState) {
+      GStorage.setting.put(SettingBoxKey.floatingNavBarStyle, value.index);
+      if (Get.isRegistered<MainController>()) {
+        Get.find<MainController>().floatingNavBarStyle.value = value;
+      }
+      setState();
+    },
   ),
   SwitchModel(
     title: '显示粉丝勋章',
