@@ -103,6 +103,56 @@ jobs:
         shell: pwsh
         run: lib/scripts/build.ps1 android
 
+      - name: Prefetch media-kit libmpv jars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          flutter pub get
+
+          # media_kit_libs_android_video 在其 build.gradle 里用单次、无重试的
+          # 请求从 GitHub Releases 下载 libmpv jar，偶发的 HTTP 504 会让整个
+          # Gradle 构建失败。该 task 在目标文件已存在且 SHA-256 匹配时会跳过
+          # 下载，因此这里带重试预下载到同一位置。URL / 校验和 / 目标路径
+          # 直接从 pinned 的 build.gradle 解析，与锁定的 media-kit ref 保持
+          # 一致；若上游格式变化导致解析不到条目，此步骤会失败以便及时发现。
+          resolved_ref=$(awk '/^  media_kit_libs_android_video:/{p=1} p && /resolved-ref:/{split($0,a,"\""); print a[2]; exit}' pubspec.lock)
+          pub_cache="${PUB_CACHE:-$HOME/.pub-cache}"
+          pkg="$pub_cache/git/media-kit-${resolved_ref}/libs/android/media_kit_libs_android_video/android"
+          gradle_file="$pkg/build.gradle"
+
+          if [ ! -f "$gradle_file" ]; then
+            echo "media-kit checkout not found at $pkg" >&2
+            exit 1
+          fi
+
+          grep -oE '\["url": "[^"]+", "sha256": "[^"]+", "destination": file\("\$buildDir/[^"]+"\)\]' "$gradle_file" |
+          while IFS= read -r entry; do
+            url=$(printf '%s' "$entry" | sed -n 's/.*"url": "\([^"]*\)".*/\1/p')
+            sha=$(printf '%s' "$entry" | sed -n 's/.*"sha256": "\([^"]*\)".*/\1/p')
+            dest_rel=$(printf '%s' "$entry" | sed -n 's/.*\$buildDir\/\([^"]*\)".*/\1/p')
+            dest="$pkg/build/$dest_rel"
+
+            if [ -f "$dest" ] && [ "$(sha256sum "$dest" | awk '{print $1}')" = "$sha" ]; then
+              echo "Already present and valid: $dest"
+              continue
+            fi
+
+            mkdir -p "$(dirname "$dest")"
+            echo "Downloading $url"
+            curl --fail --location --silent --show-error \
+              --retry 5 --retry-delay 5 --retry-all-errors \
+              --output "$dest.part" "$url"
+
+            actual_sha=$(sha256sum "$dest.part" | awk '{print $1}')
+            if [ "$actual_sha" != "$sha" ]; then
+              echo "SHA-256 mismatch for $dest.part (expected $sha, got $actual_sha)" >&2
+              exit 1
+            fi
+            mv "$dest.part" "$dest"
+            echo "Cached: $dest"
+          done
+
       - name: Build Android APKs
         shell: bash
         run: |
