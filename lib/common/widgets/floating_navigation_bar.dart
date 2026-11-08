@@ -13,9 +13,9 @@ const _kIndicatorHeight = _kNavigationHeight - 2 * _kIndicatorPaddingInt;
 const _kIndicatorWidth = 86.0;
 const _kIndicatorPaddingInt = 4.0;
 const _kIndicatorPadding = EdgeInsets.all(_kIndicatorPaddingInt);
+const _kBorderRadius = BorderRadius.all(.circular(_kNavigationHeight / 2));
 
-// 仅图标时收窄为“图标 + 少量内边距”，避免每个 icon 占据整格文字宽度。
-const _kCompactNavigationHeight = 48.0;
+// 仅图标时收窄为“图标 + 少量内边距”，避免每个 icon 占据整格文字宽度；整体高度不缩小。
 const _kCompactCellWidth = 56.0;
 
 /// ref [NavigationBar]
@@ -86,11 +86,7 @@ class FloatingNavigationBar extends StatelessWidget {
     final padding = MediaQuery.viewPaddingOf(context);
 
     final isCompact = style == FloatingNavBarStyle.iconOnly;
-    final navigationHeight = isCompact
-        ? _kCompactNavigationHeight
-        : _kNavigationHeight;
     final itemWidth = isCompact ? _kCompactCellWidth : _kIndicatorWidth;
-    final indicatorHeight = navigationHeight - 2 * _kIndicatorPaddingInt;
     // 紧凑模式让每个 icon 占到固定的 56dp 单元格，而不是被整体 padding 挤压。
     final barWidth = isCompact
         ? destinations.length * itemWidth + 2 * _kIndicatorPaddingInt
@@ -104,7 +100,7 @@ class FloatingNavigationBar extends StatelessWidget {
         bottomPadding + padding.bottom,
       ),
       child: SizedBox(
-        height: navigationHeight,
+        height: _kNavigationHeight,
         width: barWidth,
         child: DecoratedBox(
           decoration: ShapeDecoration(
@@ -119,7 +115,7 @@ class FloatingNavigationBar extends StatelessWidget {
             ),
             shape: RoundedSuperellipseBorder(
               side: defaults.borderSide,
-              borderRadius: .all(.circular(navigationHeight / 2)),
+              borderRadius: _kBorderRadius,
             ),
           ),
           child: Padding(
@@ -140,7 +136,7 @@ class FloatingNavigationBar extends StatelessWidget {
                           selectedAnimation: animation,
                           style: style,
                           indicatorWidth: itemWidth,
-                          indicatorHeight: indicatorHeight,
+                          indicatorHeight: _kIndicatorHeight,
                           labelBehavior: effectiveLabelBehavior,
                           indicatorColor: indicatorColor,
                           indicatorShape: indicatorShape,

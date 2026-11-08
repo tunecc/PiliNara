@@ -108,18 +108,41 @@ void main() {
       expect(tapped, 0);
     });
 
-    testWidgets('iconOnly uses a compact bar and indicator', (tester) async {
+    testWidgets('iconOnly keeps full height with compact width', (tester) async {
       await pumpBar(tester, style: FloatingNavBarStyle.iconOnly);
 
-      // 两个 destination，每个 56 宽，加左右各 4 的容器内边距；高度 48 + bottomPadding 8。
+      // 两个 destination，每个 56 宽，加左右各 4 的容器内边距；高度 64 + bottomPadding 8。
       final barSize = tester.getSize(find.byType(FloatingNavigationBar));
-      expect(barSize, const Size(120, 56));
+      expect(barSize, const Size(120, 72));
 
-      // 指示器 = 56 x (48 - 2 * 4)。
+      // 指示器 = 56 x (64 - 2 * 4)。
       final indicatorSize = tester.getSize(
         find.byType(NavigationIndicator).first,
       );
-      expect(indicatorSize, const Size(56, 40));
+      expect(indicatorSize, const Size(56, 56));
+    });
+
+    testWidgets('iconAndLabel and labelOnly keep original sizes', (
+      tester,
+    ) async {
+      for (final style in FloatingNavBarStyle.values) {
+        if (style == FloatingNavBarStyle.iconOnly) {
+          continue;
+        }
+        await pumpBar(tester, style: style);
+
+        // 两个 destination，每个 86 宽；高度 64 + bottomPadding 8。
+        final barSize = tester.getSize(find.byType(FloatingNavigationBar));
+        expect(barSize, const Size(172, 72), reason: 'style=$style');
+
+        // 指示器配置尺寸 86 x (64 - 2 * 4)；实际渲染宽度受容器 4dp 内边距均摊
+        // 收窄为 (2×86 - 2×4) / 2 = 82，与本 change 之前一致。
+        final indicator = tester.widget<NavigationIndicator>(
+          find.byType(NavigationIndicator).first,
+        );
+        expect(indicator.width, 86.0, reason: 'style=$style');
+        expect(indicator.height, 56.0, reason: 'style=$style');
+      }
     });
   });
 }
