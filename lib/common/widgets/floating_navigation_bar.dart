@@ -14,9 +14,9 @@ const _kIndicatorWidth = 86.0;
 const _kIndicatorPaddingInt = 4.0;
 const _kIndicatorPadding = EdgeInsets.all(_kIndicatorPaddingInt);
 const _kBorderRadius = BorderRadius.all(.circular(_kNavigationHeight / 2));
-
-// 仅图标时收窄为“图标 + 少量内边距”，避免每个 icon 占据整格文字宽度；整体高度不缩小。
-const _kCompactCellWidth = 56.0;
+const _kNavigationShape = RoundedSuperellipseBorder(
+  borderRadius: _kBorderRadius,
+);
 
 /// ref [NavigationBar]
 class FloatingNavigationBar extends StatelessWidget {
@@ -85,13 +85,6 @@ class FloatingNavigationBar extends StatelessWidget {
 
     final padding = MediaQuery.viewPaddingOf(context);
 
-    final isCompact = style == FloatingNavBarStyle.iconOnly;
-    final itemWidth = isCompact ? _kCompactCellWidth : _kIndicatorWidth;
-    // 紧凑模式让每个 icon 占到固定的 56dp 单元格，而不是被整体 padding 挤压。
-    final barWidth = isCompact
-        ? destinations.length * itemWidth + 2 * _kIndicatorPaddingInt
-        : destinations.length * itemWidth;
-
     return Padding(
       padding: .fromLTRB(
         padding.left,
@@ -101,7 +94,7 @@ class FloatingNavigationBar extends StatelessWidget {
       ),
       child: SizedBox(
         height: _kNavigationHeight,
-        width: barWidth,
+        width: destinations.length * _kIndicatorWidth,
         child: DecoratedBox(
           decoration: ShapeDecoration(
             color: ElevationOverlay.applySurfaceTint(
@@ -135,8 +128,6 @@ class FloatingNavigationBar extends StatelessWidget {
                           totalNumberOfDestinations: destinations.length,
                           selectedAnimation: animation,
                           style: style,
-                          indicatorWidth: itemWidth,
-                          indicatorHeight: _kIndicatorHeight,
                           labelBehavior: effectiveLabelBehavior,
                           indicatorColor: indicatorColor,
                           indicatorShape: indicatorShape,
@@ -195,8 +186,6 @@ class FloatingNavigationDestination extends StatelessWidget {
       children: [
         NavigationIndicator(
           animation: animation,
-          width: info.indicatorWidth,
-          height: info.indicatorHeight,
           color:
               info.indicatorColor ??
               navigationBarTheme.indicatorColor ??
@@ -335,8 +324,6 @@ class _NavigationDestinationInfo extends InheritedWidget {
     required this.totalNumberOfDestinations,
     required this.selectedAnimation,
     required this.style,
-    required this.indicatorWidth,
-    required this.indicatorHeight,
     required this.labelBehavior,
     required this.indicatorColor,
     required this.indicatorShape,
@@ -356,10 +343,6 @@ class _NavigationDestinationInfo extends InheritedWidget {
   final Animation<double> selectedAnimation;
 
   final FloatingNavBarStyle style;
-
-  final double indicatorWidth;
-
-  final double indicatorHeight;
 
   final NavigationDestinationLabelBehavior labelBehavior;
 
@@ -447,12 +430,13 @@ class NavigationIndicator extends StatelessWidget {
                 opacity: fadeAnimation,
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
-                    shape: RoundedSuperellipseBorder(
-                      borderRadius: .all(.circular(height / 2)),
-                    ),
+                    shape: _kNavigationShape,
                     color: color ?? Theme.of(context).colorScheme.secondary,
                   ),
-                  child: SizedBox(width: width, height: height),
+                  child: const SizedBox(
+                    width: _kIndicatorWidth,
+                    height: _kIndicatorHeight,
+                  ),
                 ),
               );
             },
