@@ -171,7 +171,6 @@ test*
 !test/
 /pubspec_overrides.yaml
 .mindfs
-
 # >>> Comet managed artifacts >>>
 !docs/comet/
 !docs/comet/**
@@ -179,6 +178,9 @@ test*
 
 .agents
 docs/comet/.DS_Store
+!/test/
+!/test/**
+test/**/*.DS_Store
 # >>> Comet managed project state >>>
 !/.comet/
 /.comet/*

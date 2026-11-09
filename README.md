@@ -15,7 +15,7 @@
 
 ## 构建与依赖差异
 
-- Flutter 版本固定为 3.47.0（`.fvmrc`，用 [fvm](https://fvm.app) 管理），不跟随上游升级；`environment.flutter` 与 `.fvmrc` 需保持一致。
+- Flutter 版本跟随上游固定为 3.47.9（`.fvmrc`，用 [fvm](https://fvm.app) 管理）；`environment.flutter` 与 `.fvmrc` 需保持一致。
 - 三个依赖钉死兼容版本（iOS 构建约束，勿随上游升级）：`connectivity_plus: 7.0.0`、`device_info_plus: 13.0.0`、`file_picker: 12.0.0-beta.7`（上游新代码按 13.x API 编写时需在调用方适配回 beta.7）。
 - iOS 本机构建：见 [BUILD_IOS.md](BUILD_IOS.md)；`lib/scripts/patch.sh ios` 一键应用全部补丁（含 SDK / material_ui / cupertino_ui / geetest 隔离），构建前必须先跑。
 - 自动同步：`.github/workflows/sync_upstream_build.yml` 每日定时检查上游，有新提交时自动合并、构建 Android/iOS 并发布 Release；fork 只维护这一条 workflow 链（`android_reusable.yml`、`ios.yml` 为其被调用方）。
